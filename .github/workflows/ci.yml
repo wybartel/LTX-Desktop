@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Type Checking
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ltx-video
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ltx-video/package-lock.json
+
+      - run: npm ci
+
+      - name: TypeScript type check
+        run: npm run typecheck
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "ltx-video/backend/uv.lock"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dev dependencies
+        working-directory: ltx-video/backend
+        run: uv sync --frozen --extra dev
+
+      - name: Pyright type check
+        working-directory: ltx-video/backend
+        run: uv run pyright
+
+  test-python:
+    name: Python Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos
+            runner: macos-latest
+          - os: windows
+            runner: windows-latest
+    defaults:
+      run:
+        working-directory: ltx-video/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "ltx-video/backend/uv.lock"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra test
+
+      - name: Run tests
+        run: uv run pytest -v --tb=short
+
+  build-check:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ltx-video
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ltx-video/package-lock.json
+
+      - run: npm ci
+
+      - name: Build frontend
+        run: npm run build:frontend
