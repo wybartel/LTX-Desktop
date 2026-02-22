@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { 
   Plus, Trash2, Download, Image, Video, X,
   Heart, Film, Volume2, VolumeX, Sparkles,
-  Zap, Clock, Monitor, ChevronUp, Scissors, AudioLines,
+  Clock, Monitor, ChevronUp, Scissors, AudioLines,
   Paintbrush, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useProjects } from '../contexts/ProjectContext'
@@ -213,32 +213,32 @@ function SettingsDropdown({
       <button 
         ref={btnRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 px-2 py-1.5 rounded hover:bg-zinc-800 transition-colors"
+        className={`flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors ${isOpen ? 'bg-zinc-700 hover:bg-zinc-700' : 'hover:bg-zinc-800'}`}
       >
         {trigger}
       </button>
       
       {isOpen && (() => {
         const rect = btnRef.current?.getBoundingClientRect()
-        const menuBottom = rect ? rect.top - 8 : 0
-        const menuRight = rect ? rect.right : 0
+        const top = rect ? rect.top - 8 : 0
+        const left = rect ? rect.left : 0
         return (
           <>
             <div className="fixed inset-0 z-[9998]" onMouseDown={() => setIsOpen(false)} />
             <div
-              className="fixed bg-zinc-800 border border-zinc-700 rounded-xl py-3 px-4 min-w-[160px] shadow-xl z-[9999]"
-              style={{ bottom: window.innerHeight - menuBottom, right: window.innerWidth - menuRight }}
+              className="fixed bg-zinc-800 border border-zinc-700 rounded-md p-2 min-w-[160px] shadow-xl z-[9999]"
+              style={{ bottom: window.innerHeight - top, left }}
             >
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-3">{title}</div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">{title}</div>
               <div className="space-y-1">
                 {options.map(option => (
                   <div key={option.value} className="relative group/option">
                     <button
                       onClick={() => { if (!option.disabled) { onChange(option.value); setIsOpen(false) } }}
-                      className={`w-full flex items-center justify-between px-2 py-2 rounded-lg transition-colors text-left ${
-                        option.disabled 
-                          ? 'cursor-not-allowed' 
-                          : 'hover:bg-zinc-700'
+                      className={`w-full flex items-center justify-between px-2 py-2 rounded-md transition-colors text-left ${
+                        option.disabled
+                          ? 'cursor-not-allowed'
+                          : value === option.value ? 'bg-white/20 hover:bg-white/25' : 'hover:bg-zinc-700'
                       }`}
                     >
                       <span className={`flex items-center gap-2.5 text-sm ${
@@ -279,6 +279,24 @@ function GridIcon({ className }: { className?: string }) {
       <rect x="14" y="3" width="7" height="7" rx="1.5" />
       <rect x="3" y="14" width="7" height="7" rx="1.5" />
       <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  )
+}
+
+// Lightricks brand icon
+function LightricksIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path fillRule="evenodd" clipRule="evenodd" d="M17.0073 8.18934C16.3266 5.6556 14.9346 2.06903 12.3065 2.06903C9.27204 2.06903 6.86627 7.24621 5.45487 11.7948C4.79654 13.9203 4.35877 15.9049 4.17755 17.1736C4.10214 17.5829 4.06274 18.0044 4.06274 18.4347C4.06274 22.2903 7.22553 25.4338 11.1133 25.4338C15.5206 25.4338 23.9376 22.7073 23.9376 18.4347C23.9376 17.1179 23.1376 15.948 21.9018 14.9595L21.9039 14.9575C22.4493 13.7707 22.847 12.648 23.001 11.705C23.1934 10.5053 23.0074 9.5494 22.4429 8.88217C21.7692 8.07382 20.7107 7.85572 19.6586 7.84288C18.8826 7.84288 17.9777 7.96904 17.0073 8.18934ZM8.00176 9.17083C7.6945 9.93266 7.02317 11.7419 6.70157 12.9799C7.93005 11.9987 9.2965 11.1653 10.7091 10.4796C12.2325 9.73758 13.9171 9.06448 15.518 8.58411C15.08 6.98293 13.9585 3.62158 12.3129 3.62158C11.0298 3.62158 9.41958 5.69374 8.00176 9.17083ZM20.6201 14.083L20.6209 14.0786C21.0507 13.1163 21.3522 12.2118 21.4741 11.4547C21.5511 10.9607 21.5832 10.2872 21.2752 9.89577C20.9416 9.46599 20.1975 9.39543 19.6521 9.38901C18.9932 9.38901 18.2117 9.49943 17.3641 9.69208L17.3683 9.69702C17.586 10.7217 17.7526 11.772 17.8808 12.7968C18.8527 13.16 19.7877 13.5908 20.6201 14.083ZM15.8828 10.0897C14.6739 10.4588 13.4041 10.9464 12.209 11.4846C13.4346 11.588 14.8471 11.8527 16.2581 12.2608C16.1554 11.5367 16.0273 10.8061 15.8799 10.0948L15.8828 10.0897ZM11.1133 12.9816C8.07878 12.9816 5.60884 15.4258 5.60884 18.4347C5.60884 21.4435 8.07878 23.8878 11.1133 23.8878C13.8701 23.8878 16.3653 21.6639 16.6048 18.9158C16.7011 17.7546 16.669 15.9263 16.4637 13.9311C14.6294 13.3385 12.6763 12.9816 11.1133 12.9816ZM18.3883 22.2069C17.7984 22.4697 17.1711 22.7085 16.5284 22.9184C18.0872 21.3274 19.8832 18.8193 21.1982 16.3689L21.1997 16.3654C21.9756 17.0509 22.3915 17.7593 22.3915 18.4347C22.3915 19.6985 20.9288 21.0778 18.3883 22.2069ZM19.9493 15.4655L19.9473 15.4707C19.4291 16.4567 18.8221 17.4625 18.1833 18.4092C18.2214 17.4089 18.1892 16.0386 18.0611 14.5212C18.71 14.7948 19.3456 15.1021 19.9493 15.4655Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function FluxIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M19.113 12.2515H16.5605L14.008 8.63382L6.04545 19.9068H8.60348L14.0079 12.2518L16.5605 12.2515L11.156 19.9068H13.721L19.113 12.2515V15.8693L16.2716 19.9073V22.0063H2L14.008 5L19.113 12.2515Z" fill="currentColor"/>
+      <path d="M26 22.0064L21.9704 22.0063V19.9151L19.113 15.8693V12.2515L26 22.0064Z" fill="currentColor"/>
     </svg>
   )
 }
@@ -367,10 +385,10 @@ function PromptBar({
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-visible">
       {/* Top row: Image ref | Prompt | Generate */}
-      <div className="flex items-center">
+      <div className="flex items-start">
         {/* Input image drop zone */}
         <div
-          className={`relative w-10 h-10 mx-2 rounded-lg border-2 border-dashed transition-colors flex items-center justify-center flex-shrink-0 cursor-pointer ${
+          className={`relative w-10 h-10 mx-2 mt-2 rounded-md border-2 border-dashed transition-colors flex items-center justify-center flex-shrink-0 cursor-pointer ${
             isDragOver ? 'border-violet-500 bg-violet-500/10' : 'border-zinc-700 hover:border-zinc-500'
           }`}
           onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
@@ -402,23 +420,22 @@ function PromptBar({
 
         {/* Prompt input - fills remaining width */}
         <div className="flex-1 min-w-0 py-1">
-          <input
-            type="text"
+          <textarea
             value={prompt}
             onChange={(e) => onPromptChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={mode === 'image' 
+            placeholder={mode === 'image'
               ? (inputImage ? "Change the background to a sunset beach..." : "A close-up of a woman talking on the phone...")
               : "The woman sips from a cup of coffee..."
             }
-            className="w-full bg-transparent text-white text-sm placeholder:text-zinc-500 focus:outline-none px-2 py-2"
+            className="w-full bg-transparent text-white text-sm placeholder:text-zinc-500 focus:outline-none px-2 py-2 resize-none overflow-y-auto h-[70px] leading-5"
           />
         </div>
 
       </div>
       
       {/* Bottom row: Mode selector + Settings */}
-      <div className="flex items-center gap-0.5 px-3 py-1.5 border-t border-zinc-800/60 text-xs text-zinc-400">
+      <div className="flex items-center gap-0.5 px-1.5 py-1.5 border-t border-zinc-800/60 text-xs text-zinc-400">
         {/* Mode dropdown */}
         <SettingsDropdown
           title="MODE"
@@ -444,8 +461,8 @@ function PromptBar({
         {mode === 'image' ? (
           <>
             {/* Model indicator */}
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50">
-              <Zap className="h-3.5 w-3.5 text-amber-400" />
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-800/50">
+              <FluxIcon className="h-3.5 w-3.5" />
               <span className="text-zinc-300 font-medium">FLUX Klein</span>
             </div>
             
@@ -518,13 +535,12 @@ function PromptBar({
               ]}
               trigger={
                 <>
-                  <Zap className="h-3.5 w-3.5 text-amber-400" />
+                  <LightricksIcon className="h-3.5 w-3.5" />
                   <span className="text-zinc-300 font-medium">{settings.model === 'fast' ? 'LTX-2 Fast' : 'LTX-2 Pro'}</span>
                 </>
               }
             />
-            
-            
+
             <div className="w-px h-4 bg-zinc-700 mx-0.5" />
             
             {/* Duration dropdown */}
@@ -609,7 +625,7 @@ function PromptBar({
         <button
           onClick={onGenerate}
           disabled={isGenerating || !prompt.trim()}
-          className={`flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex-shrink-0 ${
+          className={`flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all flex-shrink-0 ${
             isGenerating || !prompt.trim()
               ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
               : 'bg-white text-black hover:bg-zinc-200'
@@ -988,156 +1004,154 @@ export function GenSpace() {
   }, [selectedAsset, goToPrev, goToNext])
 
   return (
-    <div className="h-full flex flex-col bg-zinc-950">
-      {/* Top bar with Favorites and Gallery Size */}
+    <div className="h-full relative bg-zinc-950">
+
+      {/* Empty state */}
+      {assets.length === 0 && !isGenerating && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+          <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-zinc-700 flex items-center justify-center mb-4">
+            <Sparkles className="h-10 w-10 text-zinc-600" />
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">Start Creating</h3>
+          <p className="text-zinc-500 max-w-md">
+            Use the prompt bar below to generate images and videos.
+            Drag assets into the input box to use them as references.
+          </p>
+        </div>
+      )}
+
+      {/* No favorites empty state */}
+      {showFavorites && filteredAssets.length === 0 && assets.length > 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+          <Heart className="h-12 w-12 text-zinc-700 mb-4" />
+          <h3 className="text-lg font-semibold text-white mb-2">No favorites yet</h3>
+          <p className="text-zinc-500 text-sm">
+            Click the heart icon on any asset to add it to your favorites.
+          </p>
+        </div>
+      )}
+
+      {/* Assets area — full width, no background, above the prompt bar */}
       {(assets.length > 0 || isGenerating) && (
-        <div className="flex items-center justify-end px-6 pt-4 pb-0 gap-2">
-          {/* Favorites filter */}
-          <button
-            onClick={() => setShowFavorites(!showFavorites)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              showFavorites 
-                ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-            }`}
-          >
-            <Heart className={`h-4 w-4 ${showFavorites ? 'fill-current' : ''}`} />
-            Favorites
-            {favoriteCount > 0 && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                showFavorites ? 'bg-red-500/30 text-red-300' : 'bg-zinc-800 text-zinc-500'
-              }`}>
-                {favoriteCount}
-              </span>
-            )}
-          </button>
-          
-          {/* Gallery size */}
-          <div ref={sizeMenuRef} className="relative">
+        <div className="absolute inset-x-0 top-0 bottom-[160px] flex flex-col px-4 pt-4">
+          {/* Top bar */}
+          <div className="flex items-center justify-end pb-2 gap-2">
             <button
-              onClick={() => setShowSizeMenu(!showSizeMenu)}
-              className={`p-2 rounded-lg transition-colors ${
-                showSizeMenu ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+              onClick={() => setShowFavorites(!showFavorites)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                showFavorites
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
               }`}
             >
-              {gallerySize === 'small' ? <GridSmallIcon className="h-4 w-4" /> : 
-               gallerySize === 'medium' ? <GridMediumIcon className="h-4 w-4" /> : 
-               <GridLargeIcon className="h-4 w-4" />}
+              <Heart className={`h-4 w-4 ${showFavorites ? 'fill-current' : ''}`} />
+              Favorites
+              {favoriteCount > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  showFavorites ? 'bg-red-500/30 text-red-300' : 'bg-zinc-800 text-zinc-500'
+                }`}>
+                  {favoriteCount}
+                </span>
+              )}
             </button>
-            
-            {showSizeMenu && (
-              <div className="absolute top-full mt-2 right-0 bg-zinc-800 border border-zinc-700 rounded-xl py-3 px-4 min-w-[160px] shadow-xl z-50">
-                {([
-                  { value: 'small' as GallerySize, label: 'Small', icon: GridSmallIcon },
-                  { value: 'medium' as GallerySize, label: 'Medium', icon: GridMediumIcon },
-                  { value: 'large' as GallerySize, label: 'Large', icon: GridLargeIcon },
-                ]).map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => { setGallerySize(option.value); setShowSizeMenu(false) }}
-                    className="w-full flex items-center justify-between px-2 py-2.5 rounded-lg hover:bg-zinc-700 transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <option.icon className={`h-4 w-4 ${gallerySize === option.value ? 'text-white' : 'text-zinc-500'}`} />
-                      <span className={`text-sm ${gallerySize === option.value ? 'text-white font-medium' : 'text-zinc-400'}`}>
-                        {option.label}
-                      </span>
+
+            <div ref={sizeMenuRef} className="relative">
+              <button
+                onClick={() => setShowSizeMenu(!showSizeMenu)}
+                className={`p-2 rounded-md transition-colors ${
+                  showSizeMenu ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                }`}
+              >
+                {gallerySize === 'small' ? <GridSmallIcon className="h-4 w-4" /> :
+                 gallerySize === 'medium' ? <GridMediumIcon className="h-4 w-4" /> :
+                 <GridLargeIcon className="h-4 w-4" />}
+              </button>
+
+              {showSizeMenu && (
+                <div className="absolute top-full mt-2 right-0 bg-zinc-800 border border-zinc-700 rounded-md p-2 min-w-[160px] shadow-xl z-50">
+                  {([
+                    { value: 'small' as GallerySize, label: 'Small', icon: GridSmallIcon },
+                    { value: 'medium' as GallerySize, label: 'Medium', icon: GridMediumIcon },
+                    { value: 'large' as GallerySize, label: 'Large', icon: GridLargeIcon },
+                  ]).map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => { setGallerySize(option.value); setShowSizeMenu(false) }}
+                      className={`w-full flex items-center justify-between px-2 py-2.5 rounded-md transition-colors text-left ${gallerySize === option.value ? 'bg-white/20 hover:bg-white/25' : 'hover:bg-zinc-700'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <option.icon className={`h-4 w-4 ${gallerySize === option.value ? 'text-white' : 'text-zinc-500'}`} />
+                        <span className={`text-sm ${gallerySize === option.value ? 'text-white font-medium' : 'text-zinc-400'}`}>
+                          {option.label}
+                        </span>
+                      </div>
+                      {gallerySize === option.value && (
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Assets grid — fills remaining space, scrollable */}
+          <div className="overflow-auto flex-1">
+            <div className={`grid ${gallerySizeClasses[gallerySize]} gap-4`}>
+              {isGenerating && (
+                <div className="relative rounded-xl overflow-hidden bg-zinc-800 aspect-video">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="relative w-16 h-16 mb-3">
+                      <div className="absolute inset-0 rounded-full border-2 border-violet-500/30" />
+                      <div className="absolute inset-0 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
+                      <div className="absolute inset-2 rounded-full bg-zinc-800 flex items-center justify-center">
+                        <Sparkles className="h-6 w-6 text-violet-400" />
+                      </div>
                     </div>
-                    {gallerySize === option.value && (
-                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                    <p className="text-sm text-zinc-400">{statusMessage || 'Generating...'}</p>
+                    {progress > 0 && (
+                      <div className="w-32 h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
+                        <div className="h-full bg-violet-500 transition-all" style={{ width: `${progress}%` }} />
+                      </div>
                     )}
-                  </button>
-                ))}
-              </div>
-            )}
+                  </div>
+                </div>
+              )}
+              {filteredAssets.map(asset => (
+                <AssetCard
+                  key={asset.id}
+                  asset={asset}
+                  onDelete={() => handleDelete(asset.id)}
+                  onPlay={() => setSelectedAsset(asset)}
+                  onDragStart={handleDragStart}
+                  onCreateVideo={handleCreateVideo}
+                  onEditImage={handleEditImage}
+                  onToggleFavorite={() => currentProjectId && toggleFavorite(currentProjectId, asset.id)}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}
-      
-      {/* Assets grid */}
-      <div className="flex-1 overflow-auto p-6">
-        {assets.length === 0 && !isGenerating ? (
-          <div className="h-full flex flex-col items-center justify-center text-center">
-            <div className="w-24 h-24 rounded-2xl bg-zinc-900 border-2 border-dashed border-zinc-700 flex items-center justify-center mb-4">
-              <Sparkles className="h-10 w-10 text-zinc-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-white mb-2">Start Creating</h3>
-            <p className="text-zinc-500 max-w-md">
-              Use the prompt bar below to generate images and videos. 
-              Drag assets into the input box to use them as references.
-            </p>
-          </div>
-        ) : showFavorites && filteredAssets.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center">
-            <Heart className="h-12 w-12 text-zinc-700 mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">No favorites yet</h3>
-            <p className="text-zinc-500 text-sm">
-              Click the heart icon on any asset to add it to your favorites.
-            </p>
-          </div>
-        ) : (
-          <div className={`grid ${gallerySizeClasses[gallerySize]} gap-4`}>
-            {/* Generating placeholder */}
-            {isGenerating && (
-              <div className="relative rounded-xl overflow-hidden bg-zinc-900 aspect-video">
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="relative w-16 h-16 mb-3">
-                    <div className="absolute inset-0 rounded-full border-2 border-violet-500/30" />
-                    <div 
-                      className="absolute inset-0 rounded-full border-2 border-violet-500 border-t-transparent animate-spin"
-                    />
-                    <div className="absolute inset-2 rounded-full bg-zinc-800 flex items-center justify-center">
-                      <Sparkles className="h-6 w-6 text-violet-400" />
-                    </div>
-                  </div>
-                  <p className="text-sm text-zinc-400">{statusMessage || 'Generating...'}</p>
-                  {progress > 0 && (
-                    <div className="w-32 h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
-                      <div 
-                        className="h-full bg-violet-500 transition-all"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            {/* Assets */}
-            {filteredAssets.map(asset => (
-              <AssetCard
-                key={asset.id}
-                asset={asset}
-                onDelete={() => handleDelete(asset.id)}
-                onPlay={() => setSelectedAsset(asset)}
-                onDragStart={handleDragStart}
-                onCreateVideo={handleCreateVideo}
-                onEditImage={handleEditImage}
-                onToggleFavorite={() => currentProjectId && toggleFavorite(currentProjectId, asset.id)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-      
-      {/* Bottom prompt bar */}
-      <div className="border-t border-zinc-800 p-4 bg-zinc-950">
-        <div className="max-w-5xl mx-auto">
-          <PromptBar
-            mode={mode}
-            onModeChange={setMode}
-            prompt={prompt}
-            onPromptChange={setPrompt}
-            onGenerate={handleGenerate}
-            isGenerating={isGenerating}
-            inputImage={inputImage}
-            onInputImageChange={setInputImage}
-            settings={settings}
-            onSettingsChange={setSettings}
-          />
-        </div>
+
+      {/* Floating prompt panel — centered 600px */}
+      <div className="absolute bottom-5 left-[calc(50%-300px)] w-[600px]">
+
+        {/* Prompt bar */}
+        <PromptBar
+          mode={mode}
+          onModeChange={setMode}
+          prompt={prompt}
+          onPromptChange={setPrompt}
+          onGenerate={handleGenerate}
+          isGenerating={isGenerating}
+          inputImage={inputImage}
+          onInputImageChange={setInputImage}
+          settings={settings}
+          onSettingsChange={setSettings}
+        />
       </div>
       
       {/* Asset preview modal */}
@@ -1181,7 +1195,7 @@ export function GenSpace() {
               </span>
               <button
                 onClick={() => setSelectedAsset(null)}
-                className="p-2 rounded-lg text-zinc-400 hover:text-white transition-colors"
+                className="p-2 rounded-md text-zinc-400 hover:text-white transition-colors"
               >
                 <X className="h-6 w-6" />
               </button>
