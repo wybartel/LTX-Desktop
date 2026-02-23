@@ -456,7 +456,6 @@ export function ProgramMonitor({
                       e.preventDefault()
                       e.stopPropagation()
                       setSelectedClipIds(new Set([tc.id]))
-                      if (showPropertiesPanel) return
                       const container = (e.currentTarget.parentElement as HTMLElement)
                       if (!container) return
                       const rect = container.getBoundingClientRect()
