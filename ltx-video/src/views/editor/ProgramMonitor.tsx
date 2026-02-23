@@ -61,6 +61,8 @@ export interface ProgramMonitorProps {
   selectedClipIds: Set<string>
   setSelectedClipIds: React.Dispatch<React.SetStateAction<Set<string>>>
   setClips: React.Dispatch<React.SetStateAction<TimelineClip[]>>
+  showPropertiesPanel: boolean
+  setShowPropertiesPanel: (v: boolean) => void
 
   // In/Out & transport
   inPoint: number | null
@@ -121,6 +123,8 @@ export function ProgramMonitor({
   selectedClipIds,
   setSelectedClipIds,
   setClips,
+  showPropertiesPanel,
+  setShowPropertiesPanel,
   inPoint,
   outPoint,
   setInPoint,
@@ -452,6 +456,7 @@ export function ProgramMonitor({
                       e.preventDefault()
                       e.stopPropagation()
                       setSelectedClipIds(new Set([tc.id]))
+                      if (showPropertiesPanel) return
                       const container = (e.currentTarget.parentElement as HTMLElement)
                       if (!container) return
                       const rect = container.getBoundingClientRect()
@@ -473,6 +478,8 @@ export function ProgramMonitor({
                     }}
                     onDoubleClick={(e) => {
                       e.stopPropagation()
+                      setSelectedClipIds(new Set([tc.id]))
+                      setShowPropertiesPanel(true)
                     }}
                   >
                     <div

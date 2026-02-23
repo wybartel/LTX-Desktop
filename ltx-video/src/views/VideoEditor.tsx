@@ -1887,6 +1887,8 @@ export function VideoEditor() {
             selectedClipIds={selectedClipIds}
             setSelectedClipIds={setSelectedClipIds}
             setClips={setClips}
+            showPropertiesPanel={showPropertiesPanel}
+            setShowPropertiesPanel={setShowPropertiesPanel}
             inPoint={inPoint}
             outPoint={outPoint}
             setInPoint={setInPoint}
