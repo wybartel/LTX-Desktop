@@ -976,6 +976,9 @@ export function VideoEditor() {
   })
   deleteGapRef.current = deleteGap
 
+  // Anchor position for gap action popover (screen coords of the clicked gap element)
+  const [selectedGapAnchor, setSelectedGapAnchor] = useState<{ x: number; gapTop: number; gapBottom: number } | null>(null)
+
   // Timeline drag/resize/drop handlers (extracted hook)
   const {
     draggingClip,
@@ -2915,115 +2918,6 @@ export function VideoEditor() {
                     </React.Fragment>
                   ))}
                   
-                  {/* Gap indicators between clips */}
-                  {timelineGaps.map((gap, i) => {
-                    const leftPx = gap.startTime * pixelsPerSecond
-                    const widthPx = (gap.endTime - gap.startTime) * pixelsPerSecond
-                    const topPx = trackTopPx(gap.trackIndex, 1)
-                    const isSelected = selectedGap && 
-                      selectedGap.trackIndex === gap.trackIndex && 
-                      Math.abs(selectedGap.startTime - gap.startTime) < 0.01 &&
-                      Math.abs(selectedGap.endTime - gap.endTime) < 0.01
-                    const isGeneratingHere = generatingGap &&
-                      generatingGap.trackIndex === gap.trackIndex &&
-                      Math.abs(generatingGap.startTime - gap.startTime) < 0.01 &&
-                      Math.abs(generatingGap.endTime - gap.endTime) < 0.01
-                    
-                    // Only show if gap is wide enough to be clickable
-                    if (widthPx < 4) return null
-                    
-                    return (
-                      <div
-                        key={`gap-${i}`}
-                        className={`absolute cursor-pointer transition-all group/gap ${
-                          isGeneratingHere
-                            ? 'bg-blue-500/20 border border-blue-500/60 z-10'
-                            : isSelected
-                            ? 'bg-red-500/20 border border-red-500/60 z-10'
-                            : 'hover:bg-red-500/10 hover:border hover:border-red-500/30 border border-transparent'
-                        }`}
-                        style={{
-                          left: `${leftPx}px`,
-                          top: `${topPx}px`,
-                          width: `${widthPx}px`,
-                          height: '52px',
-                          borderRadius: '4px',
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (isGeneratingHere) return
-                          setSelectedGap(gap)
-                          setSelectedClipIds(new Set())
-                          setSelectedSubtitleId(null)
-                          setGapGenerateMode(null)
-                        }}
-                        onContextMenu={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          if (isGeneratingHere) return
-                          setSelectedGap(gap)
-                          setSelectedClipIds(new Set())
-                          setSelectedSubtitleId(null)
-                        }}
-                      >
-                        {/* Generating indicator */}
-                        {isGeneratingHere ? (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-                            <Loader2 className="h-3.5 w-3.5 text-blue-400 animate-spin pointer-events-none" />
-                            <span className="text-[9px] text-blue-300 font-medium pointer-events-none">
-                              {gapRegenProgress > 0 ? `${gapRegenProgress}%` : 'Generating...'}
-                            </span>
-                            {/* Progress bar */}
-                            <div className="w-3/4 h-0.5 bg-blue-900/40 rounded-full overflow-hidden mt-0.5 pointer-events-none">
-                              <div
-                                className="h-full bg-blue-400 rounded-full transition-all duration-300"
-                                style={{ width: `${Math.max(gapRegenProgress, 2)}%` }}
-                              />
-                            </div>
-                            {/* Cancel button */}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); cancelGapGeneration() }}
-                              className="absolute top-0.5 right-0.5 p-0.5 rounded hover:bg-zinc-700/80 text-zinc-500 hover:text-red-400 transition-colors"
-                              title="Cancel generation"
-                            >
-                              <X className="h-2.5 w-2.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            {/* Gap label on hover or selected */}
-                            <div className={`absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none ${
-                              isSelected ? 'opacity-100' : 'opacity-0 group-hover/gap:opacity-100'
-                            } transition-opacity`}>
-                              <span className="text-[9px] text-red-400 font-medium">
-                                {(gap.endTime - gap.startTime).toFixed(1)}s gap
-                              </span>
-                              {widthPx > 60 && (
-                                <span className="text-[8px] text-red-400/60">
-                                  {isSelected ? 'Del to close' : 'Click to select'}
-                                </span>
-                              )}
-                            </div>
-                            
-                            {/* Diagonal hatching pattern for selected gap */}
-                            {isSelected && (
-                              <div className="absolute inset-0 overflow-hidden rounded pointer-events-none opacity-20">
-                                <svg width="100%" height="100%">
-                                  <defs>
-                                    <pattern id={`gap-hatch-${i}`} patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-                                      <line x1="0" y1="0" x2="0" y2="8" stroke="#ef4444" strokeWidth="1.5" />
-                                    </pattern>
-                                  </defs>
-                                  <rect width="100%" height="100%" fill={`url(#gap-hatch-${i})`} />
-                                </svg>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )
-                  })}
-                  
                   {/* Lasso selection rectangle */}
                   {lassoRect && lassoOriginRef.current && (() => {
                     const origin = lassoOriginRef.current!
@@ -3332,10 +3226,9 @@ export function VideoEditor() {
                       generatingGap.trackIndex === gap.trackIndex &&
                       Math.abs(generatingGap.startTime - gap.startTime) < 0.01 &&
                       Math.abs(generatingGap.endTime - gap.endTime) < 0.01
-                    
-                    // Only show if wide enough to be useful (at least 8px)
-                    if (widthPx < 8) return null
-                    
+
+                    if (widthPx < 4) return null
+
                     return (
                       <div
                         key={`gap-${i}`}
@@ -3343,8 +3236,8 @@ export function VideoEditor() {
                           isGeneratingHere
                             ? 'bg-blue-500/15 border-2 border-dashed border-blue-400/60 shadow-inner'
                             : isSelected
-                            ? 'bg-red-500/20 border-2 border-dashed border-red-400/60 shadow-inner'
-                            : 'hover:bg-zinc-700/30 border-2 border-dashed border-transparent hover:border-zinc-600/40'
+                            ? 'bg-blue-500/20 border-2 border-dashed border-blue-400/60 shadow-inner'
+                            : 'border-2 border-dashed border-transparent hover:bg-blue-500/10 hover:border-blue-400/30'
                         }`}
                         style={{
                           left: `${leftPx}px`,
@@ -3359,6 +3252,18 @@ export function VideoEditor() {
                           setSelectedClipIds(new Set())
                           setSelectedSubtitleId(null)
                           setGapGenerateMode(null)
+                          const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                          setSelectedGapAnchor({ x: r.left + r.width / 2, gapTop: r.top, gapBottom: r.bottom })
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (isGeneratingHere) return
+                          setSelectedGap(gap)
+                          setSelectedClipIds(new Set())
+                          setSelectedSubtitleId(null)
+                          const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                          setSelectedGapAnchor({ x: r.left + r.width / 2, gapTop: r.top, gapBottom: r.bottom })
                         }}
                       >
                         {isGeneratingHere ? (
@@ -3377,7 +3282,6 @@ export function VideoEditor() {
                                 />
                               </div>
                             )}
-                            {/* Cancel button */}
                             <button
                               onClick={(e) => { e.stopPropagation(); cancelGapGeneration() }}
                               className="absolute top-0.5 right-0.5 p-0.5 rounded hover:bg-zinc-700/80 text-zinc-500 hover:text-red-400 transition-colors"
@@ -3387,14 +3291,12 @@ export function VideoEditor() {
                             </button>
                           </div>
                         ) : (
-                          <div className={`absolute inset-0 flex items-center justify-center ${
+                          <div className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity ${
                             isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                          } transition-opacity`}>
-                            {widthPx > 50 ? (
-                              <span className="text-[9px] text-zinc-400 bg-zinc-900/70 px-1.5 py-0.5 rounded font-mono">
-                                {(gap.endTime - gap.startTime).toFixed(1)}s
-                              </span>
-                            ) : null}
+                          }`}>
+                            <span className="text-[9px] font-medium text-blue-400">
+                              {(gap.endTime - gap.startTime).toFixed(1)}s
+                            </span>
                           </div>
                         )}
                       </div>
@@ -4206,6 +4108,7 @@ export function VideoEditor() {
       {selectedGap && (
         <GapGenerationModal
           selectedGap={selectedGap}
+          anchorPosition={selectedGapAnchor}
           gapGenerateMode={gapGenerateMode}
           setGapGenerateMode={setGapGenerateMode}
           gapPrompt={gapPrompt}

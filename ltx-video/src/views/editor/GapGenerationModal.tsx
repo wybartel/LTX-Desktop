@@ -52,6 +52,7 @@ function dataUriToFile(dataUri: string, filename: string): File {
 
 interface GapGenerationModalProps {
   selectedGap: TimelineGap | null
+  anchorPosition?: { x: number; gapTop: number; gapBottom: number } | null
   gapGenerateMode: GapGenerateMode | null
   setGapGenerateMode: (mode: GapGenerateMode | null) => void
   gapPrompt: string
@@ -135,6 +136,7 @@ export function GapGenerationModal({
   setGapApplyAudioToTrack,
   regenerateSuggestion,
   gapSuggestionError,
+  anchorPosition,
 }: GapGenerationModalProps) {
   if (!selectedGap) return null
 
@@ -469,53 +471,74 @@ export function GapGenerationModal({
       )}
       
       {/* Gap action bar - shown when gap is selected but no generate mode yet */}
-      {!gapGenerateMode && (
+      {!gapGenerateMode && (() => {
+        // Smart positioning: anchor to the clicked gap, with edge-case clamping
+        const POPOVER_W = 420
+        const POPOVER_H = 96
+        const GAP_PX = 4
+        const MARGIN = 8
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 1280
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+
+        const cx = anchorPosition?.x ?? vw / 2
+        const gapTop = anchorPosition?.gapTop ?? vh - 220 - 52
+        const gapBottom = anchorPosition?.gapBottom ?? vh - 220
+
+        // Horizontal: center on gap, clamped so popover stays in viewport
+        const left = Math.max(MARGIN, Math.min(cx - POPOVER_W / 2, vw - POPOVER_W - MARGIN))
+
+        // Vertical: prefer below gap, flip above if not enough space below
+        const spaceBelow = vh - gapBottom - GAP_PX
+        const openAbove = spaceBelow < POPOVER_H + MARGIN
+        const rawTop = openAbove ? gapTop - GAP_PX - POPOVER_H : gapBottom + GAP_PX
+        const top = Math.max(MARGIN, Math.min(rawTop, vh - POPOVER_H - MARGIN))
+
+        return (
         <>
         <div className="fixed inset-0 z-[90]" onClick={() => setSelectedGap(null)} />
-        <div 
-          className="fixed z-[100] bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-3"
-          style={{
-            bottom: '220px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-          }}
+        <div
+          className="fixed z-[100] bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl px-4 py-3"
+          style={{ left, top, width: POPOVER_W }}
         >
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs text-zinc-400 font-medium">
+          {/* Row 1: gap info + keyboard hint */}
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-white font-medium">
               {(selectedGap.endTime - selectedGap.startTime).toFixed(1)}s gap selected
             </span>
-            <span className="text-[9px] text-zinc-600">
-              (Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 text-[8px] font-mono">Del</kbd> to close gap)
+            <span className="text-xs text-zinc-500 flex items-center gap-1.5">
+              Press
+              <kbd className="px-1.5 py-0.5 rounded bg-zinc-700 border border-zinc-600 text-zinc-300 text-[10px] font-mono leading-none">Del</kbd>
+              to close gap
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
+          {/* Row 2: action buttons */}
+          <div className="flex gap-2">
             <button
               onClick={() => deleteGap(selectedGap)}
-              className="px-3 py-1.5 rounded-lg bg-red-900/30 border border-red-800/30 text-red-400 text-[11px] hover:bg-red-900/50 transition-colors flex items-center gap-1.5"
+              className="flex-1 px-3 py-2 rounded-lg bg-red-900/30 border border-red-800/30 text-red-400 text-[11px] hover:bg-red-900/50 transition-colors flex items-center justify-center gap-1.5 font-medium"
             >
               <Trash2 className="h-3 w-3" />
-              Close Gap
+              Close gap
             </button>
-            <div className="w-px h-5 bg-zinc-700" />
-            <span className="text-[10px] text-zinc-500 px-1">Fill with:</span>
             <button
               onClick={() => setGapGenerateMode('text-to-video')}
-              className="px-3 py-1.5 rounded-lg bg-blue-900/30 border border-blue-700/30 text-blue-400 text-[11px] hover:bg-blue-900/50 transition-colors flex items-center gap-1.5"
+              className="flex-1 px-3 py-2 rounded-lg bg-blue-900/30 border border-blue-700/30 text-blue-400 text-[11px] hover:bg-blue-900/50 transition-colors flex items-center justify-center gap-1.5 font-medium"
             >
               <Video className="h-3 w-3" />
-              Video
+              Fill with Video
             </button>
             <button
               onClick={() => setGapGenerateMode('text-to-image')}
-              className="px-3 py-1.5 rounded-lg bg-emerald-900/30 border border-emerald-700/30 text-emerald-400 text-[11px] hover:bg-emerald-900/50 transition-colors flex items-center gap-1.5"
+              className="flex-1 px-3 py-2 rounded-lg bg-emerald-900/30 border border-emerald-700/30 text-emerald-400 text-[11px] hover:bg-emerald-900/50 transition-colors flex items-center justify-center gap-1.5 font-medium"
             >
               <Image className="h-3 w-3" />
-              Image
+              Fill with image
             </button>
           </div>
         </div>
         </>
-      )}
+        )
+      })()}
     </>
   )
 }
