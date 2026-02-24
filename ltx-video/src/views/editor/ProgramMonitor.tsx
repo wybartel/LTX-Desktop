@@ -475,6 +475,7 @@ export function ProgramMonitor({
                       window.addEventListener('mousemove', onMove)
                       window.addEventListener('mouseup', onUp)
                     }}
+                    onClick={(e) => e.stopPropagation()}
                     onDoubleClick={(e) => {
                       e.stopPropagation()
                       setSelectedClipIds(new Set([tc.id]))
