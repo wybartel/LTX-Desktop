@@ -68,6 +68,7 @@ export const MAX_UNDO_HISTORY = 50
 export type UndoAction =
   | { type: 'clips'; clips: TimelineClip[] }
   | { type: 'assets'; assets: import('../../types/project').Asset[] }
+  | { type: 'tracks'; tracks: import('../../types/project').Track[]; clips: TimelineClip[]; subtitles: import('../../types/project').SubtitleClip[] }
 
 /** Tolerance in seconds for detecting adjacent clips (cut points) */
 export const CUT_POINT_TOLERANCE = 0.05

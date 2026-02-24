@@ -1,10 +1,14 @@
 import { useRef, useCallback } from 'react'
-import type { Asset, TimelineClip } from '../../types/project'
+import type { Asset, TimelineClip, Track, SubtitleClip } from '../../types/project'
 import { MAX_UNDO_HISTORY, type UndoAction } from './video-editor-utils'
 
 interface UseUndoRedoParams {
   clips: TimelineClip[]
   setClips: React.Dispatch<React.SetStateAction<TimelineClip[]>>
+  tracks: Track[]
+  setTracks: React.Dispatch<React.SetStateAction<Track[]>>
+  subtitles: SubtitleClip[]
+  setSubtitles: React.Dispatch<React.SetStateAction<SubtitleClip[]>>
   assets: Asset[]
   currentProjectId: string | null
   deleteAsset: (projectId: string, assetId: string) => void
@@ -18,6 +22,10 @@ interface UseUndoRedoParams {
 export function useUndoRedo({
   clips,
   setClips,
+  tracks,
+  setTracks,
+  subtitles,
+  setSubtitles,
   assets,
   currentProjectId,
   deleteAsset,
@@ -43,6 +51,16 @@ export function useUndoRedo({
     redoStackRef.current = []
   }, [assets])
 
+  const pushTrackUndo = useCallback(() => {
+    undoStackRef.current = [...undoStackRef.current.slice(-(MAX_UNDO_HISTORY - 1)), {
+      type: 'tracks',
+      tracks: tracks.map(t => ({ ...t })),
+      clips: clips.map(c => ({ ...c })),
+      subtitles: subtitles.map(s => ({ ...s })),
+    }]
+    redoStackRef.current = []
+  }, [tracks, clips, subtitles])
+
   const handleUndo = useCallback(() => {
     if (undoStackRef.current.length === 0) return
     const action = undoStackRef.current.pop()!
@@ -63,8 +81,20 @@ export function useUndoRedo({
       prevAssets.filter(a => currentIds.has(a.id)).forEach(a => {
         updateAsset(currentProjectId, a.id, a)
       })
+    } else if (action.type === 'tracks') {
+      redoStackRef.current.push({
+        type: 'tracks',
+        tracks: tracks.map(t => ({ ...t })),
+        clips: clips.map(c => ({ ...c })),
+        subtitles: subtitles.map(s => ({ ...s })),
+      })
+      skipHistoryRef.current = true
+      setTracks(action.tracks)
+      setClips(action.clips)
+      setSubtitles(action.subtitles)
+      skipHistoryRef.current = false
     }
-  }, [clips, assets, currentProjectId, deleteAsset, addAsset, updateAsset, setClips])
+  }, [clips, tracks, subtitles, assets, currentProjectId, deleteAsset, addAsset, updateAsset, setClips, setTracks, setSubtitles])
 
   const handleRedo = useCallback(() => {
     if (redoStackRef.current.length === 0) return
@@ -86,8 +116,20 @@ export function useUndoRedo({
       nextAssets.filter(a => currentIds.has(a.id)).forEach(a => {
         updateAsset(currentProjectId, a.id, a)
       })
+    } else if (action.type === 'tracks') {
+      undoStackRef.current.push({
+        type: 'tracks',
+        tracks: tracks.map(t => ({ ...t })),
+        clips: clips.map(c => ({ ...c })),
+        subtitles: subtitles.map(s => ({ ...s })),
+      })
+      skipHistoryRef.current = true
+      setTracks(action.tracks)
+      setClips(action.clips)
+      setSubtitles(action.subtitles)
+      skipHistoryRef.current = false
     }
-  }, [clips, assets, currentProjectId, deleteAsset, addAsset, updateAsset, setClips])
+  }, [clips, tracks, subtitles, assets, currentProjectId, deleteAsset, addAsset, updateAsset, setClips, setTracks, setSubtitles])
 
   const handleCopy = useCallback(() => {
     if (selectedClipIds.size === 0) return
@@ -122,6 +164,7 @@ export function useUndoRedo({
     clipboardRef,
     pushUndo,
     pushAssetUndo,
+    pushTrackUndo,
     handleUndo,
     handleRedo,
     handleCopy,

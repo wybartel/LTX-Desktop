@@ -20,6 +20,7 @@ interface UseClipOperationsParams {
   setSelectedClipIds: React.Dispatch<React.SetStateAction<Set<string>>>
   setSelectedSubtitleId: (id: string | null) => void
   pushUndo: (c?: any) => void
+  pushTrackUndo: () => void
   addAsset: (projectId: string, data: any) => Asset
   addTimeline: (projectId: string, name: string) => any
   updateTimeline: (projectId: string, timelineId: string, data: any) => void
@@ -35,7 +36,7 @@ export function useClipOperations(params: UseClipOperationsParams) {
     clips, setClips, tracks, setTracks, setSubtitles,
     assets, currentTime, setCurrentTime, currentProjectId,
     setSelectedClipIds, setSelectedSubtitleId,
-    pushUndo, addAsset, addTimeline, updateTimeline,
+    pushUndo, pushTrackUndo, addAsset, addTimeline, updateTimeline,
     setActiveTimeline, setOpenTimelineIds, activeTimeline,
     fileInputRef, setHoveredCutPoint,
   } = params
@@ -420,6 +421,7 @@ export function useClipOperations(params: UseClipOperationsParams) {
   }, [pushUndo])
   
   const addTrack = (kind: 'video' | 'audio' = 'video') => {
+    pushTrackUndo()
     const sameKindCount = tracks.filter(t => t.kind === kind && t.type !== 'subtitle').length
     const newTrack: Track = {
       id: `track-${Date.now()}`,
@@ -432,8 +434,8 @@ export function useClipOperations(params: UseClipOperationsParams) {
   }
   
   const deleteTrack = (idx: number) => {
-    if (tracks.length <= 1) return // Keep at least one track
-    // Remove clips on that track and shift clips on higher tracks down
+    if (tracks.length <= 1) return
+    pushTrackUndo()
     setClips(prev => prev
       .filter(c => c.trackIndex !== idx)
       .map(c => c.trackIndex > idx ? { ...c, trackIndex: c.trackIndex - 1 } : c)
