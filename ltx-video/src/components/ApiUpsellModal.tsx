@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, ExternalLink, KeyRound, Sparkles, X } from 'lucide-react'
+import { ExternalLink, KeyRound, Sparkles, X } from 'lucide-react'
 
 export interface ApiUpsellCopy {
   title: string
@@ -124,23 +124,6 @@ export function ApiUpsellModal({
 
         <div className="space-y-4 px-5 py-5">
           <p className="text-sm leading-relaxed text-zinc-300">{copy.description}</p>
-
-          <div className="rounded-lg border border-zinc-700 bg-zinc-800/40 p-3">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-              <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
-              LTX API Benefits
-            </div>
-            <ul className="space-y-1.5 text-sm text-zinc-300">
-              <li className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
-                Support for any hardware device
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
-                Save disk space
-              </li>
-            </ul>
-          </div>
 
           <div>
             <label htmlFor="ltx-api-key-input" className="mb-2 block text-sm font-medium text-zinc-200">
