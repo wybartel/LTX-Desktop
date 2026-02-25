@@ -150,9 +150,10 @@ class FluxAPIClientImpl:
 
     @staticmethod
     def _extract_sample_url(result_payload: dict[str, Any]) -> str:
-        result = result_payload.get("result")
-        if not isinstance(result, dict):
+        result_obj = result_payload.get("result")
+        if not isinstance(result_obj, dict):
             raise RuntimeError("BFL result payload missing result object")
+        result = cast(dict[str, Any], result_obj)
         sample = result.get("sample")
         if isinstance(sample, str) and sample:
             return sample

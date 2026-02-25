@@ -165,6 +165,7 @@ DEFAULT_APP_SETTINGS = AppSettings(
 from app_factory import DEFAULT_ALLOWED_ORIGINS, create_app
 from state import RuntimeConfig, build_initial_state
 from runtime_config.model_download_specs import DEFAULT_MODEL_DOWNLOAD_SPECS, DEFAULT_REQUIRED_MODEL_TYPES
+from state.app_state_types import ModelFileType
 from server_utils.model_layout_migration import migrate_legacy_models_layout
 
 migrate_legacy_models_layout(APP_DATA_DIR)
@@ -172,10 +173,9 @@ IC_LORA_DIR.mkdir(parents=True, exist_ok=True)
 
 LTX_API_BASE_URL = "https://api.ltx.video"
 FORCE_API_GENERATIONS = os.environ.get("FORCE_API_GENERATIONS", "1") == "1"
-if FORCE_API_GENERATIONS:
-    REQUIRED_MODEL_TYPES = frozenset()
-else:
-    REQUIRED_MODEL_TYPES = DEFAULT_REQUIRED_MODEL_TYPES
+REQUIRED_MODEL_TYPES: frozenset[ModelFileType] = (
+    frozenset() if FORCE_API_GENERATIONS else DEFAULT_REQUIRED_MODEL_TYPES
+)
 
 CAMERA_MOTION_PROMPTS = {
     "none": "",
