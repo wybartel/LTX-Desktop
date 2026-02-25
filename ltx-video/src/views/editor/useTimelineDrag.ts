@@ -249,11 +249,11 @@ export function useTimelineDrag(params: UseTimelineDragParams) {
     if (activeTool === 'trackForward') {
       const forwardClips = clips.filter(c => {
         if (e.shiftKey) {
-          // Shift held: select forward on ALL tracks
-          return c.startTime >= clip.startTime
-        } else {
-          // Normal: only the same track
+          // Shift held: select forward on SAME track only
           return c.trackIndex === clip.trackIndex && c.startTime >= clip.startTime
+        } else {
+          // Default: select forward on ALL tracks (like Premiere)
+          return c.startTime >= clip.startTime
         }
       })
       const forwardIds = expandWithLinkedClips(new Set(forwardClips.map(c => c.id)))

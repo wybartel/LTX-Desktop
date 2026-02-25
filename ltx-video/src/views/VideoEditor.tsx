@@ -63,6 +63,12 @@ import { SubtitleTrackStyleEditor } from './editor/SubtitleTrackStyleEditor'
 const SCISSORS_CURSOR_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='6' cy='6' r='3'/><path d='M8.12 8.12 12 12'/><path d='M20 4 8.12 15.88'/><circle cx='6' cy='18' r='3'/><path d='M14.8 14.8 20 20'/></svg>`
 const SCISSORS_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(SCISSORS_CURSOR_SVG)}") 12 12, crosshair`
 
+// Track Select Forward cursors — stacked chevrons for all tracks, single for one track
+const TRACK_FWD_ALL_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='28' viewBox='0 0 24 28' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M8 1l5 5-5 5'/><path d='M8 16l5 5-5 5'/></svg>`
+const TRACK_FWD_ALL_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(TRACK_FWD_ALL_SVG)}") 12 12, e-resize`
+const TRACK_FWD_ONE_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M8 6l6 6-6 6'/></svg>`
+const TRACK_FWD_ONE_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(TRACK_FWD_ONE_SVG)}") 12 12, e-resize`
+
 export function VideoEditor() {
   const { 
     currentProject, currentProjectId, addAsset, deleteAsset, updateAsset, updateProject,
@@ -2957,7 +2963,7 @@ export function VideoEditor() {
                             ? `hover:brightness-125`
                             : 'border-zinc-600 hover:border-zinc-500'
                       } ${!clipColor ? (clip.type === 'audio' ? 'bg-green-900/50' : clip.type === 'adjustment' ? 'bg-blue-900/40 border-dashed' : clip.type === 'text' ? 'bg-cyan-900/50 border-cyan-600/40' : 'bg-zinc-800') : ''} ${
-                        activeTool === 'select' || activeTool === 'ripple' || activeTool === 'roll' || activeTool === 'trackForward' ? 'cursor-grab' : ''
+                        activeTool === 'select' || activeTool === 'ripple' || activeTool === 'roll' ? 'cursor-grab' : ''
                       } ${
                         activeTool === 'slip' ? 'cursor-ew-resize' : ''
                       } ${activeTool === 'slide' ? 'cursor-col-resize' : ''} ${
@@ -2969,7 +2975,9 @@ export function VideoEditor() {
                         width: `${clip.duration * pixelsPerSecond}px`,
                         top: `${trackTopPx(clip.trackIndex, 4)}px`,
                         height: `${getTrackHeight(clip.trackIndex) - 8}px`,
-                        ...(activeTool === 'blade' ? { cursor: SCISSORS_CURSOR } : {}),
+                        ...(activeTool === 'blade' ? { cursor: SCISSORS_CURSOR }
+                          : activeTool === 'trackForward' ? { cursor: bladeShiftHeld ? TRACK_FWD_ONE_CURSOR : TRACK_FWD_ALL_CURSOR }
+                          : {}),
                         ...(clipColor ? {
                           backgroundColor: `${clipColor.color}80`,
                           borderColor: selectedClipIds.has(clip.id) ? undefined : clipColor.color,
