@@ -17,6 +17,8 @@ jobs:
     name: Notify Slack
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Send PR notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
