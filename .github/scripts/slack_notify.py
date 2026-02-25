@@ -74,12 +74,14 @@ blocks = [
 ]
 
 # Attach up to 3 screenshots found in the PR body
+# Note: only include images from publicly accessible hosts (not GitHub user-attachments which require auth)
 for img_url in images[:3]:
-    blocks.append({
-        'type': 'image',
-        'image_url': img_url,
-        'alt_text': 'Screenshot'
-    })
+    if 'user-attachments' not in img_url and 'githubusercontent.com' not in img_url:
+        blocks.append({
+            'type': 'image',
+            'image_url': img_url,
+            'alt_text': 'Screenshot'
+        })
 
 # ── POST to Slack ────────────────────────────────────────────────
 payload = json.dumps({'blocks': blocks}).encode('utf-8')
