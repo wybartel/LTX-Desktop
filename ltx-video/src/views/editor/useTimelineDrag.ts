@@ -523,7 +523,7 @@ export function useTimelineDrag(params: UseTimelineDragParams) {
     }))
   }, [draggingClip, clips, pixelsPerSecond, snapEnabled, tracks, currentTime, lassoRect, trackDisplayRow, orderedTracks])
   
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e?: MouseEvent | Event) => {
     // Finalize lasso selection
     if (lassoRect && trackContainerRef.current) {
       const origin = lassoOriginRef.current
@@ -554,8 +554,9 @@ export function useTimelineDrag(params: UseTimelineDragParams) {
             newSelection.add(clip.id)
           }
         }
-        // Expand lasso selection to include linked clips
-        setSelectedClipIds(expandWithLinkedClips(newSelection))
+        // Alt/Option held: select only what's in the lasso (skip linked clips)
+        const altHeld = e instanceof MouseEvent && e.altKey
+        setSelectedClipIds(altHeld ? newSelection : expandWithLinkedClips(newSelection))
       }
       setLassoRect(null)
       lassoOriginRef.current = null
