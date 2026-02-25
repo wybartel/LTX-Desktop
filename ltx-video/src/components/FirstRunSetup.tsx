@@ -224,7 +224,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
         // @ts-expect-error - Electron-specific CSS property
         WebkitAppRegion: 'drag'
       }}>
-        <span style={{ fontSize: 13, color: '#a0a0a0' }}>LTX Video Studio</span>
+        <span style={{ fontSize: 13, color: '#a0a0a0' }}>LTX Desktop</span>
       </div>
 
       {/* Main Container */}

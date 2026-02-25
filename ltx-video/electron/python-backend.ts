@@ -1,6 +1,7 @@
 import { ChildProcess, spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
+import { getAppDataDir } from './app-paths'
 import { getCurrentDir, isDev, PYTHON_PORT } from './config'
 import { getCurrentLogFilename } from './logging-management'
 import { getPythonDir } from './python-setup'
@@ -95,6 +96,7 @@ export async function startPythonBackend(): Promise<void> {
         PYTHONUNBUFFERED: '1',
         LTX_PORT: String(PYTHON_PORT),
         LTX_LOG_FILE: getCurrentLogFilename(),
+        LTX_APP_DATA_DIR: getAppDataDir(),
         PYTORCH_ENABLE_MPS_FALLBACK: '1',
         // Set PYTHONHOME for bundled Python on macOS so it finds its stdlib
         ...(!isDev && process.platform !== 'win32' ? {

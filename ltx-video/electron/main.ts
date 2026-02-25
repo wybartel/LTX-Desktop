@@ -1,3 +1,4 @@
+import './app-paths'
 import { app } from 'electron'
 import { setupCSP } from './csp'
 import { registerExportHandlers } from './export/export-handler'

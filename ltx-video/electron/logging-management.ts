@@ -1,17 +1,11 @@
 import { execSync } from 'child_process'
 import fs from 'fs'
-import os from 'os'
 import path from 'path'
 import { getCurrentDir, isDev } from './config'
+export { getLogDir } from './app-paths'
+import { getLogDir } from './app-paths'
 
 let currentLogFilename: string | null = null
-
-export function getLogDir(): string {
-  if (process.platform === 'win32') {
-    return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'LTX-desktop', 'logs')
-  }
-  return path.join(os.homedir(), '.ltx-video-studio', 'logs')
-}
 
 function getGitCommitHash(): string {
   try {

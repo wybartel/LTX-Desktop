@@ -15,7 +15,6 @@ if os.environ.get("DEBUG") == "1":
 import logging
 from pathlib import Path
 import threading
-import tempfile
 from datetime import datetime
 
 # Note: expandable_segments is not supported on all platforms
@@ -29,18 +28,16 @@ from runtime_config.prompt_texts import DEFAULT_I2V_SYSTEM_PROMPT, DEFAULT_T2V_S
 # ============================================================
 
 import platform
-if platform.system() == "Windows":
-    _log_app_data = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-    log_dir = _log_app_data / "LTX-desktop" / "logs"
-else:
-    log_dir = Path.home() / ".ltx-video-studio" / "logs"
-
 _env_log_file = os.environ.get("LTX_LOG_FILE")
 if _env_log_file:
-    log_file = Path(_env_log_file)
+    log_file: Path | None = Path(_env_log_file)
 else:
-    _ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_file = log_dir / f"backend_{_ts}_unknown.log"
+    _env_app_data = os.environ.get("LTX_APP_DATA_DIR")
+    if _env_app_data:
+        _ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        log_file = Path(_env_app_data) / "logs" / f"backend_{_ts}_unknown.log"
+    else:
+        log_file = None  # console-only logging
 
 log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
@@ -49,25 +46,15 @@ console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(log_formatter)
 
 handlers: list[logging.Handler] = [console_handler]
-try:
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(log_formatter)
-    handlers.append(file_handler)
-except Exception as exc:
-    print(f"Primary log file setup failed at {log_file}: {exc}", file=sys.stderr)
-    fallback_log_dir = Path(tempfile.gettempdir()) / "ltx-video-studio" / "logs"
-    _ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+if log_file is not None:
     try:
-        fallback_log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = fallback_log_dir / f"backend_{_ts}_unknown.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(log_formatter)
         handlers.append(file_handler)
-    except Exception as fallback_exc:
-        print(f"Fallback log file setup failed at {fallback_log_dir}: {fallback_exc}", file=sys.stderr)
+    except Exception as exc:
+        print(f"Log file setup failed at {log_file}: {exc}", file=sys.stderr)
 
 logging.basicConfig(level=logging.INFO, handlers=handlers)
 logger = logging.getLogger(__name__)
@@ -139,22 +126,14 @@ DTYPE = torch.bfloat16
 
 def _resolve_app_data_dir() -> Path:
     env_path = os.environ.get("LTX_APP_DATA_DIR")
-    if env_path:
-        candidate = Path(env_path)
-    elif platform.system() == "Windows":
-        _app_data = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-        candidate = _app_data / "LTX-desktop"
-    else:
-        candidate = Path.home() / ".ltx-video-studio"
-
-    try:
-        candidate.mkdir(parents=True, exist_ok=True)
-        return candidate
-    except Exception:
-        logger.warning("Could not create app data directory at %s, using temp dir fallback", candidate, exc_info=True)
-        fallback = Path(tempfile.gettempdir()) / "ltx-video-studio"
-        fallback.mkdir(parents=True, exist_ok=True)
-        return fallback
+    if not env_path:
+        raise RuntimeError(
+            "LTX_APP_DATA_DIR environment variable must be set. "
+            "When running standalone, set it to the desired data directory."
+        )
+    candidate = Path(env_path)
+    candidate.mkdir(parents=True, exist_ok=True)
+    return candidate
 
 
 APP_DATA_DIR = _resolve_app_data_dir()

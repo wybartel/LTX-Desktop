@@ -71,12 +71,12 @@ export function registerAppHandlers(): void {
   })
 
   ipcMain.handle('check-first-run', () => {
-    const settingsPath = path.join(app.getPath('userData'), 'settings.json')
+    const settingsPath = path.join(app.getPath('userData'), 'app_state.json')
     return isFirstRun(settingsPath)
   })
 
   ipcMain.handle('complete-setup', () => {
-    const settingsPath = path.join(app.getPath('userData'), 'settings.json')
+    const settingsPath = path.join(app.getPath('userData'), 'app_state.json')
     markSetupComplete(settingsPath)
     return true
   })
