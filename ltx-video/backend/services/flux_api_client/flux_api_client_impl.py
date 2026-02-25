@@ -13,7 +13,7 @@ from services.services_utils import JSONValue
 logger = logging.getLogger(__name__)
 
 BFL_API_BASE_URL = "https://api.bfl.ai"
-BFL_MODEL_ENDPOINT = "/v1/flux-2-klein-4b"
+BFL_MODEL_ENDPOINT = "/v1/flux-2-klein-9b"
 BFL_RESULT_ENDPOINT = "/v1/get_result"
 
 # TODO(press-release): replace temporary hardcoded key and remove this constant.
