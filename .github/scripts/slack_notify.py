@@ -16,6 +16,7 @@ base         = os.environ['BASE_BRANCH']
 changed      = os.environ['CHANGED_FILES']
 additions    = os.environ['ADDITIONS']
 deletions    = os.environ['DELETIONS']
+action       = os.environ.get('EVENT_ACTION', 'opened')
 
 # ── Extract ## Summary section from PR body ──────────────────────
 summary = ''
@@ -36,7 +37,7 @@ images = re.findall(r'!\[.*?\]\((https?://\S+?)\)', body)
 blocks = [
     {
         'type': 'header',
-        'text': {'type': 'plain_text', 'text': f'New Pull Request #{number}', 'emoji': True}
+        'text': {'type': 'plain_text', 'text': f'{"Updated" if action == "synchronize" else "New"} Pull Request #{number}', 'emoji': True}
     },
     {
         'type': 'section',

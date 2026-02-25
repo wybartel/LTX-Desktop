@@ -33,4 +33,5 @@ jobs:
           CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
           ADDITIONS:     ${{ github.event.pull_request.additions }}
           DELETIONS:     ${{ github.event.pull_request.deletions }}
+          EVENT_ACTION:  ${{ github.event.action }}
         run: python3 .github/scripts/slack_notify.py
