@@ -10,6 +10,14 @@ function resolveUserDataPath(): string {
       || path.join(os.homedir(), 'AppData', 'Local')
     return path.join(localAppData, APP_FOLDER_NAME)
   }
+  if (process.platform === 'darwin') {
+    return path.join(
+      os.homedir(),
+      'Library',
+      'Application Support',
+      APP_FOLDER_NAME,
+    )
+  }
   return path.join(os.homedir(), `.${APP_FOLDER_NAME}`)
 }
 
