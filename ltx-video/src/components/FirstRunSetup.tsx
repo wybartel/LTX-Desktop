@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import './FirstRunSetup.css'
 
 interface FirstRunSetupProps {
+  licenseOnly?: boolean
   onComplete: () => void
 }
+
+type Step = 'license' | 'location' | 'installing' | 'complete'
 
 interface DownloadProgress {
   status: 'idle' | 'downloading' | 'complete' | 'error'
@@ -30,8 +33,9 @@ const INSTALL_MESSAGES = [
   "Finalizing installation..."
 ]
 
-export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
-  const [currentStep, setCurrentStep] = useState(1)
+
+export function FirstRunSetup({ licenseOnly, onComplete }: FirstRunSetupProps) {
+  const [currentStep, setCurrentStep] = useState<Step>('license')
   const [installPath, setInstallPath] = useState('')
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -40,6 +44,9 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
   const [videoPath, setVideoPath] = useState('/splash/splash.mp4')
   const [ltxApiKey, setLtxApiKey] = useState('')
   const [backendUrl, setBackendUrl] = useState<string | null>(null)
+  const [licenseAccepted, setLicenseAccepted] = useState(false)
+  const [licenseText, setLicenseText] = useState<string | null>(null)
+  const [licenseError, setLicenseError] = useState<string | null>(null)
 
   // Format bytes to human readable
   const formatBytes = (bytes: number): string => {
@@ -66,6 +73,18 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
     const speedBytesPerSec = downloadProgress.speedMbps * 1024 * 1024
     const secondsRemaining = remainingBytes / speedBytesPerSec
     return formatTimeRemaining(secondsRemaining)
+  }
+
+  // Fetch license text
+  const fetchLicense = async () => {
+    setLicenseError(null)
+    setLicenseText(null)
+    try {
+      const text = await window.electronAPI.fetchLicenseText()
+      setLicenseText(text)
+    } catch (e) {
+      setLicenseError(e instanceof Error ? e.message : 'Failed to fetch license text.')
+    }
   }
 
   // Initialize
@@ -105,11 +124,12 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
       }
     }
     init()
+    fetchLicense()
   }, [])
 
   // Cycle install messages
   useEffect(() => {
-    if (currentStep !== 2) return
+    if (currentStep !== 'installing') return
     let index = 0
     const interval = setInterval(() => {
       index = (index + 1) % INSTALL_MESSAGES.length
@@ -120,7 +140,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
 
   // Poll download progress during installation
   useEffect(() => {
-    if (currentStep !== 2 || !backendUrl) return
+    if (currentStep !== 'installing' || !backendUrl) return
 
     const pollProgress = async () => {
       try {
@@ -132,7 +152,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
           if (progress.status === 'error') {
             setDownloadError(progress.error || 'Download failed.')
           } else if (progress.status === 'complete') {
-            setTimeout(() => setCurrentStep(3), 600)
+            setTimeout(() => setCurrentStep('complete'), 600)
           }
         }
       } catch (e) {
@@ -148,7 +168,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
   // Start installation
   const startInstallation = async () => {
     if (!backendUrl) return
-    setCurrentStep(2)
+    setCurrentStep('installing')
     try {
       // If API key is provided, save it to settings first and skip text encoder download
       if (ltxApiKey.trim()) {
@@ -182,9 +202,15 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
 
   // Handle next button
   const handleNext = () => {
-    if (currentStep === 1) {
+    if (currentStep === 'license') {
+      if (licenseOnly) {
+        handleFinish()
+      } else {
+        setCurrentStep('location')
+      }
+    } else if (currentStep === 'location') {
       startInstallation()
-    } else if (currentStep === 3) {
+    } else if (currentStep === 'complete') {
       handleFinish()
     }
   }
@@ -202,9 +228,16 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
 
   // Get button text
   const getNextButtonText = () => {
-    if (currentStep === 1) return 'Install'
-    if (currentStep === 3) return 'Finish'
+    if (currentStep === 'license') return licenseOnly ? 'Accept' : 'Next'
+    if (currentStep === 'location') return 'Install'
+    if (currentStep === 'complete') return 'Finish'
     return 'Continue'
+  }
+
+  // Check if next button should be disabled
+  const isNextDisabled = () => {
+    if (currentStep === 'license') return !licenseAccepted
+    return false
   }
 
   return (
@@ -232,12 +265,14 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
         display: 'flex',
         flexDirection: 'column',
         flex: 1,
+        overflow: 'hidden',
+        minHeight: 0,
         // @ts-expect-error - Electron-specific CSS property
         WebkitAppRegion: 'no-drag'
       }}>
         {/* Header */}
         <div style={{
-          padding: currentStep === 2 ? '12px 32px' : '16px 32px',
+          padding: currentStep === 'installing' ? '12px 32px' : '16px 32px',
           borderBottom: '1px solid #1a1a1a'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -261,13 +296,138 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
         {/* Content Area */}
         <div style={{
           flex: 1,
-          padding: currentStep === 2 ? 0 : '28px 32px',
+          padding: currentStep === 'installing' ? 0 : '28px 32px',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
-          {/* Step 1: Choose Location */}
-          {currentStep === 1 && (
+          {/* Step 1: Model License */}
+          {currentStep === 'license' && (
+            <div style={{ animation: 'fadeIn 0.25s ease', display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+              <h2 style={{
+                fontFamily: "'Miriam Libre', serif",
+                fontSize: 24,
+                fontWeight: 700,
+                marginBottom: 6
+              }}>
+                LTX-2 Model License
+              </h2>
+              <p style={{ color: '#a0a0a0', fontSize: 14, marginBottom: 16 }}>
+                The LTX-2 model is subject to the following license agreement. Please review and accept before downloading.
+              </p>
+
+              <div style={{
+                background: '#2e3445',
+                borderRadius: 12,
+                padding: '14px 18px',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                minHeight: 0
+              }}>
+                <div style={{
+                  flex: 1,
+                  overflow: 'hidden',
+                  borderRadius: 8,
+                  minHeight: 0
+                }}>
+                  {licenseError ? (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      gap: 12
+                    }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      <span style={{ color: '#f87171', fontSize: 13, textAlign: 'center' }}>{licenseError}</span>
+                      <button
+                        onClick={fetchLicense}
+                        style={{
+                          padding: '6px 20px',
+                          borderRadius: 9999,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          background: 'linear-gradient(125deg, #A98BD9, #6D28D9)',
+                          border: 'none',
+                          color: '#ffffff',
+                        }}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : licenseText === null ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      gap: 10
+                    }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" style={{ animation: 'spin 1s linear infinite' }}>
+                        <circle cx="12" cy="12" r="10" stroke="#6D28D9" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" strokeLinecap="round" />
+                      </svg>
+                      <span style={{ color: '#a0a0a0', fontSize: 13 }}>Loading license...</span>
+                    </div>
+                  ) : (
+                    <div style={{
+                      overflowY: 'auto',
+                      height: '100%',
+                      background: '#1a1a1a',
+                      borderRadius: 8,
+                      padding: '14px'
+                    }}>
+                      <pre style={{
+                        fontFamily: "'Consolas', 'Monaco', monospace",
+                        fontSize: 11,
+                        lineHeight: 1.5,
+                        color: '#d0d0d0',
+                        margin: 0,
+                        whiteSpace: 'pre-wrap',
+                        wordWrap: 'break-word'
+                      }}>
+                        {licenseText}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginTop: 14,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  userSelect: 'none'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={licenseAccepted}
+                    onChange={(e) => setLicenseAccepted(e.target.checked)}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      accentColor: '#6D28D9',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  />
+                  <span>I have read and agree to the LTX-2 Community License Agreement</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Choose Location */}
+          {currentStep === 'location' && (
             <div style={{ animation: 'fadeIn 0.25s ease' }}>
               <h2 style={{
                 fontFamily: "'Miriam Libre', serif",
@@ -383,8 +543,8 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
             </div>
           )}
 
-          {/* Step 2: Installing */}
-          {currentStep === 2 && (
+          {/* Step 3: Installing */}
+          {currentStep === 'installing' && (
             <div style={{
               position: 'relative',
               height: '100%',
@@ -460,7 +620,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
                   <span style={{ color: '#f87171', fontSize: 13, textAlign: 'center', maxWidth: 400 }}>{downloadError}</span>
                   <div style={{ display: 'flex', gap: 10 }}>
                     <button
-                      onClick={() => { setDownloadError(null); setCurrentStep(1) }}
+                      onClick={() => { setDownloadError(null); setCurrentStep('location') }}
                       style={{
                         padding: '6px 20px',
                         borderRadius: 9999,
@@ -576,8 +736,8 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
             </div>
           )}
 
-          {/* Step 3: Complete */}
-          {currentStep === 3 && (
+          {/* Step 4: Complete */}
+          {currentStep === 'complete' && (
             <div style={{
               flex: 1,
               display: 'flex',
@@ -642,7 +802,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
 
         {/* Footer */}
         <div style={{
-          padding: currentStep === 2 ? '12px 24px' : '16px 32px',
+          padding: currentStep === 'installing' ? '12px 24px' : '16px 32px',
           borderTop: '1px solid #1a1a1a',
           display: 'flex',
           justifyContent: 'space-between',
@@ -652,7 +812,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
 
           <div style={{ display: 'flex', gap: 10 }}>
             {/* Cancel Button */}
-            {currentStep < 3 && (
+            {currentStep !== 'complete' && (
               <button
                 onClick={handleCancel}
                 style={{
@@ -671,20 +831,22 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
               </button>
             )}
 
-            {/* Install/Finish Button */}
-            {currentStep !== 2 && (
+            {/* Next/Install/Finish Button */}
+            {currentStep !== 'installing' && (
               <button
                 onClick={handleNext}
+                disabled={isNextDisabled()}
                 style={{
                   padding: '10px 28px',
                   borderRadius: 9999,
                   fontSize: 13,
                   fontWeight: 700,
-                  cursor: 'pointer',
-                  background: '#ffffff',
+                  cursor: isNextDisabled() ? 'not-allowed' : 'pointer',
+                  background: isNextDisabled() ? '#555' : '#ffffff',
                   border: 'none',
-                  color: '#000000',
-                  transition: 'all 0.2s ease'
+                  color: isNextDisabled() ? '#999' : '#000000',
+                  transition: 'all 0.2s ease',
+                  opacity: isNextDisabled() ? 0.6 : 1
                 }}
               >
                 {getNextButtonText()}

@@ -15,15 +15,18 @@ function getModelsPath(): string {
   return modelsPath
 }
 
-function isFirstRun(settingsPath: string): boolean {
+function getSetupStatus(settingsPath: string): { needsSetup: boolean; needsLicense: boolean } {
   if (!fs.existsSync(settingsPath)) {
-    return true
+    return { needsSetup: true, needsLicense: true }
   }
   try {
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
-    return !settings.setupComplete
+    return {
+      needsSetup: !settings.setupComplete,
+      needsLicense: !settings.licenseAccepted,
+    }
   } catch {
-    return true
+    return { needsSetup: true, needsLicense: true }
   }
 }
 
@@ -39,6 +42,8 @@ function markSetupComplete(settingsPath: string): void {
   }
 
   settings.setupComplete = true
+  settings.licenseAccepted = true
+  settings.licenseAcceptedDate = new Date().toISOString()
   settings.setupDate = new Date().toISOString()
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
@@ -72,13 +77,21 @@ export function registerAppHandlers(): void {
 
   ipcMain.handle('check-first-run', () => {
     const settingsPath = path.join(app.getPath('userData'), 'app_state.json')
-    return isFirstRun(settingsPath)
+    return getSetupStatus(settingsPath)
   })
 
   ipcMain.handle('complete-setup', () => {
     const settingsPath = path.join(app.getPath('userData'), 'app_state.json')
     markSetupComplete(settingsPath)
     return true
+  })
+
+  ipcMain.handle('fetch-license-text', async () => {
+    const resp = await fetch('https://huggingface.co/Lightricks/LTX-2/raw/main/LICENSE')
+    if (!resp.ok) {
+      throw new Error(`Failed to fetch license (HTTP ${resp.status})`)
+    }
+    return await resp.text()
   })
 
   ipcMain.handle('get-resource-path', () => {

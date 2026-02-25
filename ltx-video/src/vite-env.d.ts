@@ -13,8 +13,9 @@ interface Window {
     readLocalFile: (filePath: string) => Promise<{ data: string; mimeType: string }>
     checkGpu: () => Promise<{ available: boolean; name?: string; vram?: number }>
     getAppInfo: () => Promise<{ version: string; isPackaged: boolean; modelsPath: string; userDataPath: string }>
-    checkFirstRun: () => Promise<boolean>
+    checkFirstRun: () => Promise<{ needsSetup: boolean; needsLicense: boolean }>
     completeSetup: () => Promise<boolean>
+    fetchLicenseText: () => Promise<string>
     openFolder: (folderPath: string) => Promise<void>
     showItemInFolder: (filePath: string) => Promise<void>
     getLogs: () => Promise<LogsResponse>

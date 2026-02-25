@@ -22,8 +22,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('get-app-info'),
   
   // First-run setup
-  checkFirstRun: (): Promise<boolean> => ipcRenderer.invoke('check-first-run'),
+  checkFirstRun: (): Promise<{ needsSetup: boolean; needsLicense: boolean }> => ipcRenderer.invoke('check-first-run'),
   completeSetup: (): Promise<boolean> => ipcRenderer.invoke('complete-setup'),
+  fetchLicenseText: (): Promise<string> => ipcRenderer.invoke('fetch-license-text'),
   
   // Open folder in file explorer
   openFolder: (folderPath: string): Promise<void> => ipcRenderer.invoke('open-folder', folderPath),

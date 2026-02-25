@@ -35,7 +35,7 @@ function AppContent() {
   const { status, isLoading: backendLoading, error: backendError } = useBackend()
   const [pythonReady, setPythonReady] = useState<boolean | null>(null)
   const [backendStarted, setBackendStarted] = useState(false)
-  const [isFirstRun, setIsFirstRun] = useState<boolean | null>(null)
+  const [setupMode, setSetupMode] = useState<'loading' | 'full' | 'license-only' | null>('loading')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false)
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
@@ -128,11 +128,17 @@ function AppContent() {
   useEffect(() => {
     const checkFirstRun = async () => {
       try {
-        const firstRun = await window.electronAPI.checkFirstRun()
-        setIsFirstRun(firstRun)
+        const { needsSetup, needsLicense } = await window.electronAPI.checkFirstRun()
+        if (needsSetup) {
+          setSetupMode('full')
+        } else if (needsLicense) {
+          setSetupMode('license-only')
+        } else {
+          setSetupMode(null)
+        }
       } catch (e) {
         console.error('Failed to check first run:', e)
-        setIsFirstRun(false)
+        setSetupMode(null)
       }
     }
     checkFirstRun()
@@ -155,7 +161,7 @@ function AppContent() {
   }
 
   // Wait for backend before showing first-run setup (it needs the API)
-  if (backendLoading || isFirstRun === null) {
+  if (backendLoading || setupMode === 'loading') {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -182,8 +188,8 @@ function AppContent() {
   }
 
   // Show first run setup (after backend is connected)
-  if (isFirstRun) {
-    return <FirstRunSetup onComplete={() => setIsFirstRun(false)} />
+  if (setupMode) {
+    return <FirstRunSetup licenseOnly={setupMode === 'license-only'} onComplete={() => setSetupMode(null)} />
   }
 
   // Check if settings/logs buttons should show (not on home/loading screens)
