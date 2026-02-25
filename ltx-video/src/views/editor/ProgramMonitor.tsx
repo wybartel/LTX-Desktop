@@ -9,7 +9,7 @@ import { Tooltip } from '../../components/ui/tooltip'
 import { AudioWaveform } from '../../components/AudioWaveform'
 import { DEFAULT_SUBTITLE_STYLE } from '../../types/project'
 import type { TimelineClip, Track, SubtitleClip } from '../../types/project'
-import { getClipEffectStyles, getTransitionBgColor, formatTime, getShortcutLabel, getMaskedEffectOverlays } from './video-editor-utils'
+import { getClipEffectStyles, getTransitionBgColor, formatTime, getShortcutLabel, tooltipLabel, getMaskedEffectOverlays } from './video-editor-utils'
 import type { KeyboardLayout } from '../../lib/keyboard-shortcuts'
 
 export interface ProgramMonitorProps {
@@ -777,7 +777,7 @@ export function ProgramMonitor({
           {/* Center: transport controls — Premiere-style 5-button strip */}
           <div className="flex-1 flex items-center justify-center gap-0.5">
             {/* Set In */}
-            <Tooltip content={`${inPoint !== null ? `In: ${formatTime(inPoint)} — ` : ''}Set In point (${getShortcutLabel(kbLayout, 'mark.setIn')})`} side="top">
+            <Tooltip content={`${inPoint !== null ? `In: ${formatTime(inPoint)} — ` : ''}${tooltipLabel('Set In point', getShortcutLabel(kbLayout, 'mark.setIn'))}`} side="top">
               <Button
                 variant="ghost" size="icon"
                 className={`h-6 w-6 ${inPoint !== null ? 'text-yellow-400' : 'text-zinc-500'}`}
@@ -792,7 +792,7 @@ export function ProgramMonitor({
             </Tooltip>
             <div className="w-px h-3 bg-zinc-700" />
             {/* Go to In */}
-            <Tooltip content={`Go to In Point (${getShortcutLabel(kbLayout, 'transport.goToIn')})`} side="top">
+            <Tooltip content={tooltipLabel('Go to In Point', getShortcutLabel(kbLayout, 'transport.goToIn'))} side="top">
               <Button
                 variant="ghost" size="icon"
                 className={`h-6 w-6 ${inPoint !== null ? 'text-zinc-400' : 'text-zinc-500'}`}
@@ -809,7 +809,7 @@ export function ProgramMonitor({
               </Button>
             </Tooltip>
             {/* Step Back */}
-            <Tooltip content={`Step Back (${getShortcutLabel(kbLayout, 'transport.stepBackward')})`} side="top">
+            <Tooltip content={tooltipLabel('Step Back', getShortcutLabel(kbLayout, 'transport.stepBackward'))} side="top">
               <Button
                 variant="ghost" size="icon"
                 className="h-6 w-6 text-zinc-500"
@@ -819,7 +819,7 @@ export function ProgramMonitor({
               </Button>
             </Tooltip>
             {/* Play/Pause toggle */}
-            <Tooltip content={isPlaying ? `Pause (${getShortcutLabel(kbLayout, 'transport.playPause')})` : `Play (${getShortcutLabel(kbLayout, 'transport.playPause')})`} side="top">
+            <Tooltip content={isPlaying ? tooltipLabel('Pause', getShortcutLabel(kbLayout, 'transport.playPause')) : tooltipLabel('Play', getShortcutLabel(kbLayout, 'transport.playPause'))} side="top">
               <Button
                 variant="ghost" size="icon"
                 onClick={() => { setShuttleSpeed(0); setIsPlaying(!isPlaying) }}
@@ -829,7 +829,7 @@ export function ProgramMonitor({
               </Button>
             </Tooltip>
             {/* Step Forward */}
-            <Tooltip content={`Step Forward (${getShortcutLabel(kbLayout, 'transport.stepForward')})`} side="top">
+            <Tooltip content={tooltipLabel('Step Forward', getShortcutLabel(kbLayout, 'transport.stepForward'))} side="top">
               <Button
                 variant="ghost" size="icon"
                 className="h-6 w-6 text-zinc-500"
@@ -839,7 +839,7 @@ export function ProgramMonitor({
               </Button>
             </Tooltip>
             {/* Go to Out */}
-            <Tooltip content={`Go to Out Point (${getShortcutLabel(kbLayout, 'transport.goToOut')})`} side="top">
+            <Tooltip content={tooltipLabel('Go to Out Point', getShortcutLabel(kbLayout, 'transport.goToOut'))} side="top">
               <Button
                 variant="ghost" size="icon"
                 className={`h-6 w-6 ${outPoint !== null ? 'text-zinc-400' : 'text-zinc-500'}`}
@@ -857,7 +857,7 @@ export function ProgramMonitor({
             </Tooltip>
             <div className="w-px h-3 bg-zinc-700" />
             {/* Set Out */}
-            <Tooltip content={`${outPoint !== null ? `Out: ${formatTime(outPoint)} — ` : ''}Set Out point (${getShortcutLabel(kbLayout, 'mark.setOut')})`} side="top">
+            <Tooltip content={`${outPoint !== null ? `Out: ${formatTime(outPoint)} — ` : ''}${tooltipLabel('Set Out point', getShortcutLabel(kbLayout, 'mark.setOut'))}`} side="top">
               <Button
                 variant="ghost" size="icon"
                 className={`h-6 w-6 ${outPoint !== null ? 'text-yellow-400' : 'text-zinc-500'}`}
@@ -930,7 +930,7 @@ export function ProgramMonitor({
           </div>
 
           {/* Fullscreen */}
-          <Tooltip content={`${isFullscreen ? 'Exit fullscreen' : 'Fullscreen'} (${getShortcutLabel(kbLayout, 'view.fullscreen')})`} side="top">
+          <Tooltip content={isFullscreen ? tooltipLabel('Exit fullscreen', getShortcutLabel(kbLayout, 'view.fullscreen')) : tooltipLabel('Fullscreen', getShortcutLabel(kbLayout, 'view.fullscreen'))} side="top">
             <button
               onClick={toggleFullscreen}
               className="p-1 rounded hover:bg-zinc-800 transition-colors text-zinc-500 hover:text-zinc-300"

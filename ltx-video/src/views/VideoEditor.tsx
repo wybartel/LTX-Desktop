@@ -31,7 +31,7 @@ import {
   type ToolType, PRIMARY_TOOLS, TRIM_TOOLS,
   AUTOSAVE_DELAY, CUT_POINT_TOLERANCE, DEFAULT_DISSOLVE_DURATION,
   type EditorLayout, DEFAULT_LAYOUT, LAYOUT_LIMITS,
-  getShortcutLabel, loadLayout, saveLayout, clampVal,
+  getShortcutLabel, tooltipLabel, loadLayout, saveLayout, clampVal,
   migrateClip, migrateTracks, // EFFECTS HIDDEN: removed getClipEffectStyles
   formatTime, parseTime, getColorLabel,
   type LayoutPreset, loadLayoutPresets, saveLayoutPresets,
@@ -2111,7 +2111,7 @@ export function VideoEditor() {
           {/* Tools Panel */}
           <div className="w-10 flex-shrink-0 bg-zinc-900 border-r border-zinc-800 flex flex-col items-center py-1 gap-0.5 overflow-hidden">
             {PRIMARY_TOOLS.map(tool => (
-              <Tooltip key={tool.id} content={`${tool.label} (${getShortcutLabel(kbLayout, tool.actionId)})`} side="right">
+              <Tooltip key={tool.id} content={tooltipLabel(tool.label, getShortcutLabel(kbLayout, tool.actionId))} side="right">
                 <button
                   onClick={() => setActiveTool(tool.id)}
                   className={`p-1.5 rounded-lg transition-colors relative group flex-shrink-0 ${
@@ -2122,7 +2122,7 @@ export function VideoEditor() {
                 >
                   <tool.icon className="h-4 w-4" />
                   <div className="absolute left-full ml-2 px-2 py-1 bg-zinc-800 rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50">
-                    {tool.label} <span className="text-zinc-400">({getShortcutLabel(kbLayout, tool.actionId)})</span>
+                    {(() => { const s = getShortcutLabel(kbLayout, tool.actionId); return <>{tool.label}{s && <span className="text-zinc-400"> ({s})</span>}</>; })()}
                   </div>
                 </button>
               </Tooltip>
@@ -2135,7 +2135,7 @@ export function VideoEditor() {
               const currentTrimTool = TRIM_TOOLS.find(t => t.id === (isTrimActive ? activeTool : lastTrimTool)) || TRIM_TOOLS[0]
               return (
                 <div className="relative flex-shrink-0">
-                  <Tooltip content={`${currentTrimTool.label} (${getShortcutLabel(kbLayout, currentTrimTool.actionId)}) — right-click or hold for more`} side="right">
+                  <Tooltip content={(() => { const s = getShortcutLabel(kbLayout, currentTrimTool.actionId); return s ? `${currentTrimTool.label} (${s}) — right-click or hold for more` : `${currentTrimTool.label} — right-click or hold for more` })()} side="right">
                     <button
                       onClick={() => {
                         if (trimFlyoutOpenedRef.current) { trimFlyoutOpenedRef.current = false; return }
@@ -2174,7 +2174,7 @@ export function VideoEditor() {
                       <currentTrimTool.icon className="h-4 w-4" />
                       <div className="absolute bottom-0 right-0 w-0 h-0 border-l-[4px] border-l-transparent border-b-[4px] border-b-current opacity-60" />
                       <div className="absolute left-full ml-2 px-2 py-1 bg-zinc-800 rounded text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50">
-                        {currentTrimTool.label} <span className="text-zinc-400">({getShortcutLabel(kbLayout, currentTrimTool.actionId)})</span>
+                        {(() => { const s = getShortcutLabel(kbLayout, currentTrimTool.actionId); return <>{currentTrimTool.label}{s && <span className="text-zinc-400"> ({s})</span>}</>; })()}
                       </div>
                     </button>
                   </Tooltip>
