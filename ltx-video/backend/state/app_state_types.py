@@ -122,8 +122,8 @@ class ICLoraState:
 class GenerationProgress:
     phase: str
     progress: float
-    current_step: int
-    total_steps: int
+    current_step: int | None
+    total_steps: int | None
 
 
 @dataclass

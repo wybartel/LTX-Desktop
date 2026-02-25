@@ -13,6 +13,7 @@ export interface ApiUpsellModalProps {
   onClose: () => void
   onSaveApiKey: (apiKey: string) => Promise<void> | void
   copy: ApiUpsellCopy
+  blocking?: boolean
   initialApiKey?: string
   getApiKeyUrl?: string
   getApiKeyLabel?: string
@@ -35,6 +36,7 @@ export function ApiUpsellModal({
   onClose,
   onSaveApiKey,
   copy,
+  blocking = false,
   initialApiKey = '',
   getApiKeyUrl = DEFAULT_API_KEY_URL,
   getApiKeyLabel = 'Get API key',
@@ -53,15 +55,25 @@ export function ApiUpsellModal({
   useEffect(() => {
     if (!isOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isSaving) {
+      if (event.key === 'Escape' && !isSaving && !blocking) {
         onClose()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isOpen, isSaving, onClose])
+  }, [blocking, isOpen, isSaving, onClose])
 
   const canSubmit = useMemo(() => apiKey.trim().length > 0 && !isSaving, [apiKey, isSaving])
+
+  const handleOpenApiKeyUrl = async () => {
+    try {
+      await window.electronAPI.openExternalUrl(getApiKeyUrl)
+      return
+    } catch {
+      // Fallback in case IPC is unavailable.
+    }
+    window.open(getApiKeyUrl, '_blank', 'noopener,noreferrer')
+  }
 
   const handleSave = async () => {
     const trimmedKey = apiKey.trim()
@@ -98,14 +110,16 @@ export function ApiUpsellModal({
             </div>
             <h2 className="text-base font-semibold text-zinc-100">{copy.title}</h2>
           </div>
-          <button
-            onClick={onClose}
-            disabled={isSaving}
-            className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Close API upsell modal"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          {!blocking && (
+            <button
+              onClick={onClose}
+              disabled={isSaving}
+              className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Close API upsell modal"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <div className="space-y-4 px-5 py-5">
@@ -119,11 +133,11 @@ export function ApiUpsellModal({
             <ul className="space-y-1.5 text-sm text-zinc-300">
               <li className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
-                Faster generation turnaround
+                Support for any hardware device
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
-                No local model warmup required
+                Save disk space
               </li>
             </ul>
           </div>
@@ -146,15 +160,14 @@ export function ApiUpsellModal({
             </div>
             <div className="mt-2 flex items-center justify-between gap-3">
               <span className="text-xs text-zinc-500">Your key stays in your local app settings.</span>
-              <a
-                href={getApiKeyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={handleOpenApiKeyUrl}
                 className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
               >
                 {getApiKeyLabel}
                 <ExternalLink className="h-3 w-3" />
-              </a>
+              </button>
             </div>
           </div>
 
@@ -166,13 +179,15 @@ export function ApiUpsellModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-zinc-800 px-5 py-4">
-          <button
-            onClick={onClose}
-            disabled={isSaving}
-            className="rounded-lg border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {copy.secondaryActionLabel ?? 'Not now'}
-          </button>
+          {!blocking && (
+            <button
+              onClick={onClose}
+              disabled={isSaving}
+              className="rounded-lg border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {copy.secondaryActionLabel ?? 'Not now'}
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={!canSubmit}

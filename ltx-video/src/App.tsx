@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, AlertCircle, Settings, FileText } from 'lucide-react'
 import { ProjectProvider, useProjects } from './contexts/ProjectContext'
 import { KeyboardShortcutsProvider } from './contexts/KeyboardShortcutsContext'
+import { AppSettingsProvider, useAppSettings } from './contexts/AppSettingsContext'
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal'
 import { useBackend } from './hooks/use-backend'
 import { Home } from './views/Home'
@@ -9,40 +10,37 @@ import { Project } from './views/Project'
 import { Playground } from './views/Playground'
 import { FirstRunSetup } from './components/FirstRunSetup'
 import { PythonSetup } from './components/PythonSetup'
-import { SettingsModal, type AppSettings, type SettingsTabId } from './components/SettingsModal'
+import { SettingsModal, type SettingsTabId } from './components/SettingsModal'
 import { LogViewer } from './components/LogViewer'
+import { ApiUpsellModal, buildProApiUpsellCopy } from './components/ApiUpsellModal'
 import { Button } from './components/ui/button'
 
-const DEFAULT_APP_SETTINGS: AppSettings = {
-  useTorchCompile: false,
-  loadOnStartup: true,
-  ltxApiKey: '',
-  useLocalTextEncoder: false,
-  fastModel: { useUpscaler: true },
-  proModel: { steps: 20, useUpscaler: true },
-  promptCacheSize: 1,
-  promptEnhancerEnabledT2V: false,
-  promptEnhancerEnabledI2V: false,
-  geminiApiKey: '',
-  t2vSystemPrompt: '',
-  i2vSystemPrompt: '',
-  seedLocked: false,
-  lockedSeed: 42,
-}
+type SetupState = 'loading' | { needsSetup: boolean; needsLicense: boolean }
 
 function AppContent() {
   const { currentView } = useProjects()
   const { status, isLoading: backendLoading, error: backendError } = useBackend()
+  const { settings, updateSettings, hasLtxApiKey, forceApiGenerations, isLoaded } = useAppSettings()
+
   const [pythonReady, setPythonReady] = useState<boolean | null>(null)
   const [backendStarted, setBackendStarted] = useState(false)
-  const [setupMode, setSetupMode] = useState<'loading' | 'full' | 'license-only' | null>('loading')
+  const [setupState, setSetupState] = useState<SetupState>('loading')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId | undefined>(undefined)
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false)
-  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
-  const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [isFinalizingFirstRun, setIsFinalizingFirstRun] = useState(false)
+  const [firstRunFinalizeError, setFirstRunFinalizeError] = useState<string | null>(null)
+  const setupCompletionInFlightRef = useRef<Promise<void> | null>(null)
 
-  // Listen for open-settings events from menu actions
+  const baseUpsellCopy = buildProApiUpsellCopy()
+  const forcedApiUpsellCopy = {
+    ...baseUpsellCopy,
+    title: 'Connect LTX API',
+    description: 'This app is configured for API-only generation. Add your API key to continue.',
+    primaryActionLabel: 'Save API key',
+    secondaryActionLabel: undefined,
+  }
+
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail
@@ -53,110 +51,122 @@ function AppContent() {
     return () => window.removeEventListener('open-settings', handler)
   }, [])
 
-  // Fetch settings from backend
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const backendUrl = await window.electronAPI.getBackendUrl()
-        const response = await fetch(`${backendUrl}/api/settings`)
-        if (response.ok) {
-          const data = await response.json()
-          setAppSettings({
-            useTorchCompile: data.useTorchCompile ?? DEFAULT_APP_SETTINGS.useTorchCompile,
-            loadOnStartup: data.loadOnStartup ?? DEFAULT_APP_SETTINGS.loadOnStartup,
-            ltxApiKey: data.ltxApiKey ?? DEFAULT_APP_SETTINGS.ltxApiKey,
-            useLocalTextEncoder: data.useLocalTextEncoder ?? DEFAULT_APP_SETTINGS.useLocalTextEncoder,
-            fastModel: data.fastModel ?? DEFAULT_APP_SETTINGS.fastModel,
-            proModel: data.proModel ?? DEFAULT_APP_SETTINGS.proModel,
-            promptCacheSize: data.promptCacheSize ?? DEFAULT_APP_SETTINGS.promptCacheSize,
-            promptEnhancerEnabledT2V: data.promptEnhancerEnabledT2V ?? DEFAULT_APP_SETTINGS.promptEnhancerEnabledT2V,
-            promptEnhancerEnabledI2V: data.promptEnhancerEnabledI2V ?? DEFAULT_APP_SETTINGS.promptEnhancerEnabledI2V,
-            geminiApiKey: data.geminiApiKey ?? DEFAULT_APP_SETTINGS.geminiApiKey,
-            t2vSystemPrompt: data.t2vSystemPrompt ?? DEFAULT_APP_SETTINGS.t2vSystemPrompt,
-            i2vSystemPrompt: data.i2vSystemPrompt ?? DEFAULT_APP_SETTINGS.i2vSystemPrompt,
-            seedLocked: data.seedLocked ?? DEFAULT_APP_SETTINGS.seedLocked,
-            lockedSeed: data.lockedSeed ?? DEFAULT_APP_SETTINGS.lockedSeed,
-          })
-        }
-      } catch (e) {
-        console.warn('Failed to fetch settings:', e)
-      } finally {
-        setSettingsLoaded(true)
-      }
-    }
-    if (status.connected) fetchSettings()
-  }, [status.connected])
-
-  // Sync settings to backend
-  useEffect(() => {
-    if (!settingsLoaded || !status.connected) return
-    const syncSettings = async () => {
-      try {
-        const backendUrl = await window.electronAPI.getBackendUrl()
-        await fetch(`${backendUrl}/api/settings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(appSettings),
-        })
-      } catch (e) {
-        console.warn('Failed to sync settings:', e)
-      }
-    }
-    syncSettings()
-  }, [appSettings, settingsLoaded, status.connected])
-
-  // Check if Python environment is ready (Windows may need download)
   useEffect(() => {
     const check = async () => {
       try {
         const result = await window.electronAPI.checkPythonReady()
         setPythonReady(result.ready)
-      } catch (e) {
-        console.error('Failed to check Python readiness:', e)
-        // In dev mode or if check fails, assume ready
+      } catch {
         setPythonReady(true)
       }
     }
-    check()
+    void check()
   }, [])
 
-  // Start backend once Python is ready
   useEffect(() => {
     if (pythonReady !== true || backendStarted) return
     setBackendStarted(true)
     const start = async () => {
       try {
-        console.log('Starting Python backend...')
         await window.electronAPI.startPythonBackend()
-        console.log('Python backend started successfully')
       } catch (e) {
         console.error('Failed to start Python backend:', e)
       }
     }
-    start()
+    void start()
   }, [pythonReady, backendStarted])
 
-  // Check for first run
   useEffect(() => {
     const checkFirstRun = async () => {
       try {
-        const { needsSetup, needsLicense } = await window.electronAPI.checkFirstRun()
-        if (needsSetup) {
-          setSetupMode('full')
-        } else if (needsLicense) {
-          setSetupMode('license-only')
-        } else {
-          setSetupMode(null)
-        }
+        const next = await window.electronAPI.checkFirstRun()
+        setSetupState(next)
       } catch (e) {
         console.error('Failed to check first run:', e)
-        setSetupMode(null)
+        setSetupState({ needsSetup: false, needsLicense: false })
       }
     }
-    checkFirstRun()
+    void checkFirstRun()
   }, [])
 
-  // Show spinner while checking Python readiness
+  const handleFirstRunComplete = useCallback(async () => {
+    if (setupCompletionInFlightRef.current) {
+      return setupCompletionInFlightRef.current
+    }
+
+    setFirstRunFinalizeError(null)
+    setIsFinalizingFirstRun(true)
+
+    const inFlightPromise = (async () => {
+      const ok = await window.electronAPI.completeSetup()
+      if (!ok) {
+        throw new Error('Failed to complete setup.')
+      }
+      setSetupState({ needsSetup: false, needsLicense: false })
+    })()
+
+    setupCompletionInFlightRef.current = inFlightPromise
+
+    try {
+      await inFlightPromise
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to finalize setup.'
+      setFirstRunFinalizeError(message)
+      throw e
+    } finally {
+      setupCompletionInFlightRef.current = null
+      setIsFinalizingFirstRun(false)
+    }
+  }, [])
+
+  const handleAcceptLicense = useCallback(async () => {
+    const ok = await window.electronAPI.acceptLicense()
+    if (!ok) {
+      throw new Error('Failed to save license acceptance.')
+    }
+    setSetupState((prev) => {
+      if (prev === 'loading') return prev
+      return { ...prev, needsLicense: false }
+    })
+  }, [])
+
+  const saveApiKeyForFirstRun = useCallback(
+    async (apiKey: string) => {
+      const trimmed = apiKey.trim()
+      if (!trimmed) {
+        throw new Error('Please enter a valid LTX API key.')
+      }
+
+      const backendUrl = await window.electronAPI.getBackendUrl()
+      const response = await fetch(`${backendUrl}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ltxApiKey: trimmed }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save API key.')
+      }
+
+      setFirstRunFinalizeError(null)
+      updateSettings({ ltxApiKey: trimmed })
+    },
+    [updateSettings],
+  )
+
+  const isForcedFirstRun =
+    setupState !== 'loading' && setupState.needsSetup && !setupState.needsLicense && forceApiGenerations
+
+  const shouldAutoFinalizeForcedFirstRun =
+    isForcedFirstRun && isLoaded && hasLtxApiKey && !isFinalizingFirstRun && !firstRunFinalizeError
+
+  useEffect(() => {
+    if (!shouldAutoFinalizeForcedFirstRun) return
+    void handleFirstRunComplete().catch(() => {
+      // Error state is handled via firstRunFinalizeError.
+    })
+  }, [shouldAutoFinalizeForcedFirstRun, handleFirstRunComplete])
+
   if (pythonReady === null) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
@@ -165,15 +175,11 @@ function AppContent() {
     )
   }
 
-  // Show Python download/setup screen (Windows first launch)
   if (pythonReady === false) {
-    return (
-      <PythonSetup onReady={() => setPythonReady(true)} />
-    )
+    return <PythonSetup onReady={() => setPythonReady(true)} />
   }
 
-  // Wait for backend before showing first-run setup (it needs the API)
-  if (backendLoading || setupMode === 'loading') {
+  if (backendLoading || setupState === 'loading') {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -185,7 +191,6 @@ function AppContent() {
     )
   }
 
-  // Show error screen if backend failed
   if (backendError && !status.connected) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
@@ -199,13 +204,36 @@ function AppContent() {
     )
   }
 
-  // Show first run setup (after backend is connected)
-  if (setupMode) {
-    return <FirstRunSetup licenseOnly={setupMode === 'license-only'} onComplete={() => setSetupMode(null)} />
+  if (setupState.needsLicense) {
+    const licenseOnly = forceApiGenerations || !setupState.needsSetup
+    return (
+      <FirstRunSetup
+        showLicenseStep
+        licenseOnly={licenseOnly}
+        onAcceptLicense={handleAcceptLicense}
+        onComplete={
+          licenseOnly
+            ? async () => {
+                setSetupState((prev) => {
+                  if (prev === 'loading') return prev
+                  return { ...prev, needsLicense: false }
+                })
+              }
+            : handleFirstRunComplete
+        }
+      />
+    )
   }
 
-  // Check if settings/logs buttons should show (not on home/loading screens)
-  const showGlobalControls = currentView !== 'home' && status.connected
+  if (setupState.needsSetup && !forceApiGenerations) {
+    return <FirstRunSetup showLicenseStep={false} onComplete={handleFirstRunComplete} />
+  }
+
+  const showGlobalControls = currentView !== 'home' && status.connected && !setupState.needsSetup
+  const shouldBlockUntilSettingsLoaded = forceApiGenerations && !isLoaded
+  const shouldShowForcedFirstRunUpsell = isForcedFirstRun && isLoaded && !hasLtxApiKey
+  const shouldShowGlobalForcedUpsell = forceApiGenerations && !setupState.needsSetup && isLoaded && !hasLtxApiKey
+  const shouldBlockForApiKey = shouldShowForcedFirstRunUpsell || shouldShowGlobalForcedUpsell
 
   const renderView = () => {
     switch (currentView) {
@@ -224,10 +252,8 @@ function AppContent() {
     <div className="relative h-screen w-screen">
       {renderView()}
 
-      {/* Global Settings & Logs buttons - top right, always available */}
       {showGlobalControls && (
         <div className="fixed top-[18px] right-3 z-50 flex items-center gap-1">
-          {/* Logs */}
           <button
             onClick={() => setIsLogViewerOpen(true)}
             className="h-8 w-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
@@ -235,7 +261,6 @@ function AppContent() {
           >
             <FileText className="h-4 w-4" />
           </button>
-          {/* Settings */}
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="h-8 w-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
@@ -246,15 +271,69 @@ function AppContent() {
         </div>
       )}
 
-      {/* Global Modals */}
       <LogViewer isOpen={isLogViewerOpen} onClose={() => setIsLogViewerOpen(false)} />
       <SettingsModal
         isOpen={isSettingsOpen}
-        onClose={() => { setIsSettingsOpen(false); setSettingsInitialTab(undefined) }}
-        settings={appSettings}
-        onSettingsChange={setAppSettings}
+        onClose={() => {
+          setIsSettingsOpen(false)
+          setSettingsInitialTab(undefined)
+        }}
         initialTab={settingsInitialTab}
       />
+      <ApiUpsellModal
+        isOpen={shouldBlockForApiKey}
+        blocking
+        onClose={() => {
+          // Blocking mode intentionally does not allow close.
+        }}
+        onSaveApiKey={async (apiKey) => {
+          if (isForcedFirstRun) {
+            await saveApiKeyForFirstRun(apiKey)
+            return
+          }
+          updateSettings({ ltxApiKey: apiKey })
+        }}
+        initialApiKey={settings.ltxApiKey}
+        copy={forcedApiUpsellCopy}
+      />
+
+      {shouldBlockUntilSettingsLoaded && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-sm text-zinc-200">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading settings...
+          </div>
+        </div>
+      )}
+
+      {isForcedFirstRun && isLoaded && hasLtxApiKey && isFinalizingFirstRun && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-sm text-zinc-200">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Finalizing setup...
+          </div>
+        </div>
+      )}
+
+      {isForcedFirstRun && firstRunFinalizeError && (
+        <div className="fixed inset-0 z-[61] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-5 text-zinc-100">
+            <h3 className="text-base font-semibold">Setup finalization failed</h3>
+            <p className="mt-2 text-sm text-zinc-300">{firstRunFinalizeError}</p>
+            <div className="mt-4 flex justify-end">
+              <Button
+                onClick={() => {
+                  void handleFirstRunComplete().catch(() => {
+                    // Error state is already captured.
+                  })
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -263,8 +342,10 @@ export default function App() {
   return (
     <ProjectProvider>
       <KeyboardShortcutsProvider>
-        <AppContent />
-        <KeyboardShortcutsModal />
+        <AppSettingsProvider>
+          <AppContent />
+          <KeyboardShortcutsModal />
+        </AppSettingsProvider>
       </KeyboardShortcutsProvider>
     </ProjectProvider>
   )

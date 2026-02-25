@@ -8,6 +8,10 @@ import { getPythonDir } from './python-setup'
 
 let pythonProcess: ChildProcess | null = null
 
+interface BackendRuntimeFlags {
+  forceApiGenerations: boolean
+}
+
 function getBackendPath(): string {
   if (isDev) {
     return path.join(getCurrentDir(), 'backend')
@@ -70,7 +74,7 @@ export function getPythonPath(): string {
   return 'python'
 }
 
-export async function startPythonBackend(): Promise<void> {
+export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<void> {
   return new Promise((resolve, reject) => {
     const pythonPath = getPythonPath()
     const backendPath = getBackendPath()
@@ -98,6 +102,7 @@ export async function startPythonBackend(): Promise<void> {
         LTX_LOG_FILE: getCurrentLogFilename(),
         LTX_APP_DATA_DIR: getAppDataDir(),
         PYTORCH_ENABLE_MPS_FALLBACK: '1',
+        FORCE_API_GENERATIONS: flags.forceApiGenerations ? '1' : '0',
         // Set PYTHONHOME for bundled Python on macOS so it finds its stdlib
         ...(!isDev && process.platform !== 'win32' ? {
           PYTHONHOME: getPythonDir(),

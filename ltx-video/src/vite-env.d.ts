@@ -9,14 +9,17 @@ interface LogsResponse {
 interface Window {
   electronAPI: {
     getBackendUrl: () => Promise<string>
+    getRuntimeFlags: () => Promise<{ forceApiGenerations: boolean }>
     getModelsPath: () => Promise<string>
     readLocalFile: (filePath: string) => Promise<{ data: string; mimeType: string }>
     checkGpu: () => Promise<{ available: boolean; name?: string; vram?: number }>
     getAppInfo: () => Promise<{ version: string; isPackaged: boolean; modelsPath: string; userDataPath: string }>
     checkFirstRun: () => Promise<{ needsSetup: boolean; needsLicense: boolean }>
+    acceptLicense: () => Promise<boolean>
     completeSetup: () => Promise<boolean>
     fetchLicenseText: () => Promise<string>
     getNoticesText: () => Promise<string>
+    openExternalUrl: (url: string) => Promise<boolean>
     openFolder: (folderPath: string) => Promise<void>
     showItemInFolder: (filePath: string) => Promise<void>
     getLogs: () => Promise<LogsResponse>

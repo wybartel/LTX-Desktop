@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   // Get the backend URL
   getBackendUrl: (): Promise<string> => ipcRenderer.invoke('get-backend-url'),
+  getRuntimeFlags: (): Promise<{ forceApiGenerations: boolean }> => ipcRenderer.invoke('get-runtime-flags'),
   
   // Get the path where models are stored
   getModelsPath: (): Promise<string> => ipcRenderer.invoke('get-models-path'),
@@ -23,11 +24,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // First-run setup
   checkFirstRun: (): Promise<{ needsSetup: boolean; needsLicense: boolean }> => ipcRenderer.invoke('check-first-run'),
+  acceptLicense: (): Promise<boolean> => ipcRenderer.invoke('accept-license'),
   completeSetup: (): Promise<boolean> => ipcRenderer.invoke('complete-setup'),
   fetchLicenseText: (): Promise<string> => ipcRenderer.invoke('fetch-license-text'),
   getNoticesText: (): Promise<string> => ipcRenderer.invoke('get-notices-text'),
   
   // Open folder in file explorer
+  openExternalUrl: (url: string): Promise<boolean> => ipcRenderer.invoke('open-external-url', url),
   openFolder: (folderPath: string): Promise<void> => ipcRenderer.invoke('open-folder', folderPath),
   
   // Reveal a specific file in the OS file manager (Explorer/Finder)
@@ -113,12 +116,17 @@ declare global {
   interface Window {
     electronAPI: {
       getBackendUrl: () => Promise<string>
+      getRuntimeFlags: () => Promise<{ forceApiGenerations: boolean }>
       getModelsPath: () => Promise<string>
       readLocalFile: (filePath: string) => Promise<{ data: string; mimeType: string }>
       checkGpu: () => Promise<{ available: boolean; name?: string; vram?: number }>
       getAppInfo: () => Promise<{ version: string; isPackaged: boolean; modelsPath: string; userDataPath: string }>
-      checkFirstRun: () => Promise<boolean>
+      checkFirstRun: () => Promise<{ needsSetup: boolean; needsLicense: boolean }>
+      acceptLicense: () => Promise<boolean>
       completeSetup: () => Promise<boolean>
+      fetchLicenseText: () => Promise<string>
+      getNoticesText: () => Promise<string>
+      openExternalUrl: (url: string) => Promise<boolean>
       openFolder: (folderPath: string) => Promise<void>
       showItemInFolder: (filePath: string) => Promise<void>
       getLogs: () => Promise<LogsResponse>

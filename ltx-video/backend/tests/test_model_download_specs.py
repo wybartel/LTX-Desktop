@@ -25,6 +25,7 @@ def _build_config(tmp_path):
         ic_lora_dir=models_dir / "ic-loras",
         settings_file=tmp_path / "settings.json",
         ltx_api_base_url="https://api.ltx.video",
+        force_api_generations=False,
         use_sage_attention=False,
         camera_motion_prompts={},
         default_negative_prompt="",
@@ -57,3 +58,11 @@ def test_required_model_types_remain_dynamic_for_text_encoder():
 
     assert "text_encoder" not in required_with_api
     assert "text_encoder" in required_without_api
+
+
+def test_required_model_types_empty_base_stays_empty():
+    required = resolve_required_model_types(
+        frozenset(),
+        has_api_key=False,
+    )
+    assert required == frozenset()

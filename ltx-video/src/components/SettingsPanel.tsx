@@ -1,5 +1,11 @@
 import { Select } from './ui/select'
 import type { GenerationMode } from './ModeTabs'
+import {
+  FORCED_API_VIDEO_DURATIONS,
+  FORCED_API_VIDEO_FPS,
+  FORCED_API_VIDEO_RESOLUTIONS,
+  sanitizeForcedApiVideoSettings,
+} from '../lib/api-video-options'
 
 export interface GenerationSettings {
   model: 'fast' | 'pro'
@@ -20,20 +26,36 @@ interface SettingsPanelProps {
   onSettingsChange: (settings: GenerationSettings) => void
   disabled?: boolean
   mode?: GenerationMode
+  forceApiGenerations?: boolean
 }
 
-export function SettingsPanel({ settings, onSettingsChange, disabled, mode = 'text-to-video' }: SettingsPanelProps) {
+export function SettingsPanel({
+  settings,
+  onSettingsChange,
+  disabled,
+  mode = 'text-to-video',
+  forceApiGenerations = false,
+}: SettingsPanelProps) {
+  const isImageMode = mode === 'text-to-image'
+
   const handleChange = (key: keyof GenerationSettings, value: string | number | boolean) => {
+    const nextSettings = { ...settings, [key]: value } as GenerationSettings
+    if (forceApiGenerations && !isImageMode) {
+      onSettingsChange(sanitizeForcedApiVideoSettings(nextSettings))
+      return
+    }
+
     // If switching to Pro and duration is 20, reset to 10
     if (key === 'model' && value === 'pro' && settings.duration === 20) {
       onSettingsChange({ ...settings, [key]: value, duration: 10 })
       return
     }
-    onSettingsChange({ ...settings, [key]: value })
+    onSettingsChange(nextSettings)
   }
 
-  const isPro = settings.model === 'pro'
-  const isImageMode = mode === 'text-to-image'
+  const durationOptions = forceApiGenerations ? [...FORCED_API_VIDEO_DURATIONS] : [5, 6, 8, 10, 20]
+  const resolutionOptions = forceApiGenerations ? [...FORCED_API_VIDEO_RESOLUTIONS] : ['1080p', '720p', '540p']
+  const fpsOptions = forceApiGenerations ? [...FORCED_API_VIDEO_FPS] : [24, 25, 50]
 
   // Image mode settings
   if (isImageMode) {
@@ -74,22 +96,34 @@ export function SettingsPanel({ settings, onSettingsChange, disabled, mode = 'te
   return (
     <div className="space-y-4">
       {/* Model Selection */}
-      <div>
+      {!forceApiGenerations ? (
+        <div>
+          <Select
+            label="Model"
+            value={settings.model}
+            onChange={(e) => handleChange('model', e.target.value)}
+            disabled={disabled}
+          >
+            <option value="fast">Fast (Distilled)</option>
+            <option value="pro">Pro (Full)</option>
+          </Select>
+          {settings.model === 'pro' && (
+            <p className="text-[10px] text-zinc-500 mt-1">
+              First generation with Pro may take longer to load
+            </p>
+          )}
+        </div>
+      ) : (
         <Select
           label="Model"
           value={settings.model}
           onChange={(e) => handleChange('model', e.target.value)}
           disabled={disabled}
         >
-          <option value="fast">Fast (Distilled)</option>
-          <option value="pro">Pro (Full)</option>
+          <option value="fast">LTX-2 Fast (API)</option>
+          <option value="pro">LTX-2 Pro (API)</option>
         </Select>
-        {settings.model === 'pro' && (
-          <p className="text-[10px] text-zinc-500 mt-1">
-            First generation with Pro may take longer to load
-          </p>
-        )}
-      </div>
+      )}
 
       {/* Duration, Resolution, FPS Row */}
       <div className="grid grid-cols-3 gap-3">
@@ -99,13 +133,11 @@ export function SettingsPanel({ settings, onSettingsChange, disabled, mode = 'te
           onChange={(e) => handleChange('duration', parseInt(e.target.value))}
           disabled={disabled}
         >
-          <option value={5}>5 sec</option>
-          <option value={6}>6 sec</option>
-          <option value={8}>8 sec</option>
-          <option value={10}>10 sec</option>
-          <option value={20} disabled={isPro} className={isPro ? 'text-muted-foreground/50' : ''}>
-            20 sec
-          </option>
+          {durationOptions.map((duration) => (
+            <option key={duration} value={duration}>
+              {duration} sec
+            </option>
+          ))}
         </Select>
 
         <Select
@@ -114,9 +146,11 @@ export function SettingsPanel({ settings, onSettingsChange, disabled, mode = 'te
           onChange={(e) => handleChange('videoResolution', e.target.value)}
           disabled={disabled}
         >
-          <option value="1080p">1080p</option>
-          <option value="720p">720p</option>
-          <option value="540p">540p</option>
+          {resolutionOptions.map((resolution) => (
+            <option key={resolution} value={resolution}>
+              {resolution}
+            </option>
+          ))}
         </Select>
 
         <Select
@@ -125,9 +159,11 @@ export function SettingsPanel({ settings, onSettingsChange, disabled, mode = 'te
           onChange={(e) => handleChange('fps', parseInt(e.target.value))}
           disabled={disabled}
         >
-          <option value={24}>24</option>
-          <option value={25}>25</option>
-          <option value={50}>50</option>
+          {fpsOptions.map((fps) => (
+            <option key={fps} value={fps}>
+              {fps}
+            </option>
+          ))}
         </Select>
       </div>
 

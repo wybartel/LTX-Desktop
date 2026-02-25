@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Sparkles, Trash2, Square, ImageIcon, ArrowLeft } from 'lucide-react'
 import { ImageUploader } from '../components/ImageUploader'
 import { VideoPlayer } from '../components/VideoPlayer'
@@ -12,7 +12,9 @@ import { Button } from '../components/ui/button'
 import { useGeneration } from '../hooks/use-generation'
 import { useBackend } from '../hooks/use-backend'
 import { useProjects } from '../contexts/ProjectContext'
+import { useAppSettings } from '../contexts/AppSettingsContext'
 import { fileUrlToPath } from '../lib/url-to-path'
+import { sanitizeForcedApiVideoSettings } from '../lib/api-video-options'
 
 const DEFAULT_SETTINGS: GenerationSettings = {
   model: 'fast',
@@ -29,12 +31,18 @@ const DEFAULT_SETTINGS: GenerationSettings = {
 
 export function Playground() {
   const { goHome } = useProjects()
+  const { forceApiGenerations } = useAppSettings()
   const [mode, setMode] = useState<GenerationMode>('text-to-video')
   const [prompt, setPrompt] = useState('')
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const [settings, setSettings] = useState<GenerationSettings>(DEFAULT_SETTINGS)
+  const [settings, setSettings] = useState<GenerationSettings>(() => ({ ...DEFAULT_SETTINGS }))
 
   const { status } = useBackend()
+
+  useEffect(() => {
+    if (!forceApiGenerations) return
+    setSettings((prev) => sanitizeForcedApiVideoSettings({ ...prev, model: 'fast' }))
+  }, [forceApiGenerations])
 
   // Handle mode change
   const handleModeChange = (newMode: GenerationMode) => {
@@ -58,6 +66,10 @@ export function Playground() {
   const generatedImageRef = useRef<string | null>(null)
 
   const handleGenerate = () => {
+    const effectiveVideoSettings = forceApiGenerations
+      ? sanitizeForcedApiVideoSettings(settings)
+      : settings
+
     if (mode === 'text-to-image') {
       if (!prompt.trim()) return
       generateImage(prompt, settings)
@@ -65,7 +77,7 @@ export function Playground() {
       // Auto-detect: if image is loaded → I2V, otherwise → T2V
       if (!prompt.trim()) return
       const imagePath = selectedImage ? fileUrlToPath(selectedImage) : null
-      generate(prompt, imagePath, settings)
+      generate(prompt, imagePath, effectiveVideoSettings)
     }
   }
   
@@ -85,7 +97,8 @@ export function Playground() {
   const handleClearAll = () => {
     setPrompt('')
     setSelectedImage(null)
-    setSettings(DEFAULT_SETTINGS)
+    const baseDefaults = { ...DEFAULT_SETTINGS }
+    setSettings(forceApiGenerations ? sanitizeForcedApiVideoSettings(baseDefaults) : baseDefaults)
     if (mode !== 'text-to-image') setMode('text-to-video')
     reset()
   }
@@ -115,7 +128,7 @@ export function Playground() {
         
         <div className="flex items-center gap-4 pr-20">
           {/* Model Status Dropdown */}
-          <ModelStatusDropdown />
+          {!forceApiGenerations && <ModelStatusDropdown />}
           
           {/* GPU Info */}
           {status.gpuInfo && (
@@ -164,6 +177,7 @@ export function Playground() {
               onSettingsChange={setSettings}
               disabled={isGenerating}
               mode={mode}
+              forceApiGenerations={forceApiGenerations}
             />
 
             {/* Error Display */}

@@ -3,7 +3,9 @@ import './FirstRunSetup.css'
 
 interface FirstRunSetupProps {
   licenseOnly?: boolean
-  onComplete: () => void
+  showLicenseStep?: boolean
+  onComplete: () => Promise<void>
+  onAcceptLicense?: () => Promise<void>
 }
 
 type Step = 'license' | 'location' | 'installing' | 'complete'
@@ -34,8 +36,8 @@ const INSTALL_MESSAGES = [
 ]
 
 
-export function FirstRunSetup({ licenseOnly, onComplete }: FirstRunSetupProps) {
-  const [currentStep, setCurrentStep] = useState<Step>('license')
+export function FirstRunSetup({ licenseOnly, showLicenseStep = true, onComplete, onAcceptLicense }: FirstRunSetupProps) {
+  const [currentStep, setCurrentStep] = useState<Step>(showLicenseStep ? 'license' : 'location')
   const [installPath, setInstallPath] = useState('')
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -47,6 +49,8 @@ export function FirstRunSetup({ licenseOnly, onComplete }: FirstRunSetupProps) {
   const [licenseAccepted, setLicenseAccepted] = useState(false)
   const [licenseText, setLicenseText] = useState<string | null>(null)
   const [licenseError, setLicenseError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [isActionPending, setIsActionPending] = useState(false)
 
   // Format bytes to human readable
   const formatBytes = (bytes: number): string => {
@@ -124,8 +128,10 @@ export function FirstRunSetup({ licenseOnly, onComplete }: FirstRunSetupProps) {
       }
     }
     init()
-    fetchLicense()
-  }, [])
+    if (showLicenseStep) {
+      void fetchLicense()
+    }
+  }, [showLicenseStep])
 
   // Cycle install messages
   useEffect(() => {
@@ -201,29 +207,59 @@ export function FirstRunSetup({ licenseOnly, onComplete }: FirstRunSetupProps) {
   }
 
   // Handle next button
-  const handleNext = () => {
+  const handleNext = async () => {
+    setActionError(null)
     if (currentStep === 'license') {
-      if (licenseOnly) {
-        handleFinish()
-      } else {
+      if (!licenseAccepted) return
+      setIsActionPending(true)
+      try {
+        if (onAcceptLicense) {
+          await onAcceptLicense()
+        }
+        if (licenseOnly) {
+          await onComplete()
+          return
+        }
         setCurrentStep('location')
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Failed to accept license.')
+      } finally {
+        setIsActionPending(false)
       }
-    } else if (currentStep === 'location') {
+      return
+    }
+    if (currentStep === 'location') {
       startInstallation()
-    } else if (currentStep === 'complete') {
-      handleFinish()
+      return
+    }
+    if (currentStep === 'complete') {
+      await handleFinish()
     }
   }
 
   // Handle cancel/finish
   const handleCancel = async () => {
-    await window.electronAPI.completeSetup()
-    onComplete()
+    setActionError(null)
+    setIsActionPending(true)
+    try {
+      await onComplete()
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to complete setup.')
+    } finally {
+      setIsActionPending(false)
+    }
   }
 
   const handleFinish = async () => {
-    await window.electronAPI.completeSetup()
-    onComplete()
+    setActionError(null)
+    setIsActionPending(true)
+    try {
+      await onComplete()
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to complete setup.')
+    } finally {
+      setIsActionPending(false)
+    }
   }
 
   // Get button text
@@ -236,7 +272,8 @@ export function FirstRunSetup({ licenseOnly, onComplete }: FirstRunSetupProps) {
 
   // Check if next button should be disabled
   const isNextDisabled = () => {
-    if (currentStep === 'license') return !licenseAccepted
+    if (currentStep === 'license') return !licenseAccepted || isActionPending
+    if (currentStep === 'complete') return isActionPending
     return false
   }
 
@@ -812,19 +849,21 @@ export function FirstRunSetup({ licenseOnly, onComplete }: FirstRunSetupProps) {
 
           <div style={{ display: 'flex', gap: 10 }}>
             {/* Cancel Button */}
-            {currentStep !== 'complete' && (
+            {currentStep !== 'complete' && currentStep !== 'license' && (
               <button
                 onClick={handleCancel}
+                disabled={isActionPending}
                 style={{
                   padding: '10px 28px',
                   borderRadius: 9999,
                   fontSize: 13,
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  cursor: isActionPending ? 'not-allowed' : 'pointer',
                   background: 'transparent',
                   border: '1px solid #444',
                   color: '#ffffff',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  opacity: isActionPending ? 0.6 : 1
                 }}
               >
                 Cancel
@@ -834,7 +873,7 @@ export function FirstRunSetup({ licenseOnly, onComplete }: FirstRunSetupProps) {
             {/* Next/Install/Finish Button */}
             {currentStep !== 'installing' && (
               <button
-                onClick={handleNext}
+                onClick={() => void handleNext()}
                 disabled={isNextDisabled()}
                 style={{
                   padding: '10px 28px',
@@ -854,6 +893,11 @@ export function FirstRunSetup({ licenseOnly, onComplete }: FirstRunSetupProps) {
             )}
           </div>
         </div>
+        {actionError && (
+          <div style={{ padding: '0 32px 12px 32px', color: '#fca5a5', fontSize: 12 }}>
+            {actionError}
+          </div>
+        )}
       </div>
 
     </div>

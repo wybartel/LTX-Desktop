@@ -7,8 +7,8 @@ interface ModelInfo {
   downloaded: boolean
   size: number
   expected_size: number
-  is_folder?: boolean
   required?: boolean
+  is_folder?: boolean
 }
 
 interface ModelsStatus {

@@ -86,8 +86,8 @@ class GenerationProgressResponse(BaseModel):
     status: str
     phase: str
     progress: int
-    currentStep: int
-    totalSteps: int
+    currentStep: int | None
+    totalSteps: int | None
 
 
 class ModelInfo(BaseModel):
@@ -238,6 +238,7 @@ class GenerateVideoRequest(BaseModel):
     negativePrompt: str = ""
     duration: str = "2"
     fps: str = "24"
+    audio: str = "false"
     imagePath: str | None = None
 
 

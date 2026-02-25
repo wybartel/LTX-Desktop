@@ -173,6 +173,66 @@ class FakeLTXAPIClient:
         return self.image_to_video_result
 
 
+class FakeFluxAPIClient:
+    def __init__(self) -> None:
+        self.configured = True
+        self.text_to_image_calls: list[dict[str, Any]] = []
+        self.image_edit_calls: list[dict[str, Any]] = []
+        self.raise_on_text_to_image: Exception | None = None
+        self.raise_on_image_edit: Exception | None = None
+        self.text_to_image_result = b"fake-flux-api-image"
+        self.image_edit_result = b"fake-flux-api-edit-image"
+
+    def is_configured(self) -> bool:
+        return self.configured
+
+    def generate_text_to_image(
+        self,
+        *,
+        prompt: str,
+        width: int,
+        height: int,
+        seed: int,
+        num_inference_steps: int,
+    ) -> bytes:
+        self.text_to_image_calls.append(
+            {
+                "prompt": prompt,
+                "width": width,
+                "height": height,
+                "seed": seed,
+                "num_inference_steps": num_inference_steps,
+            }
+        )
+        if self.raise_on_text_to_image is not None:
+            raise self.raise_on_text_to_image
+        return self.text_to_image_result
+
+    def generate_image_edit(
+        self,
+        *,
+        prompt: str,
+        width: int,
+        height: int,
+        seed: int,
+        num_inference_steps: int,
+        input_images: list[bytes],
+    ) -> bytes:
+        self.image_edit_calls.append(
+            {
+                "prompt": prompt,
+                "width": width,
+                "height": height,
+                "seed": seed,
+                "num_inference_steps": num_inference_steps,
+                "input_images_count": len(input_images),
+            }
+        )
+        if self.raise_on_image_edit is not None:
+            raise self.raise_on_image_edit
+        return self.image_edit_result
+
+
 class FakeModelDownloader:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
@@ -705,6 +765,7 @@ class FakeServices:
     text_encoder: FakeTextEncoder = field(default_factory=FakeTextEncoder)
     task_runner: FakeTaskRunner = field(default_factory=FakeTaskRunner)
     ltx_api_client: FakeLTXAPIClient = field(default_factory=FakeLTXAPIClient)
+    flux_api_client: FakeFluxAPIClient = field(default_factory=FakeFluxAPIClient)
     fast_video_pipeline: FakeFastVideoPipeline = field(default_factory=FakeFastVideoPipeline)
     fast_native_video_pipeline: FakeFastNativeVideoPipeline = field(default_factory=FakeFastNativeVideoPipeline)
     pro_video_pipeline: FakeProVideoPipeline = field(default_factory=FakeProVideoPipeline)

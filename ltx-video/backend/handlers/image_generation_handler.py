@@ -9,15 +9,20 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from threading import RLock
+from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from api_types import GenerateImageRequest, GenerateImageResponse
 from _routes._errors import HTTPError
+from api_types import GenerateImageRequest, GenerateImageResponse
 from handlers.base import StateHandlerBase
 from handlers.generation_handler import GenerationHandler
 from handlers.pipelines_handler import PipelinesHandler
+from services.interfaces import FluxAPIClient
 from state.app_state_types import AppState
+
+if TYPE_CHECKING:
+    from runtime_config.runtime_config import RuntimeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +37,15 @@ class ImageGenerationHandler(StateHandlerBase):
         generation_handler: GenerationHandler,
         pipelines_handler: PipelinesHandler,
         outputs_dir: Path,
+        config: RuntimeConfig,
+        flux_api_client: FluxAPIClient,
     ) -> None:
         super().__init__(state, lock)
         self._generation = generation_handler
         self._pipelines = pipelines_handler
         self._outputs_dir = outputs_dir
+        self._config = config
+        self._flux_api_client = flux_api_client
 
     def generate(self, req: GenerateImageRequest) -> GenerateImageResponse:
         if self._generation.is_generation_running():
@@ -53,6 +62,16 @@ class ImageGenerationHandler(StateHandlerBase):
             logger.info("Using locked seed for image: %s", seed)
         else:
             seed = int(time.time()) % 2147483647
+
+        if self._config.force_api_generations:
+            return self._generate_via_api(
+                prompt=req.prompt,
+                width=width,
+                height=height,
+                num_inference_steps=req.numSteps,
+                seed=seed,
+                num_images=num_images,
+            )
 
         try:
             self._pipelines.load_flux_to_gpu()
@@ -90,18 +109,22 @@ class ImageGenerationHandler(StateHandlerBase):
         width = (width // 16) * 16
         height = (height // 16) * 16
 
-        input_images: list[Image.Image] = []
-        image_data = form.get("image", [b""])[0]
-        if image_data:
-            input_images.append(Image.open(BytesIO(image_data)).convert("RGB"))
-
-        for i in range(2, 9):
-            extra_data = form.get(f"image{i}", [b""])[0]
-            if extra_data:
-                input_images.append(Image.open(BytesIO(extra_data)).convert("RGB"))
-
-        if not input_images:
+        image_bytes_list = self._extract_input_image_bytes(form)
+        if not image_bytes_list:
             raise HTTPError(400, "At least one input image is required for editing")
+
+        if self._config.force_api_generations:
+            return self._edit_via_api(
+                prompt=prompt,
+                input_images=image_bytes_list,
+                width=width,
+                height=height,
+                num_inference_steps=num_steps,
+            )
+
+        input_images: list[Image.Image] = []
+        for image_data in image_bytes_list:
+            input_images.append(Image.open(BytesIO(image_data)).convert("RGB"))
 
         logger.info("Image edit request: %s reference(s), %sx%s, %s steps", len(input_images), width, height, num_steps)
 
@@ -220,3 +243,135 @@ class ImageGenerationHandler(StateHandlerBase):
 
         self._generation.update_progress("complete", 100, 1, 1)
         return [str(output_path)]
+
+    def _generate_via_api(
+        self,
+        *,
+        prompt: str,
+        width: int,
+        height: int,
+        num_inference_steps: int,
+        seed: int,
+        num_images: int,
+    ) -> GenerateImageResponse:
+        generation_id = uuid.uuid4().hex[:8]
+        output_paths: list[Path] = []
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        try:
+            self._generation.start_api_generation(generation_id)
+            self._generation.update_progress("validating_request", 5, None, None)
+
+            if not self._flux_api_client.is_configured():
+                raise HTTPError(500, "BFL_API_KEY_NOT_CONFIGURED")
+
+            for idx in range(num_images):
+                if self._generation.is_generation_cancelled():
+                    raise RuntimeError("Generation was cancelled")
+
+                inference_progress = 15 + int((idx / num_images) * 60)
+                self._generation.update_progress("inference", inference_progress, None, None)
+                image_bytes = self._flux_api_client.generate_text_to_image(
+                    prompt=prompt,
+                    width=width,
+                    height=height,
+                    seed=seed + idx,
+                    num_inference_steps=num_inference_steps,
+                )
+
+                if self._generation.is_generation_cancelled():
+                    raise RuntimeError("Generation was cancelled")
+
+                download_progress = 75 + int(((idx + 1) / num_images) * 20)
+                self._generation.update_progress("downloading_output", download_progress, None, None)
+
+                output_path = self._outputs_dir / f"flux_image_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+                output_path.write_bytes(image_bytes)
+                output_paths.append(output_path)
+
+            self._generation.update_progress("complete", 100, None, None)
+            self._generation.complete_generation([str(path) for path in output_paths])
+            return GenerateImageResponse(status="complete", image_paths=[str(path) for path in output_paths])
+        except HTTPError as e:
+            self._generation.fail_generation(e.detail)
+            raise
+        except Exception as e:
+            self._generation.fail_generation(str(e))
+            if "cancelled" in str(e).lower():
+                for path in output_paths:
+                    path.unlink(missing_ok=True)
+                logger.info("Image generation cancelled by user")
+                return GenerateImageResponse(status="cancelled")
+            raise HTTPError(500, str(e)) from e
+
+    def _edit_via_api(
+        self,
+        *,
+        prompt: str,
+        input_images: list[bytes],
+        width: int,
+        height: int,
+        num_inference_steps: int,
+    ) -> GenerateImageResponse:
+        if len(input_images) > 4:
+            raise HTTPError(400, "INVALID_KLEIN_REFERENCE_COUNT")
+
+        generation_id = uuid.uuid4().hex[:8]
+        output_path: Path | None = None
+        settings = self.state.app_settings.model_copy(deep=True)
+        seed = settings.locked_seed if settings.seed_locked else int(time.time()) % 2147483647
+
+        try:
+            self._generation.start_api_generation(generation_id)
+            self._generation.update_progress("validating_request", 5, None, None)
+
+            if not self._flux_api_client.is_configured():
+                raise HTTPError(500, "BFL_API_KEY_NOT_CONFIGURED")
+
+            self._generation.update_progress("uploading_image", 25, None, None)
+            self._generation.update_progress("inference", 55, None, None)
+
+            image_bytes = self._flux_api_client.generate_image_edit(
+                prompt=prompt,
+                width=width,
+                height=height,
+                seed=seed,
+                num_inference_steps=num_inference_steps,
+                input_images=input_images,
+            )
+
+            if self._generation.is_generation_cancelled():
+                raise RuntimeError("Generation was cancelled")
+
+            self._generation.update_progress("downloading_output", 85, None, None)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_path = self._outputs_dir / f"flux_edit_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+            output_path.write_bytes(image_bytes)
+
+            if self._generation.is_generation_cancelled():
+                raise RuntimeError("Generation was cancelled")
+
+            self._generation.update_progress("complete", 100, None, None)
+            self._generation.complete_generation([str(output_path)])
+            return GenerateImageResponse(status="complete", image_paths=[str(output_path)])
+        except HTTPError as e:
+            self._generation.fail_generation(e.detail)
+            raise
+        except Exception as e:
+            self._generation.fail_generation(str(e))
+            if "cancelled" in str(e).lower():
+                if output_path is not None:
+                    output_path.unlink(missing_ok=True)
+                logger.info("Image edit cancelled by user")
+                return GenerateImageResponse(status="cancelled")
+            raise HTTPError(500, str(e)) from e
+
+    @staticmethod
+    def _extract_input_image_bytes(form: MultipartForm) -> list[bytes]:
+        input_images: list[bytes] = []
+        for idx in range(1, 9):
+            key = "image" if idx == 1 else f"image{idx}"
+            image_data = form.get(key, [b""])[0]
+            if image_data:
+                input_images.append(image_data)
+        return input_images

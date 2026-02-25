@@ -41,7 +41,7 @@ class GenerationHandler(StateHandlerBase):
 
         self.state.api_generation = GenerationRunning(
             id=generation_id,
-            progress=GenerationProgress(phase="", progress=0, current_step=0, total_steps=0),
+            progress=GenerationProgress(phase="", progress=0, current_step=None, total_steps=None),
         )
 
     @with_state_lock
@@ -84,7 +84,13 @@ class GenerationHandler(StateHandlerBase):
                 return isinstance(self.state.api_generation, GenerationCancelled)
 
     @with_state_lock
-    def update_progress(self, phase: str, progress: int, current_step: int = 0, total_steps: int = 0) -> None:
+    def update_progress(
+        self,
+        phase: str,
+        progress: int,
+        current_step: int | None = None,
+        total_steps: int | None = None,
+    ) -> None:
         match self._running_slot():
             case "gpu":
                 match self.state.gpu_slot:

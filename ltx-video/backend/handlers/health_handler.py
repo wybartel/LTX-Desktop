@@ -125,6 +125,10 @@ class HealthHandler(StateHandlerBase):
                 self.set_startup_ready()
                 return
 
+            if self._config.force_api_generations:
+                self.set_startup_ready()
+                return
+
             self.set_startup_loading("Loading Fast pipeline", 30)
             self._pipelines.load_gpu_pipeline("fast", should_warm=False)
 

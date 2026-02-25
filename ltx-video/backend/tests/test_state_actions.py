@@ -153,3 +153,15 @@ def test_startup_warmup_keeps_fast_on_gpu_and_preloads_flux_on_cpu(test_state, f
     assert isinstance(test_state.state.cpu_slot, CpuSlot)
     assert test_state.state.cpu_slot.active_pipeline is fake_services.image_generation_pipeline
     assert fake_services.image_generation_pipeline.device is None
+
+
+def test_forced_mode_warmup_skips_fast_pipeline(test_state):
+    test_state.config.force_api_generations = True
+    test_state.config.required_model_types = frozenset()
+    test_state.state.app_settings.load_on_startup = True
+    test_state.state.app_settings.ltx_api_key = "api-key"
+
+    test_state.health.default_warmup()
+
+    assert test_state.state.gpu_slot is None
+    assert test_state.state.cpu_slot is None

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from api_types import DownloadProgressResponse
 from handlers.base import StateHandlerBase, with_state_lock
 from handlers.models_handler import ModelsHandler
-from runtime_config.model_download_specs import MODEL_FILE_ORDER
+from runtime_config.model_download_specs import MODEL_FILE_ORDER, resolve_required_model_types
 from services.interfaces import ModelDownloader, TaskRunner
 from state.app_state_types import AppState, DownloadError, FileDownloadCompleted, FileDownloadRunning, ModelFileType
 
@@ -165,8 +165,16 @@ class DownloadHandler(StateHandlerBase):
 
         self._models_handler.refresh_available_files()
         available = self.state.available_files.copy()
+        with self._lock:
+            has_api_key = bool(self.state.app_settings.ltx_api_key.strip())
+        required_types = resolve_required_model_types(
+            self._config.required_model_types,
+            has_api_key=has_api_key,
+        )
 
         for model_type in MODEL_FILE_ORDER:
+            if model_type not in required_types:
+                continue
             if model_type == "text_encoder" and skip_text_encoder:
                 continue
             if available[model_type] is not None:

@@ -171,6 +171,11 @@ migrate_legacy_models_layout(APP_DATA_DIR)
 IC_LORA_DIR.mkdir(parents=True, exist_ok=True)
 
 LTX_API_BASE_URL = "https://api.ltx.video"
+FORCE_API_GENERATIONS = os.environ.get("FORCE_API_GENERATIONS", "1") == "1"
+if FORCE_API_GENERATIONS:
+    REQUIRED_MODEL_TYPES = frozenset()
+else:
+    REQUIRED_MODEL_TYPES = DEFAULT_REQUIRED_MODEL_TYPES
 
 CAMERA_MOTION_PROMPTS = {
     "none": "",
@@ -190,11 +195,12 @@ runtime_config = RuntimeConfig(
     device=DEVICE,
     models_dir=MODELS_DIR,
     model_download_specs=DEFAULT_MODEL_DOWNLOAD_SPECS,
-    required_model_types=DEFAULT_REQUIRED_MODEL_TYPES,
+    required_model_types=REQUIRED_MODEL_TYPES,
     outputs_dir=OUTPUTS_DIR,
     ic_lora_dir=IC_LORA_DIR,
     settings_file=SETTINGS_FILE,
     ltx_api_base_url=LTX_API_BASE_URL,
+    force_api_generations=FORCE_API_GENERATIONS,
     use_sage_attention=use_sage_attention,
     camera_motion_prompts=CAMERA_MOTION_PROMPTS,
     default_negative_prompt=DEFAULT_NEGATIVE_PROMPT,

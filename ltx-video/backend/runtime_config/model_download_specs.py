@@ -77,7 +77,13 @@ DEFAULT_REQUIRED_MODEL_TYPES: frozenset[ModelFileType] = frozenset(
 )
 
 
-def resolve_required_model_types(base_required: frozenset[ModelFileType], has_api_key: bool, use_local_text_encoder: bool = False) -> frozenset[ModelFileType]:
+def resolve_required_model_types(
+    base_required: frozenset[ModelFileType],
+    has_api_key: bool,
+    use_local_text_encoder: bool = False,
+) -> frozenset[ModelFileType]:
+    if not base_required:
+        return base_required
     if has_api_key and not use_local_text_encoder:
         return base_required
     return cast(frozenset[ModelFileType], base_required | {"text_encoder"})

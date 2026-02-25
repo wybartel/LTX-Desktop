@@ -49,9 +49,34 @@ function markSetupComplete(settingsPath: string): void {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
 }
 
-export function registerAppHandlers(): void {
+function markLicenseAccepted(settingsPath: string): void {
+  let settings: Record<string, unknown> = {}
+
+  try {
+    if (fs.existsSync(settingsPath)) {
+      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+    }
+  } catch {
+    settings = {}
+  }
+
+  settings.licenseAccepted = true
+  settings.licenseAcceptedDate = new Date().toISOString()
+
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
+}
+
+interface RuntimeFlags {
+  forceApiGenerations: boolean
+}
+
+export function registerAppHandlers(runtimeFlags: RuntimeFlags): void {
   ipcMain.handle('get-backend-url', () => {
     return BACKEND_BASE_URL
+  })
+
+  ipcMain.handle('get-runtime-flags', () => {
+    return runtimeFlags
   })
 
   ipcMain.handle('get-models-path', () => {
@@ -78,6 +103,12 @@ export function registerAppHandlers(): void {
   ipcMain.handle('check-first-run', () => {
     const settingsPath = path.join(app.getPath('userData'), 'app_state.json')
     return getSetupStatus(settingsPath)
+  })
+
+  ipcMain.handle('accept-license', () => {
+    const settingsPath = path.join(app.getPath('userData'), 'app_state.json')
+    markLicenseAccepted(settingsPath)
+    return true
   })
 
   ipcMain.handle('complete-setup', () => {
@@ -117,7 +148,7 @@ export function registerAppHandlers(): void {
   })
 
   ipcMain.handle('start-python-backend', async () => {
-    await startPythonBackend()
+    await startPythonBackend(runtimeFlags)
   })
 
 }

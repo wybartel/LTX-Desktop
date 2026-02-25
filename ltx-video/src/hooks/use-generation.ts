@@ -16,8 +16,8 @@ interface GenerationProgress {
   status: string
   phase: string
   progress: number
-  currentStep: number
-  totalSteps: number
+  currentStep: number | null
+  totalSteps: number | null
 }
 
 interface UseGenerationReturn extends GenerationState {
@@ -61,14 +61,20 @@ function getImageDimensions(settings: GenerationSettings): { width: number; heig
 }
 
 // Map phase to user-friendly message
-function getPhaseMessage(phase: string, _currentStep: number, totalSteps: number): string {
+function getPhaseMessage(phase: string, _currentStep: number | null, totalSteps: number | null): string {
   switch (phase) {
+    case 'validating_request':
+      return 'Validating request...'
+    case 'uploading_image':
+      return 'Uploading image...'
     case 'loading_model':
       return 'Loading model...'
     case 'encoding_text':
       return 'Encoding prompt...'
     case 'inference':
-      return totalSteps > 0 ? `Generating (${totalSteps} steps)...` : 'Generating...'
+      return typeof totalSteps === 'number' && totalSteps > 0 ? `Generating (${totalSteps} steps)...` : 'Generating...'
+    case 'downloading_output':
+      return 'Downloading output...'
     case 'decoding':
       return 'Decoding video...'
     case 'complete':
@@ -110,6 +116,8 @@ export function useGeneration(): UseGenerationReturn {
     })
 
     abortControllerRef.current = new AbortController()
+    let progressInterval: ReturnType<typeof setInterval> | null = null
+    let shouldApplyPollingUpdates = true
 
     try {
       // Get backend URL from Electron
@@ -175,12 +183,15 @@ export function useGeneration(): UseGenerationReturn {
       const estimatedInferenceTime = settings.model === 'pro' ? 120 : 45
       
       const pollProgress = async () => {
+        if (!shouldApplyPollingUpdates) return
         try {
           const res = await fetch(`${backendUrl}/api/generation/progress`)
           if (res.ok) {
             const data: GenerationProgress = await res.json()
+            if (!shouldApplyPollingUpdates) return
             
             let displayProgress = data.progress
+            let statusMessage = getPhaseMessage(data.phase, data.currentStep, data.totalSteps)
             
             // Time-based interpolation during inference phase
             if (data.phase === 'inference') {
@@ -192,13 +203,20 @@ export function useGeneration(): UseGenerationReturn {
               const inferenceProgress = Math.min(elapsed / estimatedInferenceTime, 0.95)
               displayProgress = 15 + Math.floor(inferenceProgress * 80)
             }
+
+            // Keep API/local completion as a terminal response state, not polling state.
+            // Polling complete means backend state is finalized, but request can still be in-flight.
+            if (data.phase === 'complete' || data.status === 'complete') {
+              displayProgress = 95
+              statusMessage = 'Finalizing...'
+            }
             
             lastPhase = data.phase
             
             setState(prev => ({
               ...prev,
               progress: displayProgress,
-              statusMessage: getPhaseMessage(data.phase, data.currentStep, data.totalSteps),
+              statusMessage,
             }))
           }
         } catch {
@@ -206,7 +224,7 @@ export function useGeneration(): UseGenerationReturn {
         }
       }
       
-      const progressInterval = setInterval(pollProgress, 500)
+      progressInterval = setInterval(pollProgress, 500)
 
       // Start generation (HTTP POST - synchronous, returns when done)
       const response = await fetch(`${backendUrl}/api/generate`, {
@@ -215,8 +233,7 @@ export function useGeneration(): UseGenerationReturn {
         body: JSON.stringify(body),
         signal: abortControllerRef.current.signal,
       })
-
-      clearInterval(progressInterval)
+      shouldApplyPollingUpdates = false
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -263,6 +280,11 @@ export function useGeneration(): UseGenerationReturn {
           isGenerating: false,
           error: error instanceof Error ? error.message : 'Unknown error',
         }))
+      }
+    } finally {
+      shouldApplyPollingUpdates = false
+      if (progressInterval) {
+        clearInterval(progressInterval)
       }
     }
   }, [])

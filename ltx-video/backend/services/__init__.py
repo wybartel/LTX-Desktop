@@ -3,6 +3,7 @@
 from services.interfaces import (
     FastNativeVideoPipeline,
     FastVideoPipeline,
+    FluxAPIClient,
     ImageGenerationPipeline,
     GpuCleaner,
     GpuInfo,
@@ -34,6 +35,7 @@ __all__ = [
     "VideoPipelineModelType",
     "FastVideoPipeline",
     "FastNativeVideoPipeline",
+    "FluxAPIClient",
     "ProVideoPipeline",
     "ProNativeVideoPipeline",
     "ImageGenerationPipeline",

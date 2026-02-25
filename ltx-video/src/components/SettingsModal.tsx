@@ -1,6 +1,7 @@
 import { AlertCircle, Check, Download, Info, RotateCcw, Settings, Sliders, Sparkles, X, Zap } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { Button } from './ui/button'
+import { useAppSettings, type AppSettings } from '../contexts/AppSettingsContext'
 
 const DEFAULT_T2V_SYSTEM_PROMPT = `You are a prompt enhancer for a text-to-video model. Your task is to take user input and expand it into a fully realized, visually and acoustically specific scene.
 
@@ -57,45 +58,17 @@ interface TextEncoderStatus {
   expected_size_gb: number
 }
 
-interface InferenceSettings {
-  steps: number
-  useUpscaler: boolean
-}
-
-interface FastModelSettings {
-  useUpscaler: boolean
-}
-
-interface AppSettings {
-  useTorchCompile: boolean
-  loadOnStartup: boolean
-  ltxApiKey: string
-  useLocalTextEncoder: boolean
-  fastModel: FastModelSettings
-  proModel: InferenceSettings
-  promptCacheSize: number
-  // Prompt Enhancer settings
-  promptEnhancerEnabledT2V: boolean
-  promptEnhancerEnabledI2V: boolean
-  geminiApiKey: string
-  t2vSystemPrompt: string
-  i2vSystemPrompt: string
-  // Seed settings
-  seedLocked: boolean
-  lockedSeed: number
-}
-
 interface SettingsModalProps {
   isOpen: boolean
   onClose: () => void
-  settings: AppSettings
-  onSettingsChange: (settings: AppSettings) => void
   initialTab?: TabId
 }
 
 type TabId = 'general' | 'inference' | 'promptEnhancer' | 'about'
 
-export function SettingsModal({ isOpen, onClose, settings, onSettingsChange, initialTab }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProps) {
+  const { settings, updateSettings } = useAppSettings()
+  const onSettingsChange = (next: AppSettings) => updateSettings(next)
   const [activeTab, setActiveTab] = useState<TabId>('general')
   const [textEncoderStatus, setTextEncoderStatus] = useState<TextEncoderStatus | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -1192,4 +1165,4 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange, ini
   )
 }
 
-export type { AppSettings, InferenceSettings, TabId as SettingsTabId }
+export type { AppSettings, TabId as SettingsTabId }

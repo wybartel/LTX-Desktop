@@ -82,6 +82,12 @@ function importFileToStorage(sourcePath: string, originalName: string): { path: 
 }
 
 export function registerFileHandlers(): void {
+  ipcMain.handle('open-external-url', async (_event, url: string) => {
+    const { shell } = await import('electron')
+    await shell.openExternal(url)
+    return true
+  })
+
   ipcMain.handle('open-folder', async (_event, folderPath: string) => {
     const { shell } = await import('electron')
     shell.openPath(folderPath)

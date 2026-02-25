@@ -6,11 +6,18 @@ import {
   Paintbrush, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useProjects } from '../contexts/ProjectContext'
+import { useAppSettings } from '../contexts/AppSettingsContext'
 import { useGeneration } from '../hooks/use-generation'
 import type { Asset } from '../types/project'
 import { GenerationErrorDialog } from '../components/GenerationErrorDialog'
 import { copyToAssetFolder } from '../lib/asset-copy'
 import { fileUrlToPath } from '../lib/url-to-path'
+import {
+  FORCED_API_VIDEO_DURATIONS,
+  FORCED_API_VIDEO_FPS,
+  FORCED_API_VIDEO_RESOLUTIONS,
+  sanitizeForcedApiVideoSettings,
+} from '../lib/api-video-options'
 
 // Asset card with hover overlays
 function AssetCard({ 
@@ -206,80 +213,54 @@ function SettingsDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen])
   
-  const btnRef = useRef<HTMLButtonElement>(null)
-  
   return (
     <div ref={dropdownRef} className="relative">
       <button 
-        ref={btnRef}
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors ${isOpen ? 'bg-zinc-700 hover:bg-zinc-700' : 'hover:bg-zinc-800'}`}
+        className={`flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-1.5 rounded-md transition-colors ${isOpen ? 'bg-zinc-700 hover:bg-zinc-700' : 'hover:bg-zinc-800'}`}
       >
         {trigger}
       </button>
       
-      {isOpen && (() => {
-        const rect = btnRef.current?.getBoundingClientRect()
-        const top = rect ? rect.top - 8 : 0
-        const left = rect ? rect.left : 0
-        return (
-          <>
-            <div className="fixed inset-0 z-[9998]" onMouseDown={() => setIsOpen(false)} />
-            <div
-              className="fixed bg-zinc-800 border border-zinc-700 rounded-md p-2 min-w-[160px] shadow-xl z-[9999]"
-              style={{ bottom: window.innerHeight - top, left }}
-            >
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">{title}</div>
-              <div className="space-y-1">
-                {options.map(option => (
-                  <div key={option.value} className="relative group/option">
-                    <button
-                      onClick={() => { if (!option.disabled) { onChange(option.value); setIsOpen(false) } }}
-                      className={`w-full flex items-center justify-between px-2 py-2 rounded-md transition-colors text-left ${
-                        option.disabled
-                          ? 'cursor-not-allowed'
-                          : value === option.value ? 'bg-white/20 hover:bg-white/25' : 'hover:bg-zinc-700'
-                      }`}
-                    >
-                      <span className={`flex items-center gap-2.5 text-sm ${
-                        option.disabled 
-                          ? 'text-zinc-600' 
-                          : value === option.value ? 'text-white' : 'text-zinc-400'
-                      }`}>
-                        {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
-                        {option.label}
-                      </span>
-                      {value === option.value && !option.disabled && (
-                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </button>
-                    {option.disabled && option.tooltip && (
-                      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-zinc-700 rounded text-xs text-zinc-300 whitespace-nowrap opacity-0 group-hover/option:opacity-100 pointer-events-none z-[10000] transition-opacity">
-                        {option.tooltip}
-                      </div>
-                    )}
+      {isOpen && (
+        <div className="absolute bottom-full left-0 mb-2 bg-zinc-800 border border-zinc-700 rounded-md p-2 min-w-[160px] shadow-xl z-[9999]">
+          <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">{title}</div>
+          <div className="space-y-1">
+            {options.map(option => (
+              <div key={option.value} className="relative group/option">
+                <button
+                  onClick={() => { if (!option.disabled) { onChange(option.value); setIsOpen(false) } }}
+                  className={`w-full flex items-center justify-between px-2 py-2 rounded-md transition-colors text-left ${
+                    option.disabled
+                      ? 'cursor-not-allowed'
+                      : value === option.value ? 'bg-white/20 hover:bg-white/25' : 'hover:bg-zinc-700'
+                  }`}
+                >
+                  <span className={`flex items-center gap-2.5 text-sm ${
+                    option.disabled 
+                      ? 'text-zinc-600' 
+                      : value === option.value ? 'text-white' : 'text-zinc-400'
+                  }`}>
+                    {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
+                    {option.label}
+                  </span>
+                  {value === option.value && !option.disabled && (
+                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+                {option.disabled && option.tooltip && (
+                  <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-zinc-700 rounded text-xs text-zinc-300 whitespace-nowrap opacity-0 group-hover/option:opacity-100 pointer-events-none z-[10000] transition-opacity">
+                    {option.tooltip}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-          </>
-        )
-      })()}
+            ))}
+          </div>
+        </div>
+      )}
     </div>
-  )
-}
-
-// Grid icon for variations
-function GridIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
   )
 }
 
@@ -323,6 +304,7 @@ function PromptBar({
   onInputImageChange,
   settings,
   onSettingsChange,
+  forceApiGenerations,
 }: {
   mode: 'image' | 'video'
   onModeChange: (mode: 'image' | 'video') => void
@@ -336,15 +318,20 @@ function PromptBar({
     model: string
     duration: number
     videoResolution: string
+    fps: number
     aspectRatio: string
     imageResolution: string
     variations: number
     audio?: boolean
   }
   onSettingsChange: (settings: any) => void
+  forceApiGenerations: boolean
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const videoDurationOptions = forceApiGenerations ? [...FORCED_API_VIDEO_DURATIONS] : [5, 6, 8, 10, 20]
+  const videoResolutionOptions = forceApiGenerations ? [...FORCED_API_VIDEO_RESOLUTIONS] : ['540p', '720p', '1080p']
+  const videoFpsOptions = forceApiGenerations ? [...FORCED_API_VIDEO_FPS] : [24, 25, 50]
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -502,41 +489,32 @@ function PromptBar({
               }
             />
             
-            {/* Variations dropdown */}
-            <SettingsDropdown
-              title="VARIATIONS"
-              value={String(settings.variations)}
-              onChange={(v) => onSettingsChange({ ...settings, variations: parseInt(v) })}
-              options={[
-                { value: '12', label: '12' },
-                { value: '9', label: '9' },
-                { value: '6', label: '6' },
-                { value: '3', label: '3' },
-                { value: '1', label: '1' },
-              ]}
-              trigger={
-                <>
-                  <GridIcon className="h-3.5 w-3.5" />
-                  <span>{settings.variations}</span>
-                </>
-              }
-            />
           </>
         ) : (
           <>
-            {/* Model dropdown */}
             <SettingsDropdown
               title="MODEL"
               value={settings.model}
               onChange={(v) => onSettingsChange({ ...settings, model: v })}
-              options={[
-                { value: 'fast', label: 'LTX-2 Fast' },
-                { value: 'pro', label: 'LTX-2 Pro' },
-              ]}
+              options={
+                forceApiGenerations
+                  ? [
+                      { value: 'fast', label: 'LTX-2 Fast (API)' },
+                      { value: 'pro', label: 'LTX-2 Pro (API)' },
+                    ]
+                  : [
+                      { value: 'fast', label: 'LTX-2 Fast' },
+                      { value: 'pro', label: 'LTX-2 Pro' },
+                    ]
+              }
               trigger={
                 <>
                   <LightricksIcon className="h-3.5 w-3.5" />
-                  <span className="text-zinc-300 font-medium">{settings.model === 'fast' ? 'LTX-2 Fast' : 'LTX-2 Pro'}</span>
+                  <span className="text-zinc-300 font-medium">
+                    {settings.model === 'fast'
+                      ? (forceApiGenerations ? 'LTX-2 Fast (API)' : 'LTX-2 Fast')
+                      : (forceApiGenerations ? 'LTX-2 Pro (API)' : 'LTX-2 Pro')}
+                  </span>
                 </>
               }
             />
@@ -548,13 +526,7 @@ function PromptBar({
               title="DURATION"
               value={String(settings.duration)}
               onChange={(v) => onSettingsChange({ ...settings, duration: parseFloat(v) })}
-              options={[
-                { value: '5', label: '5 Sec' },
-                { value: '6', label: '6 Sec' },
-                { value: '8', label: '8 Sec' },
-                { value: '10', label: '10 Sec' },
-                { value: '20', label: '20 Sec' },
-              ]}
+              options={videoDurationOptions.map((value) => ({ value: String(value), label: `${value} Sec` }))}
               trigger={
                 <>
                   <Clock className="h-3.5 w-3.5" />
@@ -568,11 +540,7 @@ function PromptBar({
               title="RESOLUTION"
               value={settings.videoResolution}
               onChange={(v) => onSettingsChange({ ...settings, videoResolution: v })}
-              options={[
-                { value: '540p', label: '540p' },
-                { value: '720p', label: '720p' },
-                { value: '1080p', label: '1080p' },
-              ]}
+              options={videoResolutionOptions.map((value) => ({ value, label: value }))}
               trigger={
                 <>
                   <Monitor className="h-3.5 w-3.5" />
@@ -580,6 +548,21 @@ function PromptBar({
                 </>
               }
             />
+
+            {forceApiGenerations && (
+              <SettingsDropdown
+                title="FPS"
+                value={String(settings.fps)}
+                onChange={(v) => onSettingsChange({ ...settings, fps: parseInt(v) })}
+                options={videoFpsOptions.map((value) => ({ value: String(value), label: `${value}` }))}
+                trigger={
+                  <>
+                    <Film className="h-3.5 w-3.5" />
+                    <span>{settings.fps} FPS</span>
+                  </>
+                }
+              />
+            )}
             
             {/* Aspect Ratio dropdown */}
             <SettingsDropdown
@@ -599,25 +582,6 @@ function PromptBar({
               }
             />
             
-            {/* Variations dropdown */}
-            <SettingsDropdown
-              title="VARIATIONS"
-              value={String(settings.variations)}
-              onChange={(v) => onSettingsChange({ ...settings, variations: parseInt(v) })}
-              options={[
-                { value: '12', label: '12' },
-                { value: '9', label: '9' },
-                { value: '6', label: '6' },
-                { value: '3', label: '3' },
-                { value: '1', label: '1' },
-              ]}
-              trigger={
-                <>
-                  <GridIcon className="h-3.5 w-3.5" />
-                  <span>{settings.variations}</span>
-                </>
-              }
-            />
           </>
         )}
         
@@ -694,8 +658,20 @@ const gallerySizeClasses: Record<GallerySize, string> = {
   large: 'grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3',
 }
 
+const DEFAULT_VIDEO_SETTINGS = {
+  model: 'fast',
+  duration: 5,
+  videoResolution: '540p',
+  fps: 24,
+  aspectRatio: '16:9',
+  imageResolution: '1080p',
+  variations: 1,
+  audio: true,
+}
+
 export function GenSpace() {
   const { currentProject, currentProjectId, addAsset, deleteAsset, toggleFavorite, genSpaceEditImageUrl, setGenSpaceEditImageUrl, genSpaceEditMode, setGenSpaceEditMode } = useProjects()
+  const { forceApiGenerations } = useAppSettings()
   const [mode, setMode] = useState<'image' | 'video'>('video')
   const [prompt, setPrompt] = useState('')
   const [inputImage, setInputImage] = useState<string | null>(null)
@@ -705,15 +681,15 @@ export function GenSpace() {
   const [gallerySize, setGallerySize] = useState<GallerySize>('medium')
   const [showSizeMenu, setShowSizeMenu] = useState(false)
   const sizeMenuRef = useRef<HTMLDivElement>(null)
-  const [settings, setSettings] = useState({
-    model: 'fast',
-    duration: 5,
-    videoResolution: '540p',
-    aspectRatio: '16:9',
-    imageResolution: '1080p',
-    variations: 1,
-    audio: true,
-  })
+  const persistedVideoKeyRef = useRef<string | null>(null)
+  const [settings, setSettings] = useState(() => ({ ...DEFAULT_VIDEO_SETTINGS }))
+  const applyForcedVideoSettings = useCallback(
+    (next: { model: string; duration: number; videoResolution: string; fps: number; audio: boolean; aspectRatio: string; imageResolution: string; variations: number }) => {
+      if (!forceApiGenerations) return next
+      return sanitizeForcedApiVideoSettings(next)
+    },
+    [forceApiGenerations],
+  )
   
   const {
     generate,
@@ -741,6 +717,11 @@ export function GenSpace() {
     }
   }, [genSpaceEditImageUrl, setGenSpaceEditImageUrl, genSpaceEditMode, setGenSpaceEditMode])
 
+  useEffect(() => {
+    if (!forceApiGenerations) return
+    setSettings((prev) => applyForcedVideoSettings({ ...prev, model: 'fast' }))
+  }, [applyForcedVideoSettings, forceApiGenerations])
+
   // Only show assets that were generated (have generationParams), not imported files
   const assets = (currentProject?.assets || []).filter(a => a.generationParams)
   const [lastPrompt, setLastPrompt] = useState('')
@@ -749,43 +730,52 @@ export function GenSpace() {
 
   // When video generation completes, add to project assets
   useEffect(() => {
-    if (videoUrl && videoPath && currentProjectId && !isGenerating) {
-      const exists = assets.some(a => a.url === videoUrl)
-      if (!exists) {
-        const genMode = inputImage ? 'image-to-video' : 'text-to-video'
-        ;(async () => {
-          const { path: finalPath, url: finalUrl } = await copyToAssetFolder(videoPath, videoUrl, assetSavePath)
-          addAsset(currentProjectId, {
-            type: 'video',
-            path: finalPath,
-            url: finalUrl,
+    if (!videoUrl || !videoPath || !currentProjectId || isGenerating) return
+
+    const generationKey = `${videoUrl}|${videoPath}`
+    if (persistedVideoKeyRef.current === generationKey) return
+    persistedVideoKeyRef.current = generationKey
+
+    const genMode = inputImage ? 'image-to-video' : 'text-to-video'
+    const savedVideoSettings = applyForcedVideoSettings(settings)
+
+    ;(async () => {
+      try {
+        const { path: finalPath, url: finalUrl } = await copyToAssetFolder(videoPath, videoUrl, assetSavePath)
+        addAsset(currentProjectId, {
+          type: 'video',
+          path: finalPath,
+          url: finalUrl,
+          prompt: lastPrompt,
+          resolution: savedVideoSettings.videoResolution,
+          duration: savedVideoSettings.duration,
+          generationParams: {
+            mode: genMode as 'text-to-video' | 'image-to-video',
             prompt: lastPrompt,
-            resolution: settings.videoResolution,
-            duration: settings.duration,
-            generationParams: {
-              mode: genMode as 'text-to-video' | 'image-to-video',
-              prompt: lastPrompt,
-              model: settings.model,
-              duration: settings.duration,
-              resolution: settings.videoResolution,
-              fps: 24,
-              audio: settings.audio || false,
-              cameraMotion: 'none',
-              imageAspectRatio: settings.aspectRatio,
-              imageSteps: 4,
-              inputImageUrl: inputImage || undefined,
-            },
-            takes: [{
-              url: finalUrl,
-              path: finalPath,
-              createdAt: Date.now(),
-            }],
-            activeTakeIndex: 0,
-          })
-        })()
+            model: savedVideoSettings.model,
+            duration: savedVideoSettings.duration,
+            resolution: savedVideoSettings.videoResolution,
+            fps: savedVideoSettings.fps,
+            audio: savedVideoSettings.audio || false,
+            cameraMotion: 'none',
+            imageAspectRatio: savedVideoSettings.aspectRatio,
+            imageSteps: 4,
+            inputImageUrl: inputImage || undefined,
+          },
+          takes: [{
+            url: finalUrl,
+            path: finalPath,
+            createdAt: Date.now(),
+          }],
+          activeTakeIndex: 0,
+        })
+        reset()
+      } catch (err) {
+        persistedVideoKeyRef.current = null
+        console.error('Failed to persist generated video asset:', err)
       }
-    }
-  }, [videoUrl, videoPath, currentProjectId, isGenerating])
+    })()
+  }, [videoUrl, videoPath, currentProjectId, isGenerating, applyForcedVideoSettings, settings, inputImage, assetSavePath, lastPrompt, addAsset, reset])
   
   // When image generation/editing completes, add all images to project assets
   useEffect(() => {
@@ -919,19 +909,20 @@ export function GenSpace() {
       // Generate video (t2v if no image, i2v if image is provided)
       // Extract filesystem path from the file:// URL for the backend
       const imagePath = inputImage ? fileUrlToPath(inputImage) : null
+      const videoSettings = applyForcedVideoSettings(settings)
 
       generate(
         prompt,
         imagePath,
         {
-          model: settings.model as 'fast' | 'pro',
-          duration: settings.duration,
-          videoResolution: settings.videoResolution,
-          fps: 24,
-          audio: settings.audio || false,
+          model: videoSettings.model as 'fast' | 'pro',
+          duration: videoSettings.duration,
+          videoResolution: videoSettings.videoResolution,
+          fps: videoSettings.fps,
+          audio: videoSettings.audio || false,
           cameraMotion: 'none',
-          imageResolution: settings.imageResolution,
-          imageAspectRatio: settings.aspectRatio,
+          imageResolution: videoSettings.imageResolution,
+          imageAspectRatio: videoSettings.aspectRatio,
           imageSteps: 4,
         }
       )
@@ -1098,7 +1089,7 @@ export function GenSpace() {
           </div>
 
           {/* Assets grid — fills remaining space, scrollable */}
-          <div className="overflow-auto flex-1">
+          <div className="overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] flex-1">
             <div className={`grid ${gallerySizeClasses[gallerySize]} gap-4`}>
               {isGenerating && (
                 <div className="relative rounded-xl overflow-hidden bg-zinc-800 aspect-video">
@@ -1136,8 +1127,8 @@ export function GenSpace() {
         </div>
       )}
 
-      {/* Floating prompt panel — centered 600px */}
-      <div className="absolute bottom-5 left-[calc(50%-300px)] w-[600px]">
+      {/* Floating prompt panel — wider, responsive, centered */}
+      <div className="absolute bottom-5 left-1/2 w-[min(700px,calc(100%-2rem))] -translate-x-1/2">
 
         {/* Prompt bar */}
         <PromptBar
@@ -1150,7 +1141,8 @@ export function GenSpace() {
           inputImage={inputImage}
           onInputImageChange={setInputImage}
           settings={settings}
-          onSettingsChange={setSettings}
+          onSettingsChange={(nextSettings) => setSettings(applyForcedVideoSettings(nextSettings))}
+          forceApiGenerations={forceApiGenerations}
         />
       </div>
       

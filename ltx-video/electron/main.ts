@@ -11,9 +11,11 @@ import { stopPythonBackend } from './python-backend'
 import { initAutoUpdater } from './updater'
 import { createWindow, getMainWindow } from './window'
 
+const FORCE_API_GENERATIONS = true
+
 initSessionLog()
 
-registerAppHandlers()
+registerAppHandlers({ forceApiGenerations: FORCE_API_GENERATIONS })
 registerFileHandlers()
 registerLogHandlers()
 registerExportHandlers()
