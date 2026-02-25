@@ -30,6 +30,7 @@ from services.interfaces import (
     HTTPClient,
     IcLoraModelDownloader,
     IcLoraPipeline,
+    LTXAPIClient,
     ModelDownloader,
     ProNativeVideoPipeline,
     ProVideoPipeline,
@@ -54,6 +55,7 @@ class AppHandler:
         video_processor: VideoProcessor,
         text_encoder: TextEncoder,
         task_runner: TaskRunner,
+        ltx_api_client: LTXAPIClient,
         fast_video_pipeline_class: type[FastVideoPipeline],
         fast_native_video_pipeline_class: type[FastNativeVideoPipeline],
         pro_video_pipeline_class: type[ProVideoPipeline],
@@ -71,6 +73,7 @@ class AppHandler:
         self.gpu_info = gpu_info
         self.video_processor = video_processor
         self.task_runner = task_runner
+        self.ltx_api_client = ltx_api_client
         self.fast_video_pipeline_class = fast_video_pipeline_class
         self.fast_native_video_pipeline_class = fast_native_video_pipeline_class
         self.pro_video_pipeline_class = pro_video_pipeline_class
@@ -91,6 +94,7 @@ class AppHandler:
             },
             downloading_session=None,
             gpu_slot=None,
+            api_generation=None,
             cpu_slot=None,
             text_encoder=TextEncoderState(service=text_encoder),
             startup=StartupPending(message="Not started"),
@@ -215,6 +219,7 @@ class ServiceBundle:
     video_processor: VideoProcessor
     text_encoder: TextEncoder
     task_runner: TaskRunner
+    ltx_api_client: LTXAPIClient
     fast_video_pipeline_class: type[FastVideoPipeline]
     fast_native_video_pipeline_class: type[FastNativeVideoPipeline]
     pro_video_pipeline_class: type[ProVideoPipeline]
@@ -234,6 +239,7 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
     from services.ic_lora_model_downloader.ic_lora_model_downloader_impl import IcLoraModelDownloaderImpl
     from services.ic_lora_pipeline.ltx_ic_lora_pipeline import LTXIcLoraPipeline
     from services.image_generation_pipeline.flux_image_generation_pipeline import FluxImageGenerationPipeline
+    from services.ltx_api_client.ltx_api_client_impl import LTXAPIClientImpl
     from services.model_downloader.hugging_face_downloader import HuggingFaceDownloader
     from services.pro_native_video_pipeline.ltx_pro_native_video_pipeline import LTXProNativeVideoPipeline
     from services.pro_video_pipeline.ltx_pro_video_pipeline import LTXProVideoPipeline
@@ -255,6 +261,7 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
             ltx_api_base_url=config.ltx_api_base_url,
         ),
         task_runner=ThreadingRunner(),
+        ltx_api_client=LTXAPIClientImpl(http=http, ltx_api_base_url=config.ltx_api_base_url),
         fast_video_pipeline_class=LTXFastVideoPipeline,
         fast_native_video_pipeline_class=LTXFastNativeVideoPipeline,
         pro_video_pipeline_class=LTXProVideoPipeline,
@@ -282,6 +289,7 @@ def build_initial_state(
         video_processor=bundle.video_processor,
         text_encoder=bundle.text_encoder,
         task_runner=bundle.task_runner,
+        ltx_api_client=bundle.ltx_api_client,
         fast_video_pipeline_class=bundle.fast_video_pipeline_class,
         fast_native_video_pipeline_class=bundle.fast_native_video_pipeline_class,
         pro_video_pipeline_class=bundle.pro_video_pipeline_class,

@@ -16,6 +16,7 @@ from services.ic_lora_model_downloader.ic_lora_model_downloader import (
 )
 from services.ic_lora_pipeline.ic_lora_pipeline import IcLoraPipeline
 from services.image_generation_pipeline.image_generation_pipeline import ImageGenerationPipeline
+from services.ltx_api_client.ltx_api_client import LTXAPIClient
 from services.model_downloader.model_downloader import ModelDownloader
 from services.pro_native_video_pipeline.pro_native_video_pipeline import ProNativeVideoPipeline
 from services.pro_video_pipeline.pro_video_pipeline import ProVideoPipeline
@@ -49,5 +50,6 @@ __all__ = [
     "ImageGenerationPipeline",
     "IcLoraPipeline",
     "IcLoraModelDownloader",
+    "LTXAPIClient",
     "TextEncoder",
 ]

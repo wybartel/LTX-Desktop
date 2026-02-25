@@ -166,6 +166,19 @@ class TestGenerationProgress:
         assert data["currentStep"] == 4
         assert data["totalSteps"] == 8
 
+    def test_running_from_api_generation_state(self, client, test_state):
+        test_state.generation.start_api_generation("api-running")
+        test_state.generation.update_progress("inference", 35, 2, 6)
+
+        r = client.get("/api/generation/progress")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["status"] == "running"
+        assert data["phase"] == "inference"
+        assert data["progress"] == 35
+        assert data["currentStep"] == 2
+        assert data["totalSteps"] == 6
+
 
 class TestGenerateImage:
     def test_happy_path(self, client):

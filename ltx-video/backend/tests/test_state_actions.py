@@ -58,6 +58,34 @@ def test_generation_progress_resets_when_pipeline_unset(test_state):
     assert progress.status == "idle"
 
 
+def test_api_generation_does_not_require_gpu(test_state):
+    test_state.generation.start_api_generation("api-gen-1")
+    test_state.generation.update_progress("inference", 25, 1, 4)
+
+    progress = test_state.generation.get_generation_progress()
+    assert progress.status == "running"
+    assert progress.phase == "inference"
+    assert progress.progress == 25
+
+
+def test_cancel_marks_running_api_generation(test_state):
+    test_state.generation.start_api_generation("api-gen-1")
+
+    out = test_state.generation.cancel_generation()
+    assert out.status == "cancelling"
+    assert out.id == "api-gen-1"
+
+
+def test_gpu_cancel_state_not_affected_by_stale_api_cancel_state(test_state):
+    test_state.generation.start_api_generation("api-gen-1")
+    test_state.generation.cancel_generation()
+
+    test_state.pipelines.load_gpu_pipeline("fast")
+    test_state.generation.start_generation("gpu-gen-1")
+
+    assert test_state.generation.is_generation_cancelled() is False
+
+
 def test_startup_state_transitions_are_tracked(test_state):
     test_state.health.set_startup_pending("waiting")
     assert isinstance(test_state.state.startup, StartupPending)

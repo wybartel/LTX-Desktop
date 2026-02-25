@@ -109,6 +109,70 @@ class FakeTaskRunner:
                 on_error(exc)
 
 
+class FakeLTXAPIClient:
+    def __init__(self) -> None:
+        self.text_to_video_calls: list[dict[str, Any]] = []
+        self.image_to_video_calls: list[dict[str, Any]] = []
+        self.raise_on_text_to_video: Exception | None = None
+        self.raise_on_image_to_video: Exception | None = None
+        self.text_to_video_result = b"fake-ltx-api-t2v-video"
+        self.image_to_video_result = b"fake-ltx-api-i2v-video"
+
+    def generate_text_to_video(
+        self,
+        *,
+        api_key: str,
+        prompt: str,
+        model: str,
+        resolution: str,
+        duration: float,
+        fps: float,
+        generate_audio: bool,
+    ) -> bytes:
+        self.text_to_video_calls.append(
+            {
+                "api_key": api_key,
+                "prompt": prompt,
+                "model": model,
+                "resolution": resolution,
+                "duration": duration,
+                "fps": fps,
+                "generate_audio": generate_audio,
+            }
+        )
+        if self.raise_on_text_to_video is not None:
+            raise self.raise_on_text_to_video
+        return self.text_to_video_result
+
+    def generate_image_to_video(
+        self,
+        *,
+        api_key: str,
+        prompt: str,
+        image_path: str,
+        model: str,
+        resolution: str,
+        duration: float,
+        fps: float,
+        generate_audio: bool,
+    ) -> bytes:
+        self.image_to_video_calls.append(
+            {
+                "api_key": api_key,
+                "prompt": prompt,
+                "image_path": image_path,
+                "model": model,
+                "resolution": resolution,
+                "duration": duration,
+                "fps": fps,
+                "generate_audio": generate_audio,
+            }
+        )
+        if self.raise_on_image_to_video is not None:
+            raise self.raise_on_image_to_video
+        return self.image_to_video_result
+
+
 class FakeModelDownloader:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
@@ -640,6 +704,7 @@ class FakeServices:
     video_processor: FakeVideoProcessor = field(default_factory=FakeVideoProcessor)
     text_encoder: FakeTextEncoder = field(default_factory=FakeTextEncoder)
     task_runner: FakeTaskRunner = field(default_factory=FakeTaskRunner)
+    ltx_api_client: FakeLTXAPIClient = field(default_factory=FakeLTXAPIClient)
     fast_video_pipeline: FakeFastVideoPipeline = field(default_factory=FakeFastVideoPipeline)
     fast_native_video_pipeline: FakeFastNativeVideoPipeline = field(default_factory=FakeFastNativeVideoPipeline)
     pro_video_pipeline: FakeProVideoPipeline = field(default_factory=FakeProVideoPipeline)

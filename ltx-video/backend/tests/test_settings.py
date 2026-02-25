@@ -127,6 +127,7 @@ class TestSettingsPersistence:
             video_processor=fake_services.video_processor,
             text_encoder=fake_services.text_encoder,
             task_runner=fake_services.task_runner,
+            ltx_api_client=fake_services.ltx_api_client,
             fast_video_pipeline_class=type(fake_services.fast_video_pipeline),
             fast_native_video_pipeline_class=type(fake_services.fast_native_video_pipeline),
             pro_video_pipeline_class=type(fake_services.pro_video_pipeline),

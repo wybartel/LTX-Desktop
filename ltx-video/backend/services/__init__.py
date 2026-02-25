@@ -11,6 +11,7 @@ from services.interfaces import (
     HttpTimeoutError,
     IcLoraModelDownloader,
     IcLoraPipeline,
+    LTXAPIClient,
     ModelDownloader,
     ProNativeVideoPipeline,
     ProVideoPipeline,
@@ -38,4 +39,5 @@ __all__ = [
     "ImageGenerationPipeline",
     "IcLoraPipeline",
     "IcLoraModelDownloader",
+    "LTXAPIClient",
 ]

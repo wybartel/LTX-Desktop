@@ -208,6 +208,7 @@ class AppState:
     available_files: AvailableFiles
     downloading_session: DownloadingSession
     gpu_slot: GpuSlot | None
+    api_generation: GenerationState | None
     cpu_slot: CpuSlot | None
     text_encoder: TextEncoderState | None
     startup: StartupState
