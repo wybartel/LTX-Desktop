@@ -234,6 +234,40 @@ jobs:
             ltx-video/python-embed-win32.tar.gz.part-*
           retention-days: 7
 
+      # Upload installer files to GCS (tagged releases only)
+      - name: Authenticate to GCP (macOS)
+        if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/361900799277/locations/global/workloadIdentityPools/push-docker-images/providers/github
+          service_account: ltx-desktop-ci@ltx-vl-web-prd.iam.gserviceaccount.com
+
+      - name: Set up gcloud CLI (macOS)
+        if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload installer to GCS (macOS)
+        if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          DEST="gs://ltx-desktop-artifacts/releases/${TAG}"
+          for f in release/*.dmg; do
+            echo "Uploading $(basename "$f") → ${DEST}/"
+            gcloud storage cp "$f" "${DEST}/$(basename "$f")"
+          done
+
+      - name: Upload installer to GCS (Windows)
+        if: matrix.os == 'windows' && startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          DEST="gs://ltx-desktop-artifacts/releases/${TAG}"
+          for f in release/*Setup*.exe; do
+            echo "Uploading $(basename "$f") → ${DEST}/"
+            gcloud storage cp "$f" "${DEST}/$(basename "$f")"
+          done
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
