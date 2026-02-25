@@ -257,6 +257,8 @@ jobs:
     # To require manual approval before going live, uncomment:
     # environment: production
     steps:
+      - uses: actions/checkout@v4
+
       - name: Verify release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
