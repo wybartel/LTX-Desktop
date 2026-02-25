@@ -16,6 +16,7 @@ interface Window {
     checkFirstRun: () => Promise<{ needsSetup: boolean; needsLicense: boolean }>
     completeSetup: () => Promise<boolean>
     fetchLicenseText: () => Promise<string>
+    getNoticesText: () => Promise<string>
     openFolder: (folderPath: string) => Promise<void>
     showItemInFolder: (filePath: string) => Promise<void>
     getLogs: () => Promise<LogsResponse>

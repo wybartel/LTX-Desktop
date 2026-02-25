@@ -189,3 +189,11 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+---
+
+Third-Party Software Notices
+
+This application uses open-source software and AI models subject to
+their own license terms. See NOTICES.md for the complete list
+of third-party components, their copyright holders, and license texts.

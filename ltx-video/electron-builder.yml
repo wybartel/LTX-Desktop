@@ -10,6 +10,8 @@ files:
   - dist/**/*
   - dist-electron/**/*
   - package.json
+  - LICENSE.txt
+  - NOTICES.md
   - "!**/*.map"
 
 asarUnpack:

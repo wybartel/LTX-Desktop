@@ -94,6 +94,11 @@ export function registerAppHandlers(): void {
     return await resp.text()
   })
 
+  ipcMain.handle('get-notices-text', async () => {
+    const noticesPath = path.join(app.getAppPath(), 'NOTICES.md')
+    return fs.readFileSync(noticesPath, 'utf-8')
+  })
+
   ipcMain.handle('get-resource-path', () => {
     if (!app.isPackaged) {
       return null

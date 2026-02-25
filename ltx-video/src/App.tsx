@@ -9,7 +9,7 @@ import { Project } from './views/Project'
 import { Playground } from './views/Playground'
 import { FirstRunSetup } from './components/FirstRunSetup'
 import { PythonSetup } from './components/PythonSetup'
-import { SettingsModal, type AppSettings } from './components/SettingsModal'
+import { SettingsModal, type AppSettings, type SettingsTabId } from './components/SettingsModal'
 import { LogViewer } from './components/LogViewer'
 import { Button } from './components/ui/button'
 
@@ -37,9 +37,21 @@ function AppContent() {
   const [backendStarted, setBackendStarted] = useState(false)
   const [setupMode, setSetupMode] = useState<'loading' | 'full' | 'license-only' | null>('loading')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId | undefined>(undefined)
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false)
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
+
+  // Listen for open-settings events from menu actions
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.tab) setSettingsInitialTab(detail.tab)
+      setIsSettingsOpen(true)
+    }
+    window.addEventListener('open-settings', handler)
+    return () => window.removeEventListener('open-settings', handler)
+  }, [])
 
   // Fetch settings from backend
   useEffect(() => {
@@ -238,9 +250,10 @@ function AppContent() {
       <LogViewer isOpen={isLogViewerOpen} onClose={() => setIsLogViewerOpen(false)} />
       <SettingsModal
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={() => { setIsSettingsOpen(false); setSettingsInitialTab(undefined) }}
         settings={appSettings}
         onSettingsChange={setAppSettings}
+        initialTab={settingsInitialTab}
       />
     </div>
   )
