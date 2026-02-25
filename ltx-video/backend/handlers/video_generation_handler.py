@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, cast
 
 from PIL import Image
 
-from api_types import GenerateVideoRequest, GenerateVideoResponse
+from api_types import GenerateVideoRequest, GenerateVideoResponse, VideoCameraMotion
 from _routes._errors import HTTPError
 from handlers.base import StateHandlerBase
 from handlers.generation_handler import GenerationHandler
@@ -177,7 +177,7 @@ class VideoGenerationHandler(StateHandlerBase):
         fps: float,
         seed: int,
         model_type: VideoPipelineModelType,
-        camera_motion: str,
+        camera_motion: VideoCameraMotion,
         negative_prompt: str,
     ) -> str:
         if self._generation.is_generation_cancelled():
@@ -314,6 +314,7 @@ class VideoGenerationHandler(StateHandlerBase):
                     duration=float(duration),
                     fps=float(fps),
                     generate_audio=generate_audio,
+                    camera_motion=req.cameraMotion,
                 )
                 self._generation.update_progress("downloading_output", 85, None, None)
             else:
@@ -326,6 +327,7 @@ class VideoGenerationHandler(StateHandlerBase):
                     duration=float(duration),
                     fps=float(fps),
                     generate_audio=generate_audio,
+                    camera_motion=req.cameraMotion,
                 )
                 self._generation.update_progress("downloading_output", 85, None, None)
 

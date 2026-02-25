@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypeAlias, TypedDict
+from typing import Literal, TypeAlias, TypedDict
 from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
@@ -41,6 +41,17 @@ class ModelDownloadState(TypedDict):
 
 
 JsonObject: TypeAlias = dict[str, object]
+VideoCameraMotion = Literal[
+    "none",
+    "dolly_in",
+    "dolly_out",
+    "dolly_left",
+    "dolly_right",
+    "jib_up",
+    "jib_down",
+    "static",
+    "focus_shift",
+]
 
 
 # ============================================================
@@ -234,7 +245,7 @@ class GenerateVideoRequest(BaseModel):
     prompt: NonEmptyPrompt
     resolution: str = "512p"
     model: str = "fast"
-    cameraMotion: str = "none"
+    cameraMotion: VideoCameraMotion = "none"
     negativePrompt: str = ""
     duration: str = "2"
     fps: str = "24"

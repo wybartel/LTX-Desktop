@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from PIL import Image
+from api_types import VideoCameraMotion
 from services.interfaces import IcLoraDownloadPayload, IcLoraModelPayload, VideoInfoPayload
 from tests.fakes.fake_gpu_info import FakeGpuInfo
 
@@ -128,6 +129,7 @@ class FakeLTXAPIClient:
         duration: float,
         fps: float,
         generate_audio: bool,
+        camera_motion: VideoCameraMotion = "none",
     ) -> bytes:
         self.text_to_video_calls.append(
             {
@@ -138,6 +140,7 @@ class FakeLTXAPIClient:
                 "duration": duration,
                 "fps": fps,
                 "generate_audio": generate_audio,
+                "camera_motion": camera_motion,
             }
         )
         if self.raise_on_text_to_video is not None:
@@ -155,6 +158,7 @@ class FakeLTXAPIClient:
         duration: float,
         fps: float,
         generate_audio: bool,
+        camera_motion: VideoCameraMotion = "none",
     ) -> bytes:
         self.image_to_video_calls.append(
             {
@@ -166,6 +170,7 @@ class FakeLTXAPIClient:
                 "duration": duration,
                 "fps": fps,
                 "generate_audio": generate_audio,
+                "camera_motion": camera_motion,
             }
         )
         if self.raise_on_image_to_video is not None:

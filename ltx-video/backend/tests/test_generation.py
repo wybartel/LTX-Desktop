@@ -146,6 +146,7 @@ class TestForcedApiGenerate:
                 "duration": "6",
                 "fps": "50",
                 "audio": "true",
+                "cameraMotion": "dolly_in",
             },
         )
 
@@ -158,6 +159,7 @@ class TestForcedApiGenerate:
         assert call["duration"] == 6.0
         assert call["fps"] == 50.0
         assert call["generate_audio"] is True
+        assert call["camera_motion"] == "dolly_in"
 
     def test_i2v_routes_to_ltx_api(self, client, test_state, fake_services, make_test_image, tmp_path):
         test_state.config.force_api_generations = True
@@ -174,6 +176,7 @@ class TestForcedApiGenerate:
                 "duration": "8",
                 "fps": "25",
                 "audio": "false",
+                "cameraMotion": "jib_up",
                 "imagePath": str(image_path),
             },
         )
@@ -186,6 +189,54 @@ class TestForcedApiGenerate:
         assert call["resolution"] == "3840x2160"
         assert call["duration"] == 8.0
         assert call["fps"] == 25.0
+        assert call["camera_motion"] == "jib_up"
+
+    def test_camera_motion_none_maps_to_none_for_t2v(self, client, test_state, fake_services):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A mountain lake",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "50",
+                "audio": "true",
+                "cameraMotion": "none",
+            },
+        )
+
+        assert r.status_code == 200
+        assert len(fake_services.ltx_api_client.text_to_video_calls) == 1
+        call = fake_services.ltx_api_client.text_to_video_calls[0]
+        assert call["camera_motion"] == "none"
+
+    def test_camera_motion_none_maps_to_none_for_i2v(self, client, test_state, fake_services, make_test_image, tmp_path):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+        image_path = tmp_path / "input-none.png"
+        image_path.write_bytes(make_test_image().getvalue())
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "Animate this frame",
+                "resolution": "2160p",
+                "model": "pro",
+                "duration": "8",
+                "fps": "25",
+                "audio": "false",
+                "cameraMotion": "none",
+                "imagePath": str(image_path),
+            },
+        )
+
+        assert r.status_code == 200
+        assert len(fake_services.ltx_api_client.image_to_video_calls) == 1
+        call = fake_services.ltx_api_client.image_to_video_calls[0]
+        assert call["camera_motion"] == "none"
 
     def test_i2v_fast_routes_to_fast_model(self, client, test_state, fake_services, make_test_image, tmp_path):
         test_state.config.force_api_generations = True
@@ -309,6 +360,25 @@ class TestForcedApiGenerate:
 
         assert r.status_code == 400
         assert r.json()["error"] == "INVALID_FORCED_API_FPS"
+
+    def test_invalid_camera_motion_rejected_with_422(self, client, test_state):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A city skyline",
+                "resolution": "1080p",
+                "model": "pro",
+                "duration": "6",
+                "fps": "25",
+                "audio": "false",
+                "cameraMotion": "orbit",
+            },
+        )
+
+        assert r.status_code == 422
 
     def test_forced_api_cancelled_response(self, client, test_state, fake_services):
         test_state.config.force_api_generations = True

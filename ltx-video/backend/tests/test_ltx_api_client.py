@@ -28,6 +28,7 @@ def test_generate_text_to_video_returns_binary_content() -> None:
         duration=5.0,
         fps=24.0,
         generate_audio=False,
+        camera_motion="dolly_in",
     )
 
     assert out == b"video-bytes"
@@ -41,6 +42,7 @@ def test_generate_text_to_video_returns_binary_content() -> None:
     assert call.json_payload is not None
     assert call.json_payload["prompt"] == "A mountain"
     assert call.json_payload["resolution"] == "1920x1080"
+    assert call.json_payload["camera_motion"] == "dolly_in"
 
 
 def test_generate_image_to_video_uploads_image_then_downloads_video(tmp_path) -> None:
@@ -86,6 +88,7 @@ def test_generate_image_to_video_uploads_image_then_downloads_video(tmp_path) ->
         duration=4.0,
         fps=24.0,
         generate_audio=True,
+        camera_motion="jib_up",
     )
 
     assert out == b"downloaded-video"
@@ -95,7 +98,37 @@ def test_generate_image_to_video_uploads_image_then_downloads_video(tmp_path) ->
     assert http.calls[2].url == "https://api.ltx.video/v1/image-to-video"
     assert http.calls[2].json_payload is not None
     assert http.calls[2].json_payload["image_uri"] == "storage://image/123"
+    assert http.calls[2].json_payload["camera_motion"] == "jib_up"
     assert http.calls[3].url == "https://cdn.example.com/output.mp4"
+
+
+def test_generate_text_to_video_omits_camera_motion_when_none() -> None:
+    http = FakeHTTPClient()
+    http.queue(
+        "post",
+        FakeResponse(
+            status_code=200,
+            headers={"Content-Type": "video/mp4"},
+            content=b"video-bytes",
+        ),
+    )
+
+    client = LTXAPIClientImpl(http=http, ltx_api_base_url="https://api.ltx.video")
+    out = client.generate_text_to_video(
+        api_key="test-key",
+        prompt="A mountain",
+        model="ltx-2-pro",
+        resolution="1920x1080",
+        duration=5.0,
+        fps=24.0,
+        generate_audio=False,
+        camera_motion="none",
+    )
+
+    assert out == b"video-bytes"
+    call = http.calls[0]
+    assert call.json_payload is not None
+    assert "camera_motion" not in call.json_payload
 
 
 def test_generate_text_to_video_raises_on_non_200() -> None:

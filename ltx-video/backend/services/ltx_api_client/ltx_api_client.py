@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from api_types import VideoCameraMotion
+
 
 class LTXAPIClient(Protocol):
     def generate_text_to_video(
@@ -16,6 +18,7 @@ class LTXAPIClient(Protocol):
         duration: float,
         fps: float,
         generate_audio: bool,
+        camera_motion: VideoCameraMotion = "none",
     ) -> bytes:
         ...
 
@@ -30,5 +33,6 @@ class LTXAPIClient(Protocol):
         duration: float,
         fps: float,
         generate_audio: bool,
+        camera_motion: VideoCameraMotion = "none",
     ) -> bytes:
         ...

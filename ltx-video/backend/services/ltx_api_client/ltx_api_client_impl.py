@@ -4,10 +4,34 @@ from __future__ import annotations
 
 import mimetypes
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
+from api_types import VideoCameraMotion
 from services.http_client.http_client import HTTPClient
 from services.services_utils import JSONValue
+
+LTXCameraMotion = Literal[
+    "dolly_in",
+    "dolly_out",
+    "dolly_left",
+    "dolly_right",
+    "jib_up",
+    "jib_down",
+    "static",
+    "focus_shift",
+]
+
+_CAMERA_MOTION_TO_LTX: dict[VideoCameraMotion, LTXCameraMotion | None] = {
+    "none": None,
+    "dolly_in": "dolly_in",
+    "dolly_out": "dolly_out",
+    "dolly_left": "dolly_left",
+    "dolly_right": "dolly_right",
+    "jib_up": "jib_up",
+    "jib_down": "jib_down",
+    "static": "static",
+    "focus_shift": "focus_shift",
+}
 
 
 class LTXAPIClientImpl:
@@ -25,6 +49,7 @@ class LTXAPIClientImpl:
         duration: float,
         fps: float,
         generate_audio: bool,
+        camera_motion: VideoCameraMotion = "none",
     ) -> bytes:
         payload: dict[str, JSONValue] = {
             "prompt": prompt,
@@ -34,6 +59,9 @@ class LTXAPIClientImpl:
             "fps": fps,
             "generate_audio": generate_audio,
         }
+        mapped_camera_motion = self._map_camera_motion(camera_motion)
+        if mapped_camera_motion is not None:
+            payload["camera_motion"] = mapped_camera_motion
         response = self._http.post(
             f"{self._base_url}/v1/text-to-video",
             headers=self._json_headers(api_key),
@@ -53,6 +81,7 @@ class LTXAPIClientImpl:
         duration: float,
         fps: float,
         generate_audio: bool,
+        camera_motion: VideoCameraMotion = "none",
     ) -> bytes:
         image_uri = self._upload_image(image_path=image_path, api_key=api_key)
         payload: dict[str, JSONValue] = {
@@ -64,6 +93,9 @@ class LTXAPIClientImpl:
             "fps": fps,
             "generate_audio": generate_audio,
         }
+        mapped_camera_motion = self._map_camera_motion(camera_motion)
+        if mapped_camera_motion is not None:
+            payload["camera_motion"] = mapped_camera_motion
         response = self._http.post(
             f"{self._base_url}/v1/image-to-video",
             headers=self._json_headers(api_key),
@@ -162,3 +194,7 @@ class LTXAPIClientImpl:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
+
+    @staticmethod
+    def _map_camera_motion(camera_motion: VideoCameraMotion) -> LTXCameraMotion | None:
+        return _CAMERA_MOTION_TO_LTX[camera_motion]
