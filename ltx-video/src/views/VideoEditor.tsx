@@ -2729,7 +2729,11 @@ export function VideoEditor() {
                   onScroll={handleTimelineScroll}
                 >
                 <div 
-                  style={{ minWidth: `${totalDuration * pixelsPerSecond}px` }}
+                  style={{ minWidth: `${totalDuration * pixelsPerSecond}px`,
+                    ...(activeTool === 'blade' ? { cursor: SCISSORS_CURSOR }
+                      : activeTool === 'trackForward' ? { cursor: bladeShiftHeld ? TRACK_FWD_ONE_CURSOR : TRACK_FWD_ALL_CURSOR }
+                      : {}),
+                  }}
                   className="relative"
                   onDragOver={(e) => {
                     // Allow asset/timeline drops anywhere on the timeline area
@@ -2797,9 +2801,9 @@ export function VideoEditor() {
                           
                           const forwardClips = clips.filter(c => {
                             if (e.shiftKey) {
-                              return c.startTime >= clickTime - 0.01
-                            } else {
                               return c.trackIndex === clickedRealTrackIndex && c.startTime >= clickTime - 0.01
+                            } else {
+                              return c.startTime >= clickTime - 0.01
                             }
                           })
                           setSelectedClipIds(new Set(forwardClips.map(c => c.id)))
@@ -3025,7 +3029,8 @@ export function VideoEditor() {
                           </div>
                         )
                       })()}
-                      <div className="absolute left-0 top-0 bottom-0 w-4 flex items-center justify-center text-zinc-500 hover:text-white cursor-grab">
+                      <div className={`absolute left-0 top-0 bottom-0 w-4 flex items-center justify-center text-zinc-500 hover:text-white ${activeTool === 'trackForward' || activeTool === 'blade' ? '' : 'cursor-grab'}`}
+                        style={activeTool === 'blade' ? { cursor: SCISSORS_CURSOR } : activeTool === 'trackForward' ? { cursor: bladeShiftHeld ? TRACK_FWD_ONE_CURSOR : TRACK_FWD_ALL_CURSOR } : {}}>
                         <GripVertical className="h-3 w-3" />
                       </div>
                       
@@ -3197,11 +3202,12 @@ export function VideoEditor() {
                       })()}
 
                       <div 
-                        className={`absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize transition-colors flex items-center justify-center ${
+                        className={`absolute left-0 top-0 bottom-0 w-3 ${activeTool === 'trackForward' || activeTool === 'blade' ? '' : 'cursor-ew-resize'} transition-colors flex items-center justify-center ${
                           resizingClip?.clipId === clip.id && resizingClip?.edge === 'left'
                             ? activeTool === 'roll' ? 'bg-yellow-500' : activeTool === 'ripple' ? 'bg-green-500' : 'bg-blue-500'
                             : activeTool === 'roll' ? 'hover:bg-yellow-500/50' : activeTool === 'ripple' ? 'hover:bg-green-500/50' : 'hover:bg-blue-500/50'
                         }`}
+                        style={activeTool === 'blade' ? { cursor: SCISSORS_CURSOR } : activeTool === 'trackForward' ? { cursor: bladeShiftHeld ? TRACK_FWD_ONE_CURSOR : TRACK_FWD_ALL_CURSOR } : {}}
                         onMouseDown={(e) => handleResizeStart(e, clip, 'left')}
                       >
                         <div className={`w-0.5 h-6 rounded-full ${
@@ -3209,11 +3215,12 @@ export function VideoEditor() {
                         }`} />
                       </div>
                       <div 
-                        className={`absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize transition-colors flex items-center justify-center ${
+                        className={`absolute right-0 top-0 bottom-0 w-3 ${activeTool === 'trackForward' || activeTool === 'blade' ? '' : 'cursor-ew-resize'} transition-colors flex items-center justify-center ${
                           resizingClip?.clipId === clip.id && resizingClip?.edge === 'right'
                             ? activeTool === 'roll' ? 'bg-yellow-500' : activeTool === 'ripple' ? 'bg-green-500' : 'bg-blue-500'
                             : activeTool === 'roll' ? 'hover:bg-yellow-500/50' : activeTool === 'ripple' ? 'hover:bg-green-500/50' : 'hover:bg-blue-500/50'
                         }`}
+                        style={activeTool === 'blade' ? { cursor: SCISSORS_CURSOR } : activeTool === 'trackForward' ? { cursor: bladeShiftHeld ? TRACK_FWD_ONE_CURSOR : TRACK_FWD_ALL_CURSOR } : {}}
                         onMouseDown={(e) => handleResizeStart(e, clip, 'right')}
                       >
                         <div className={`w-0.5 h-6 rounded-full ${
