@@ -9,7 +9,7 @@ name: PR Slack Notification
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
     branches: [main]
 
 jobs:
