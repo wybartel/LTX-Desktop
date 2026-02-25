@@ -4,6 +4,7 @@ import type { GenerationSettings } from '../../components/SettingsPanel'
 import { copyToAssetFolder } from '../../lib/asset-copy'
 import { fileUrlToPath } from '../../lib/url-to-path'
 import { sanitizeForcedApiVideoSettings } from '../../lib/api-video-options'
+import { logger } from '../../lib/logger'
 
 export interface UseRegenerationParams {
   clips: TimelineClip[]
@@ -94,7 +95,7 @@ export function useRegeneration(params: UseRegenerationParams) {
 
     const imagePath = fileUrlToPath(imageUrl)
     if (!imagePath) {
-      console.error('I2V: cannot extract path from', imageUrl)
+      logger.error(`I2V: cannot extract path from ${imageUrl}`)
       return
     }
 
@@ -107,7 +108,7 @@ export function useRegeneration(params: UseRegenerationParams) {
     try {
       await regenGenerate(i2vPrompt, imagePath, settings)
     } catch (err) {
-      console.error('I2V generation failed:', err)
+      logger.error(`I2V generation failed: ${err}`)
     }
   }, [i2vClipId, i2vPrompt, i2vSettings, currentProjectId, clips, resolveClipSrc, regenGenerate])
 
@@ -244,7 +245,7 @@ export function useRegeneration(params: UseRegenerationParams) {
           }
         }
       } catch (err) {
-        console.warn('Failed to auto-generate prompt for imported asset:', err)
+        logger.warn(`Failed to auto-generate prompt for imported asset: ${err}`)
       }
 
       if (!params) {
@@ -444,13 +445,13 @@ export function useRegeneration(params: UseRegenerationParams) {
       } else {
         const errorMsg = data.error || 'Unknown error'
         setRetakeStatus(`Error: ${errorMsg}`)
-        console.error('Retake failed:', errorMsg)
+        logger.error(`Retake failed: ${errorMsg}`)
         setTimeout(() => {
           setRetakeStatus('')
         }, 5000)
       }
     } catch (error) {
-      console.error('Retake error:', error)
+      logger.error(`Retake error: ${error}`)
       setRetakeStatus(`Error: ${(error as Error).message}`)
       setTimeout(() => {
         setRetakeStatus('')

@@ -1,8 +1,16 @@
 import { ipcMain } from 'electron'
 import fs from 'fs'
 import { getLogDir, getCurrentLogFilename } from '../logging-management'
+import { logger, writeLog } from '../logger'
+
+const VALID_LOG_LEVELS = new Set(['INFO', 'WARNING', 'ERROR', 'DEBUG'])
 
 export function registerLogHandlers(): void {
+  ipcMain.handle('write-log', async (_event, level: string, message: string) => {
+    const upperLevel = String(level).toUpperCase()
+    if (!VALID_LOG_LEVELS.has(upperLevel)) return
+    writeLog(upperLevel as 'INFO' | 'WARNING' | 'ERROR' | 'DEBUG', 'Renderer', String(message))
+  })
   ipcMain.handle('get-logs', async () => {
     try {
       const logPath = getCurrentLogFilename()
@@ -14,7 +22,7 @@ export function registerLogHandlers(): void {
       }
       return { logPath, lines: [] }
     } catch (error) {
-      console.error('Error getting logs:', error)
+      logger.error(`Error getting logs: ${error}`)
       return { logPath: '', lines: [], error: String(error) }
     }
   })

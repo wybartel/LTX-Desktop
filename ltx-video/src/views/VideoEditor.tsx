@@ -19,6 +19,7 @@ import { useKeyboardShortcuts } from '../contexts/KeyboardShortcutsContext'
 import { useAppSettings } from '../contexts/AppSettingsContext'
 import { useGeneration } from '../hooks/use-generation'
 import { Button } from '../components/ui/button'
+import { logger } from '../lib/logger'
 import { Tooltip } from '../components/ui/tooltip'
 import { ExportModal } from '../components/ExportModal'
 import { MenuBar, type MenuDefinition } from '../components/MenuBar'
@@ -1464,7 +1465,7 @@ export function VideoEditor() {
       
       return base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`
     } catch (err) {
-      console.error('Failed to extract frame:', err)
+      logger.error(`Failed to extract frame: ${err}`)
       return null
     }
   }, [currentTime, resolveClipSrc])

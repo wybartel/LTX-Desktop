@@ -57,6 +57,7 @@ interface Window {
     onPythonSetupProgress: (cb: (data: unknown) => void) => void
     removePythonSetupProgress: () => void
     onBackendHealthStatus: (cb: (data: BackendHealthStatus) => void) => (() => void)
+    writeLog: (level: string, message: string) => Promise<void>
     platform: string
   }
 }

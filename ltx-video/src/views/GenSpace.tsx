@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { 
+import {
   Plus, Trash2, Download, Image, Video, X,
   Heart, Film, Volume2, VolumeX, Sparkles,
   Clock, Monitor, ChevronUp, Scissors, AudioLines,
@@ -18,6 +18,7 @@ import {
   FORCED_API_VIDEO_RESOLUTIONS,
   sanitizeForcedApiVideoSettings,
 } from '../lib/api-video-options'
+import { logger } from '../lib/logger'
 
 // Asset card with hover overlays
 function AssetCard({ 
@@ -772,7 +773,7 @@ export function GenSpace() {
         reset()
       } catch (err) {
         persistedVideoKeyRef.current = null
-        console.error('Failed to persist generated video asset:', err)
+        logger.error(`Failed to persist generated video asset: ${err}`)
       }
     })()
   }, [videoUrl, videoPath, currentProjectId, isGenerating, applyForcedVideoSettings, settings, inputImage, assetSavePath, lastPrompt, addAsset, reset])
@@ -865,7 +866,7 @@ export function GenSpace() {
             imageFile = new File([blob], 'input-image.png', { type: blob.type })
           }
         } catch (e) {
-          console.error('Failed to convert input image for editing:', e)
+          logger.error(`Failed to convert input image for editing: ${e}`)
           setLocalError(e instanceof Error ? e.message : 'Failed to prepare the input image.')
           return
         }

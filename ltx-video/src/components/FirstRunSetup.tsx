@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { logger } from '../lib/logger'
 import './FirstRunSetup.css'
 
 interface FirstRunSetupProps {
@@ -118,13 +119,13 @@ export function FirstRunSetup({ licenseOnly, showLicenseStep = true, onComplete,
             }
           }
         } catch (e) {
-          console.error('Failed to get models path:', e)
+          logger.error(`Failed to get models path: ${e}`)
         }
 
         // TODO: Get actual available space
         setAvailableSpace('1.8 TB')
       } catch (e) {
-        console.error('Init error:', e)
+        logger.error(`Init error: ${e}`)
       }
     }
     init()
@@ -162,7 +163,7 @@ export function FirstRunSetup({ licenseOnly, showLicenseStep = true, onComplete,
           }
         }
       } catch (e) {
-        console.error('Progress poll error:', e)
+        logger.error(`Progress poll error: ${e}`)
       }
     }
 
@@ -185,7 +186,7 @@ export function FirstRunSetup({ licenseOnly, showLicenseStep = true, onComplete,
             body: JSON.stringify({ ltxApiKey: ltxApiKey.trim() }),
           })
         } catch (e) {
-          console.error('Failed to save API key:', e)
+          logger.error(`Failed to save API key: ${e}`)
         }
       }
 
@@ -196,7 +197,7 @@ export function FirstRunSetup({ licenseOnly, showLicenseStep = true, onComplete,
         body: JSON.stringify({ skipTextEncoder: !!ltxApiKey.trim() }),
       })
     } catch (e) {
-      console.error('Download start error:', e)
+      logger.error(`Download start error: ${e}`)
       setDownloadError(e instanceof Error ? e.message : 'Failed to start model download.')
     }
   }

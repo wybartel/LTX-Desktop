@@ -109,6 +109,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
+  // Write a log line to the session log file
+  writeLog: (level: string, message: string): Promise<void> =>
+    ipcRenderer.invoke('write-log', level, message),
+
   // Platform info
   platform: process.platform,
 })
@@ -172,6 +176,7 @@ declare global {
       onPythonSetupProgress: (cb: (data: unknown) => void) => void
       removePythonSetupProgress: () => void
       onBackendHealthStatus: (cb: (data: BackendHealthStatus) => void) => (() => void)
+      writeLog: (level: string, message: string) => Promise<void>
       platform: string
     }
   }

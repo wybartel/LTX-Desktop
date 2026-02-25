@@ -3,6 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { getAppDataDir } from './app-paths'
 import { BACKEND_BASE_URL, getCurrentDir, isDev, PYTHON_PORT } from './config'
+import { logger } from './logger'
 import { getCurrentLogFilename } from './logging-management'
 import { getPythonDir } from './python-setup'
 import { getMainWindow } from './window'
@@ -125,7 +126,7 @@ function startOwnershipTakeover(): void {
       backendOwnership = null
       await startPythonBackend(restartFlags)
     } catch (error) {
-      console.error('Failed to reclaim backend process ownership:', error)
+      logger.error(`Failed to reclaim backend process ownership: ${error}`)
       backendOwnership = null
       publishBackendHealthStatus({ status: 'dead' })
     } finally {
@@ -142,7 +143,7 @@ export function getPythonPath(): string {
       ? path.join(pythonDir, 'python.exe')
       : path.join(pythonDir, 'bin', 'python3')
     if (fs.existsSync(bundledPython)) {
-      console.log(`Using bundled Python: ${bundledPython}`)
+      logger.info(`Using bundled Python: ${bundledPython}`)
       return bundledPython
     }
   }
@@ -155,7 +156,7 @@ export function getPythonPath(): string {
     : path.join(backendPath, '.venv', 'bin', 'python')
 
   if (fs.existsSync(venvPython)) {
-    console.log(`Using venv Python: ${venvPython}`)
+    logger.info(`Using venv Python: ${venvPython}`)
     return venvPython
   }
 
@@ -217,7 +218,7 @@ export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<vo
     const backendPath = getBackendPath()
     const mainPy = path.join(backendPath, 'ltx2_server.py')
 
-    console.log(`Starting Python backend: ${pythonPath} ${mainPy}`)
+    logger.info(`Starting Python backend: ${pythonPath} ${mainPy}`)
 
     // Windows embedded Python's ._pth file suppresses normal sys.path setup —
     // the script's directory isn't added, so sibling packages (e.g. state/)
@@ -291,7 +292,7 @@ export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<vo
     })
 
     pythonProcess.on('error', (error) => {
-      console.error('Failed to start Python backend:', error)
+      logger.error(`Failed to start Python backend: ${error}`)
       if (!started) {
         backendOwnership = null
         publishBackendHealthStatus({ status: 'dead' })
@@ -300,7 +301,7 @@ export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<vo
     })
 
     pythonProcess.on('exit', async (code) => {
-      console.log(`Python backend exited with code ${code}`)
+      logger.info(`Python backend exited with code ${code}`)
       pythonProcess = null
 
       if (!started) {
@@ -378,7 +379,7 @@ export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<vo
 export function stopPythonBackend(): void {
   if (pythonProcess) {
     isIntentionalShutdown = true
-    console.log('Stopping Python backend...')
+    logger.info('Stopping Python backend...')
     const pid = pythonProcess.pid
     pythonProcess.kill('SIGTERM')
     pythonProcess = null

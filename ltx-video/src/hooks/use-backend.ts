@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { logger } from '../lib/logger'
 
 interface BackendStatus {
   connected: boolean
@@ -65,12 +66,12 @@ export function useBackend(): UseBackendReturn {
   const checkHealth = useCallback(async (): Promise<boolean> => {
     try {
       const backendUrl = await window.electronAPI.getBackendUrl()
-      console.log('Checking backend health at:', backendUrl)
+      logger.info(`Checking backend health at: ${backendUrl}`)
       const response = await fetch(`${backendUrl}/health`)
 
       if (response.ok) {
         const data = await response.json()
-        console.log('Backend health:', data)
+        logger.info(`Backend health: ${JSON.stringify(data)}`)
 
         setStatus({
           connected: true,
@@ -80,10 +81,10 @@ export function useBackend(): UseBackendReturn {
         setError(null)
         return true
       }
-      console.warn('Backend health check failed with status:', response.status)
+      logger.warn(`Backend health check failed with status: ${response.status}`)
       return false
     } catch (err) {
-      console.error('Backend health check error:', err)
+      logger.error(`Backend health check error: ${err}`)
       setStatus(prev => ({ ...prev, connected: false }))
       return false
     }
@@ -99,7 +100,7 @@ export function useBackend(): UseBackendReturn {
         setModels(data.models)
       }
     } catch (err) {
-      console.error('Failed to fetch models:', err)
+      logger.error(`Failed to fetch models: ${err}`)
     }
   }, [])
 
@@ -180,7 +181,7 @@ export function useBackend(): UseBackendReturn {
         const snapshot = await window.electronAPI.getBackendHealthStatus()
         await applyStatus(snapshot)
       } catch (err) {
-        console.error('Failed to load backend health status snapshot:', err)
+        logger.error(`Failed to load backend health status snapshot: ${err}`)
       }
     }
 

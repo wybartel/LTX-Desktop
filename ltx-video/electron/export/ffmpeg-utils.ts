@@ -2,6 +2,7 @@ import { spawn, spawnSync, ChildProcess, execSync } from 'child_process'
 import path from 'path'
 import fs from 'fs'
 import { isDev, getCurrentDir } from '../config'
+import { logger } from '../logger'
 
 let activeExportProcess: ChildProcess | null = null
 
@@ -73,7 +74,7 @@ export function urlToFilePath(url: string): string {
 /** Run an ffmpeg command and return a promise. Logs stderr and sets activeExportProcess. */
 export function runFfmpeg(ffmpegPath: string, args: string[]): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
-    console.log(`[ffmpeg] spawn: ${args.join(' ').slice(0, 400)}`)
+    logger.info( `[ffmpeg] spawn: ${args.join(' ').slice(0, 400)}`)
     const proc = spawn(ffmpegPath, args, { stdio: ['pipe', 'pipe', 'pipe'] })
     activeExportProcess = proc
     let stderrLog = ''
@@ -83,7 +84,7 @@ export function runFfmpeg(ffmpegPath: string, args: string[]): Promise<{ success
       const lines = text.trim().split('\n')
       for (const line of lines) {
         if (line.includes('frame=') || line.includes('Error') || line.includes('error')) {
-          console.log(`[ffmpeg] ${line.trim().slice(0, 200)}`)
+          logger.info( `[ffmpeg] ${line.trim().slice(0, 200)}`)
         }
       }
     })
@@ -93,7 +94,7 @@ export function runFfmpeg(ffmpegPath: string, args: string[]): Promise<{ success
         resolve({ success: true })
       } else {
         const errLines = stderrLog.split('\n').filter(l => l.trim()).slice(-5).join('\n')
-        console.error(`[ffmpeg] exited ${code}:\n${errLines}`)
+        logger.error( `[ffmpeg] exited ${code}:\n${errLines}`)
         resolve({ success: false, error: `FFmpeg failed (code ${code}): ${errLines.slice(0, 300)}` })
       }
     })
@@ -106,7 +107,7 @@ export function runFfmpeg(ffmpegPath: string, args: string[]): Promise<{ success
 
 export function stopExportProcess(): void {
   if (activeExportProcess) {
-    console.log('Stopping active export process...')
+    logger.info( 'Stopping active export process...')
     activeExportProcess.kill()
     activeExportProcess = null
   }

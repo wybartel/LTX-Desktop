@@ -1,5 +1,6 @@
 import { execSync } from 'child_process'
 import { BACKEND_BASE_URL } from './config'
+import { logger } from './logger'
 import { getPythonPath } from './python-backend'
 
 // Check if NVIDIA GPU is available
@@ -20,7 +21,7 @@ export async function checkGPU(): Promise<{ available: boolean; name?: string; v
       }
     }
   } catch (error) {
-    console.log('Backend GPU check failed, trying direct check:', error)
+    logger.warn(`Backend GPU check failed, trying direct check: ${error}`)
   }
 
   // Fallback: try direct Python check
@@ -38,7 +39,7 @@ export async function checkGPU(): Promise<{ available: boolean; name?: string; v
       vram: parseInt(result[2]) || undefined
     }
   } catch (error) {
-    console.error('Direct GPU check also failed:', error)
+    logger.error(`Direct GPU check also failed: ${error}`)
     return { available: false }
   }
 }

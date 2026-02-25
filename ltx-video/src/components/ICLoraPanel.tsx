@@ -3,6 +3,7 @@ import {
   X, Play, Pause, Upload, Loader2, Film, Sparkles,
   FolderOpen, ChevronDown, RefreshCw, Settings, Download, Check, AlertCircle,
 } from 'lucide-react'
+import { logger } from '../lib/logger'
 
 interface ICLoraModel {
   name: string
@@ -145,7 +146,7 @@ export function ICLoraPanel({
         }
       }
     } catch (e) {
-      console.warn('Failed to fetch IC-LoRA models:', e)
+      logger.warn(`Failed to fetch IC-LoRA models: ${e}`)
     }
   }, [selectedModel])
 
@@ -169,7 +170,7 @@ export function ICLoraPanel({
         setConditioningPreview(data.conditioning)
       }
     } catch (e) {
-      console.warn('Failed to extract conditioning:', e)
+      logger.warn(`Failed to extract conditioning: ${e}`)
     } finally {
       setIsExtracting(false)
     }

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Sparkles, Trash2, Square, ImageIcon, ArrowLeft } from 'lucide-react'
+import { logger } from '../lib/logger'
 import { ImageUploader } from '../components/ImageUploader'
 import { VideoPlayer } from '../components/VideoPlayer'
 import { ImageResult } from '../components/ImageResult'
@@ -84,7 +85,7 @@ export function Playground() {
   // Handle "Create video" from generated image
   const handleCreateVideoFromImage = () => {
     if (!imageUrl) {
-      console.error('No image URL available')
+      logger.error('No image URL available')
       return
     }
 

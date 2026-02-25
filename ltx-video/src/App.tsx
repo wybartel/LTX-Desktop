@@ -5,6 +5,7 @@ import { KeyboardShortcutsProvider } from './contexts/KeyboardShortcutsContext'
 import { AppSettingsProvider, useAppSettings } from './contexts/AppSettingsContext'
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal'
 import { useBackend } from './hooks/use-backend'
+import { logger } from './lib/logger'
 import { Home } from './views/Home'
 import { Project } from './views/Project'
 import { Playground } from './views/Playground'
@@ -59,7 +60,8 @@ function AppContent() {
       try {
         const result = await window.electronAPI.checkPythonReady()
         setPythonReady(result.ready)
-      } catch {
+      } catch (e) {
+        logger.error(`Failed to check Python readiness: ${e}`)
         setPythonReady(true)
       }
     }
@@ -71,9 +73,11 @@ function AppContent() {
     setBackendStarted(true)
     const start = async () => {
       try {
+        logger.info('Starting Python backend...')
         await window.electronAPI.startPythonBackend()
+        logger.info('Python backend started successfully')
       } catch (e) {
-        console.error('Failed to start Python backend:', e)
+        logger.error(`Failed to start Python backend: ${e}`)
       }
     }
     void start()
@@ -85,7 +89,7 @@ function AppContent() {
         const next = await window.electronAPI.checkFirstRun()
         setSetupState(next)
       } catch (e) {
-        console.error('Failed to check first run:', e)
+        logger.error(`Failed to check first run: ${e}`)
         setSetupState({ needsSetup: false, needsLicense: false })
       }
     }

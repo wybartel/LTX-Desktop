@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import type { Project, Asset, AssetTake, ViewType, ProjectTab, Timeline } from '../types/project'
 import { createDefaultTimeline } from '../types/project'
+import { logger } from '../lib/logger'
 
 interface ProjectContextType {
   // Navigation
@@ -123,7 +124,7 @@ function loadProjectsFromStorage(): Project[] {
       }
     }
   } catch (e) {
-    console.error('Failed to load projects:', e)
+    logger.error(`Failed to load projects: ${e}`)
   }
   return []
 }
@@ -150,9 +151,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
-      console.log('Projects saved:', projects.length)
+      logger.info(`Projects saved: ${projects.length}`)
     } catch (e) {
-      console.error('Failed to save projects:', e)
+      logger.error(`Failed to save projects: ${e}`)
     }
   }, [projects])
   

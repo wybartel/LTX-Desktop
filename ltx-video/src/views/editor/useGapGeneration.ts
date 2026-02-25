@@ -4,6 +4,7 @@ import { DEFAULT_COLOR_CORRECTION } from '../../types/project'
 import type { GenerationSettings } from '../../components/SettingsPanel'
 import { copyToAssetFolder } from '../../lib/asset-copy'
 import { sanitizeForcedApiVideoSettings } from '../../lib/api-video-options'
+import { logger } from '../../lib/logger'
 
 export interface UseGapGenerationParams {
   clips: TimelineClip[]
@@ -218,7 +219,7 @@ export function useGapGeneration({
         await regenGenerate(finalPrompt, imagePath, settings)
       }
     } catch (err) {
-      console.error('Gap generation failed:', err)
+      logger.error(`Gap generation failed: ${err}`)
       setGeneratingGap(null)
     }
   }, [selectedGap, gapGenerateMode, gapPrompt, gapShotType, gapCameraAngle, gapSettings, gapImageFile, gapApplyAudioToTrack, currentProjectId, regenGenerate, regenGenerateImage, regenEditImage, forceApiGenerations])
@@ -510,7 +511,7 @@ export function useGapGeneration({
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
-      console.warn('Gap prompt suggestion failed:', err)
+      logger.warn(`Gap prompt suggestion failed: ${err}`)
       setGapSuggestionError(true)
     } finally {
       if (!abortController.signal.aborted) {

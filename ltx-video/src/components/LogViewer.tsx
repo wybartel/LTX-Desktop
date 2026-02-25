@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, FolderOpen, RefreshCw, ChevronDown, ChevronUp, Download } from 'lucide-react'
 import { Button } from './ui/button'
+import { logger } from '../lib/logger'
 
 interface LogViewerProps {
   isOpen: boolean
@@ -24,7 +25,7 @@ export function LogViewer({ isOpen, onClose, embedded = false }: LogViewerProps)
       setLogs(result.lines || [])
       setLogPath(result.logPath || '')
     } catch (error) {
-      console.error('Failed to fetch logs:', error)
+      logger.error(`Failed to fetch logs: ${error}`)
     } finally {
       setIsLoading(false)
     }
@@ -57,7 +58,7 @@ export function LogViewer({ isOpen, onClose, embedded = false }: LogViewerProps)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = logPath ? logPath.split(/[/\\]/).pop() || 'backend.log' : 'backend.log'
+    a.download = logPath ? logPath.split(/[/\\]/).pop() || 'session.log' : 'session.log'
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -69,7 +70,7 @@ export function LogViewer({ isOpen, onClose, embedded = false }: LogViewerProps)
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-700">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-white">Backend Logs</h2>
+            <h2 className="text-lg font-semibold text-white">Logs</h2>
             <span className="text-xs text-zinc-500 font-mono truncate max-w-[300px]" title={logPath}>
               {logPath}
             </span>

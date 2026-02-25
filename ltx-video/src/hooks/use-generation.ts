@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import { logger } from '../lib/logger'
 import type { GenerationSettings } from '../components/SettingsPanel'
 
 interface GenerationState {
@@ -138,22 +139,22 @@ export function useGeneration(): UseGenerationReturn {
           const enhanceResult = await enhanceResponse.json()
           if (enhanceResult.status === 'success' && enhanceResult.enhanced_prompt) {
             if (enhanceResult.skipped) {
-              console.log(`Prompt enhancement skipped (${enhanceMode}): ${enhanceResult.reason}`)
+              logger.info(`Prompt enhancement skipped (${enhanceMode}): ${enhanceResult.reason}`)
             } else {
               finalPrompt = enhanceResult.enhanced_prompt
-              console.log(`Prompt enhanced (${enhanceMode}):`, finalPrompt.substring(0, 100) + '...')
+              logger.info(`Prompt enhanced (${enhanceMode}): ${finalPrompt.substring(0, 100)}...`)
             }
           }
         } else {
           const errorData = await enhanceResponse.json().catch(() => ({}))
           if (errorData.error === 'GEMINI_API_KEY_MISSING') {
-            console.log('Prompt enhancement skipped: no Gemini API key')
+            logger.info('Prompt enhancement skipped: no Gemini API key')
           } else {
-            console.warn('Prompt enhancement failed, using original:', errorData)
+            logger.warn(`Prompt enhancement failed, using original: ${JSON.stringify(errorData)}`)
           }
         }
       } catch (enhanceError) {
-        console.warn('Prompt enhancement error, using original:', enhanceError)
+        logger.warn(`Prompt enhancement error, using original: ${enhanceError}`)
       }
       
       // Update status for video generation

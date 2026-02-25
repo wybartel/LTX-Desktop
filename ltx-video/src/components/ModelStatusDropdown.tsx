@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Loader2, CheckCircle2, Download, Clock, ChevronDown, AlertCircle } from 'lucide-react'
+import { logger } from '../lib/logger'
 
 interface ModelInfo {
   name: string
@@ -60,7 +61,7 @@ export function ModelStatusDropdown({ className = '' }: ModelStatusDropdownProps
           setModelsStatus(await response.json())
         }
       } catch (e) {
-        console.error('Failed to fetch models status:', e)
+        logger.error(`Failed to fetch models status: ${e}`)
       }
     }
 
@@ -80,7 +81,7 @@ export function ModelStatusDropdown({ className = '' }: ModelStatusDropdownProps
           setDownloadProgress(await response.json())
         }
       } catch (e) {
-        console.error('Failed to fetch download progress:', e)
+        logger.error(`Failed to fetch download progress: ${e}`)
       }
     }
 
@@ -142,7 +143,7 @@ export function ModelStatusDropdown({ className = '' }: ModelStatusDropdownProps
         body: JSON.stringify({}),
       })
     } catch (e) {
-      console.error('Failed to start download:', e)
+      logger.error(`Failed to start download: ${e}`)
     }
   }
 

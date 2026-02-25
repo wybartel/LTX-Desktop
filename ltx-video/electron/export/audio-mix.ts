@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import path from 'path'
 import fs from 'fs'
+import { logger } from '../logger'
 import { fileHasAudio, urlToFilePath } from './ffmpeg-utils'
 import type { ExportClip } from './timeline'
 
@@ -98,7 +99,7 @@ export async function mixAudioToPcm(
     }
   }
 
-  console.log(`[Export] Audio: ${audioSources.length} source(s) from ${clips.length} clip(s)`)
+  logger.info( `[Export] Audio: ${audioSources.length} source(s) from ${clips.length} clip(s)`)
 
   // Create master mix buffer (Float64 to accumulate without clipping)
   const totalFrames = Math.ceil(totalDuration * SAMPLE_RATE)
@@ -108,7 +109,7 @@ export async function mixAudioToPcm(
   // Extract each source and mix into the master buffer
   for (let i = 0; i < audioSources.length; i++) {
     const src = audioSources[i]
-    console.log(`[Export] Audio ${i + 1}/${audioSources.length}: ${path.basename(src.filePath)} trim=${src.trimStart.toFixed(2)}-${src.trimEnd.toFixed(2)} @${src.timelineStart.toFixed(2)}s vol=${src.volume}`)
+    logger.info( `[Export] Audio ${i + 1}/${audioSources.length}: ${path.basename(src.filePath)} trim=${src.trimStart.toFixed(2)}-${src.trimEnd.toFixed(2)} @${src.timelineStart.toFixed(2)}s vol=${src.volume}`)
     try {
       const pcm = await extractPcmBuffer(ffmpegPath, src.filePath, src.trimStart, src.trimEnd, src.speed, src.reversed)
       const startFrame = Math.round(src.timelineStart * SAMPLE_RATE)
@@ -121,9 +122,9 @@ export async function mixAudioToPcm(
         const value = pcm.readInt16LE(s * BYTES_PER_SAMPLE)
         mixBuffer[destIdx] += value * src.volume
       }
-      console.log(`[Export] Audio ${i + 1}: mixed ${numPcmSamples} samples (${(numPcmSamples / SAMPLE_RATE / NUM_CHANNELS).toFixed(2)}s) at offset frame ${startFrame}`)
+      logger.info( `[Export] Audio ${i + 1}: mixed ${numPcmSamples} samples (${(numPcmSamples / SAMPLE_RATE / NUM_CHANNELS).toFixed(2)}s) at offset frame ${startFrame}`)
     } catch (err: any) {
-      console.warn(`[Export] Failed to extract audio from ${src.filePath}: ${err.message}`)
+      logger.warn( `[Export] Failed to extract audio from ${src.filePath}: ${err.message}`)
     }
   }
 

@@ -2,6 +2,7 @@ import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { getCurrentDir, isDev } from './config'
+import { logger, setLogFilePath } from './logger'
 export { getLogDir } from './app-paths'
 import { getLogDir } from './app-paths'
 
@@ -19,13 +20,13 @@ function getGitCommitHash(): string {
 function generateLogFilename(gitHash: string): string {
   const now = new Date()
   const ts = now.toISOString().replace(/T/, '_').replace(/:/g, '-').replace(/\..+/, '')
-  return `backend_${ts}_${gitHash}.log`
+  return `session_${ts}_${gitHash}.log`
 }
 
 function cleanupOldLogs(logDir: string, maxFiles = 30): void {
   try {
     const files = fs.readdirSync(logDir)
-      .filter(f => f.startsWith('backend_') && f.endsWith('.log'))
+      .filter(f => (f.startsWith('session_') || f.startsWith('backend_')) && f.endsWith('.log'))
       .map(f => ({ name: f, time: fs.statSync(path.join(logDir, f)).mtimeMs }))
       .sort((a, b) => a.time - b.time)
 
@@ -51,7 +52,8 @@ export function initSessionLog(): void {
 
   cleanupOldLogs(logDir)
 
-  console.log(`Session log file: ${currentLogFilename}`)
+  setLogFilePath(currentLogFilename)
+  logger.info(`Session log file: ${currentLogFilename}`)
 }
 
 export function getCurrentLogFilename(): string {

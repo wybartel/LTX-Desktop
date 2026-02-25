@@ -2,6 +2,7 @@ import { ipcMain, dialog } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { getCurrentDir, getAllowedRoots } from '../config'
+import { logger } from '../logger'
 import { getMainWindow } from '../window'
 import { validatePath, approvePath } from '../path-validation'
 
@@ -108,7 +109,7 @@ export function registerFileHandlers(): void {
 
       return readLocalFileAsBase64(normalizedPath)
     } catch (error) {
-      console.error('Error reading local file:', error)
+      logger.error( `Error reading local file: ${error}`)
       throw error
     }
   })
@@ -140,7 +141,7 @@ export function registerFileHandlers(): void {
       }
       return { success: true, path: filePath }
     } catch (error) {
-      console.error('Error saving file:', error)
+      logger.error( `Error saving file: ${error}`)
       return { success: false, error: String(error) }
     }
   })
@@ -151,7 +152,7 @@ export function registerFileHandlers(): void {
       fs.writeFileSync(filePath, Buffer.from(data))
       return { success: true, path: filePath }
     } catch (error) {
-      console.error('Error saving binary file:', error)
+      logger.error( `Error saving binary file: ${error}`)
       return { success: false, error: String(error) }
     }
   })

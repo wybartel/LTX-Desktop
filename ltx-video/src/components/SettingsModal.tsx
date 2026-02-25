@@ -2,6 +2,7 @@ import { AlertCircle, Check, Download, Info, RotateCcw, Settings, Sliders, Spark
 import React, { useEffect, useState } from 'react'
 import { Button } from './ui/button'
 import { useAppSettings, type AppSettings } from '../contexts/AppSettingsContext'
+import { logger } from '../lib/logger'
 
 const DEFAULT_T2V_SYSTEM_PROMPT = `You are a prompt enhancer for a text-to-video model. Your task is to take user input and expand it into a fully realized, visually and acoustically specific scene.
 
@@ -108,7 +109,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
           setTextEncoderStatus(data.text_encoder_status)
         }
       } catch (e) {
-        console.error('Failed to fetch text encoder status:', e)
+        logger.error(`Failed to fetch text encoder status: ${e}`)
       }
     }
 
@@ -294,7 +295,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
       setModelLicenseText(text)
       setShowModelLicense(true)
     } catch (e) {
-      console.error('Failed to load model license:', e)
+      logger.error(`Failed to load model license: ${e}`)
     } finally {
       setModelLicenseLoading(false)
     }
@@ -307,7 +308,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
       setNoticesText(text)
       setShowNotices(true)
     } catch (e) {
-      console.error('Failed to load notices:', e)
+      logger.error(`Failed to load notices: ${e}`)
     } finally {
       setNoticesLoading(false)
     }
