@@ -6,6 +6,11 @@ interface LogsResponse {
   error?: string
 }
 
+interface BackendHealthStatus {
+  status: 'alive' | 'restarting' | 'dead'
+  exitCode?: number | null
+}
+
 interface Window {
   electronAPI: {
     getBackendUrl: () => Promise<string>
@@ -48,8 +53,10 @@ interface Window {
     checkPythonReady: () => Promise<{ ready: boolean }>
     startPythonSetup: () => Promise<void>
     startPythonBackend: () => Promise<void>
+    getBackendHealthStatus: () => Promise<BackendHealthStatus | null>
     onPythonSetupProgress: (cb: (data: unknown) => void) => void
     removePythonSetupProgress: () => void
+    onBackendHealthStatus: (cb: (data: BackendHealthStatus) => void) => (() => void)
     platform: string
   }
 }

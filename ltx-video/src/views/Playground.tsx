@@ -37,7 +37,7 @@ export function Playground() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [settings, setSettings] = useState<GenerationSettings>(() => ({ ...DEFAULT_SETTINGS }))
 
-  const { status } = useBackend()
+  const { status, processStatus } = useBackend()
 
   useEffect(() => {
     if (!forceApiGenerations) return
@@ -104,7 +104,7 @@ export function Playground() {
   }
 
   const isVideoMode = mode !== 'text-to-image'
-  const canGenerate = status.connected && !isGenerating && !!prompt.trim() && (
+  const canGenerate = processStatus === 'alive' && !isGenerating && !!prompt.trim() && (
     isVideoMode || mode === 'text-to-image'
   )
 

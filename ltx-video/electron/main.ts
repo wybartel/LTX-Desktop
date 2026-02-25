@@ -13,34 +13,57 @@ import { createWindow, getMainWindow } from './window'
 
 const FORCE_API_GENERATIONS = true
 
-initSessionLog()
+const gotLock = app.requestSingleInstanceLock()
 
-registerAppHandlers({ forceApiGenerations: FORCE_API_GENERATIONS })
-registerFileHandlers()
-registerLogHandlers()
-registerExportHandlers()
+if (!gotLock) {
+  app.quit()
+} else {
+  initSessionLog()
 
-app.whenReady().then(async () => {
-  setupCSP()
-  createWindow()
-  initAutoUpdater()
-  // Python setup + backend start are now driven by the renderer via IPC
-})
+  registerAppHandlers({ forceApiGenerations: FORCE_API_GENERATIONS })
+  registerFileHandlers()
+  registerLogHandlers()
+  registerExportHandlers()
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    stopPythonBackend();
-    app.quit();
-  }
-});
+  app.on('second-instance', () => {
+    const mainWindow = getMainWindow()
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore()
+      }
+      if (!mainWindow.isVisible()) {
+        mainWindow.show()
+      }
+      mainWindow.focus()
+      return
+    }
+    if (app.isReady()) {
+      createWindow()
+    }
+  })
 
-app.on('activate', () => {
-  if (getMainWindow() === null) {
-    createWindow();
-  }
-});
+  app.whenReady().then(async () => {
+    setupCSP()
+    createWindow()
+    initAutoUpdater()
+    // Python setup + backend start are now driven by the renderer via IPC
+  })
 
-app.on('before-quit', () => {
-  stopExportProcess();
-  stopPythonBackend();
-});
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      stopPythonBackend()
+      app.quit()
+    }
+  })
+
+  app.on('activate', () => {
+    if (getMainWindow() === null) {
+      createWindow()
+    }
+  })
+
+  app.on('before-quit', () => {
+    stopExportProcess()
+    stopPythonBackend()
+  })
+}

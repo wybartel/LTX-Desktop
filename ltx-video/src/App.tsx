@@ -19,7 +19,7 @@ type SetupState = 'loading' | { needsSetup: boolean; needsLicense: boolean }
 
 function AppContent() {
   const { currentView } = useProjects()
-  const { status, isLoading: backendLoading, error: backendError } = useBackend()
+  const { status, processStatus, isLoading: backendLoading, error: backendError } = useBackend()
   const { settings, updateSettings, hasLtxApiKey, forceApiGenerations, isLoaded } = useAppSettings()
 
   const [pythonReady, setPythonReady] = useState<boolean | null>(null)
@@ -40,6 +40,9 @@ function AppContent() {
     primaryActionLabel: 'Save API key',
     secondaryActionLabel: undefined,
   }
+
+  const isBackendRestarting = processStatus === 'restarting'
+  const isBackendDead = processStatus === 'dead'
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -167,6 +170,18 @@ function AppContent() {
     })
   }, [shouldAutoFinalizeForcedFirstRun, handleFirstRunComplete])
 
+  const restartingOverlay = isBackendRestarting ? (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="rounded-lg border border-zinc-700 bg-zinc-900/95 px-6 py-4 text-center shadow-xl">
+        <div className="flex items-center justify-center gap-2 text-zinc-100">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="font-medium">Reconnecting...</span>
+        </div>
+        <p className="mt-2 text-sm text-zinc-400">The backend process stopped unexpectedly. Attempting to restart...</p>
+      </div>
+    </div>
+  ) : null
+
   if (pythonReady === null) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
@@ -179,14 +194,37 @@ function AppContent() {
     return <PythonSetup onReady={() => setPythonReady(true)} />
   }
 
+  if (isBackendDead) {
+    return (
+      <div className="h-screen bg-background flex items-center justify-center p-6">
+        <div className="w-full max-w-5xl rounded-xl border border-zinc-700 bg-zinc-900/80 p-6 shadow-2xl">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">The backend process crashed and could not be restarted</h2>
+            <p className="text-muted-foreground mb-4">Review the logs below and restart the application.</p>
+          </div>
+          <div className="h-[50vh]">
+            <LogViewer isOpen={true} onClose={() => {}} embedded={true} />
+          </div>
+          <div className="mt-4 flex justify-center">
+            <Button onClick={() => window.location.reload()}>Restart Application</Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (backendLoading || setupState === 'loading') {
     return (
-      <div className="h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-foreground mb-2">Starting LTX Desktop...</h2>
-          <p className="text-muted-foreground">Initializing the inference engine</p>
+      <div className="relative h-screen w-screen">
+        <div className="h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">Starting LTX Desktop...</h2>
+            <p className="text-muted-foreground">Initializing the inference engine</p>
+          </div>
         </div>
+        {restartingOverlay}
       </div>
     )
   }
@@ -334,6 +372,8 @@ function AppContent() {
           </div>
         </div>
       )}
+
+      {restartingOverlay}
     </div>
   )
 }

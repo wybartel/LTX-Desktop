@@ -5,9 +5,10 @@ import { Button } from './ui/button'
 interface LogViewerProps {
   isOpen: boolean
   onClose: () => void
+  embedded?: boolean
 }
 
-export function LogViewer({ isOpen, onClose }: LogViewerProps) {
+export function LogViewer({ isOpen, onClose, embedded = false }: LogViewerProps) {
   const [logs, setLogs] = useState<string[]>([])
   const [logPath, setLogPath] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -63,9 +64,8 @@ export function LogViewer({ isOpen, onClose }: LogViewerProps) {
 
   if (!isOpen) return null
 
-  return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 rounded-lg border border-zinc-700 w-full max-w-4xl h-[80vh] flex flex-col">
+  const panel = (
+    <div className={`bg-zinc-900 rounded-lg border border-zinc-700 w-full ${embedded ? 'h-full' : 'max-w-4xl h-[80vh]'} flex flex-col`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-700">
           <div className="flex items-center gap-3">
@@ -113,14 +113,16 @@ export function LogViewer({ isOpen, onClose }: LogViewerProps) {
             >
               {autoScroll ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="text-zinc-400 hover:text-white"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            {!embedded && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="text-zinc-400 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -164,6 +166,15 @@ export function LogViewer({ isOpen, onClose }: LogViewerProps) {
           <span>Auto-refreshing every 2s</span>
         </div>
       </div>
+  )
+
+  if (embedded) {
+    return panel
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      {panel}
     </div>
   )
 }

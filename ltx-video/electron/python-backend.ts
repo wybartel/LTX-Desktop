@@ -2,14 +2,41 @@ import { ChildProcess, spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { getAppDataDir } from './app-paths'
-import { getCurrentDir, isDev, PYTHON_PORT } from './config'
+import { BACKEND_BASE_URL, getCurrentDir, isDev, PYTHON_PORT } from './config'
 import { getCurrentLogFilename } from './logging-management'
 import { getPythonDir } from './python-setup'
+import { getMainWindow } from './window'
 
 let pythonProcess: ChildProcess | null = null
+let isIntentionalShutdown = false
+let lastCrashTime = 0
+const CRASH_DEBOUNCE_MS = 10_000
+let startPromise: Promise<void> | null = null
+let takeoverInFlight: Promise<void> | null = null
+
+type BackendOwnership = 'managed' | 'adopted' | null
+
+let backendOwnership: BackendOwnership = null
 
 interface BackendRuntimeFlags {
   forceApiGenerations: boolean
+}
+
+export interface BackendHealthStatus {
+  status: 'alive' | 'restarting' | 'dead'
+  exitCode?: number | null
+}
+
+let latestBackendHealthStatus: BackendHealthStatus | null = null
+let lastRuntimeFlags: BackendRuntimeFlags | null = null
+
+function publishBackendHealthStatus(status: BackendHealthStatus): void {
+  latestBackendHealthStatus = status
+  getMainWindow()?.webContents.send('backend-health-status', status)
+}
+
+export function getBackendHealthStatus(): BackendHealthStatus | null {
+  return latestBackendHealthStatus
 }
 
 function getBackendPath(): string {
@@ -17,6 +44,94 @@ function getBackendPath(): string {
     return path.join(getCurrentDir(), 'backend')
   }
   return path.join(process.resourcesPath, 'backend')
+}
+
+function isPortConflictOutput(output: string): boolean {
+  const normalizedOutput = output.toLowerCase()
+  return (
+    normalizedOutput.includes('address already in use') ||
+    normalizedOutput.includes('eaddrinuse') ||
+    normalizedOutput.includes('errno 48')
+  )
+}
+
+async function probeBackendHealth(timeoutMs = 1500): Promise<boolean> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/health`, {
+      signal: controller.signal,
+    })
+    return response.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function requestAdoptedBackendShutdown(timeoutMs = 2000): Promise<boolean> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/system/shutdown`, {
+      method: 'POST',
+      signal: controller.signal,
+    })
+    return response.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function waitUntilBackendDown(timeoutMs = 8000): Promise<boolean> {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < timeoutMs) {
+    const healthy = await probeBackendHealth(800)
+    if (!healthy) {
+      return true
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  return false
+}
+
+function startOwnershipTakeover(): void {
+  if (takeoverInFlight || backendOwnership !== 'adopted') {
+    return
+  }
+
+  const restartFlags = lastRuntimeFlags
+  if (!restartFlags) {
+    backendOwnership = null
+    publishBackendHealthStatus({ status: 'dead' })
+    return
+  }
+
+  takeoverInFlight = (async () => {
+    try {
+      const shutdownRequested = await requestAdoptedBackendShutdown()
+      if (!shutdownRequested) {
+        throw new Error('Failed to request shutdown for adopted backend')
+      }
+
+      const backendStopped = await waitUntilBackendDown()
+      if (!backendStopped) {
+        throw new Error('Timed out waiting for adopted backend shutdown')
+      }
+
+      backendOwnership = null
+      await startPythonBackend(restartFlags)
+    } catch (error) {
+      console.error('Failed to reclaim backend process ownership:', error)
+      backendOwnership = null
+      publishBackendHealthStatus({ status: 'dead' })
+    } finally {
+      takeoverInFlight = null
+    }
+  })()
 }
 
 export function getPythonPath(): string {
@@ -75,7 +190,29 @@ export function getPythonPath(): string {
 }
 
 export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<void> {
-  return new Promise((resolve, reject) => {
+  lastRuntimeFlags = flags
+
+  if (startPromise) {
+    return startPromise
+  }
+
+  if (pythonProcess && backendOwnership === 'managed') {
+    publishBackendHealthStatus({ status: 'alive' })
+    return
+  }
+
+  if (backendOwnership === 'adopted') {
+    const adoptedHealthy = await probeBackendHealth()
+    if (adoptedHealthy) {
+      publishBackendHealthStatus({ status: 'alive' })
+      return
+    }
+    backendOwnership = null
+  }
+
+  isIntentionalShutdown = false
+
+  startPromise = new Promise((resolve, reject) => {
     const pythonPath = getPythonPath()
     const backendPath = getBackendPath()
     const mainPy = path.join(backendPath, 'ltx2_server.py')
@@ -112,12 +249,32 @@ export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<vo
     })
 
     let started = false
+    let startupSettled = false
+    let sawPortConflict = false
+
+    const settleResolve = () => {
+      if (startupSettled) return
+      startupSettled = true
+      resolve()
+    }
+
+    const settleReject = (error: Error) => {
+      if (startupSettled) return
+      startupSettled = true
+      reject(error)
+    }
 
     const checkStarted = (output: string) => {
+      if (isPortConflictOutput(output)) {
+        sawPortConflict = true
+      }
+
       // Check if server has started
       if (!started && (output.includes('Server running on') || output.includes('Uvicorn running'))) {
         started = true
-        resolve()
+        backendOwnership = 'managed'
+        publishBackendHealthStatus({ status: 'alive' })
+        settleResolve()
       }
     }
 
@@ -135,25 +292,92 @@ export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<vo
 
     pythonProcess.on('error', (error) => {
       console.error('Failed to start Python backend:', error)
-      reject(error)
+      if (!started) {
+        backendOwnership = null
+        publishBackendHealthStatus({ status: 'dead' })
+        settleReject(error)
+      }
     })
 
-    pythonProcess.on('exit', (code) => {
+    pythonProcess.on('exit', async (code) => {
       console.log(`Python backend exited with code ${code}`)
       pythonProcess = null
+
+      if (!started) {
+        if (isIntentionalShutdown) {
+          isIntentionalShutdown = false
+          backendOwnership = null
+          settleReject(new Error('Python backend stopped during startup'))
+          return
+        }
+
+        if (sawPortConflict) {
+          const healthyExistingBackend = await probeBackendHealth()
+          if (healthyExistingBackend) {
+            backendOwnership = 'adopted'
+            publishBackendHealthStatus({ status: 'alive' })
+            settleResolve()
+            startOwnershipTakeover()
+            return
+          }
+        }
+
+        backendOwnership = null
+        publishBackendHealthStatus({ status: 'dead', exitCode: code })
+        settleReject(new Error(`Python backend exited during startup with code ${code}`))
+        return
+      }
+
+      if (isIntentionalShutdown) {
+        isIntentionalShutdown = false
+        backendOwnership = null
+        return
+      }
+
+      backendOwnership = 'managed'
+      const now = Date.now()
+      if (now - lastCrashTime < CRASH_DEBOUNCE_MS) {
+        publishBackendHealthStatus({ status: 'dead', exitCode: code })
+        return
+      }
+
+      lastCrashTime = now
+      publishBackendHealthStatus({ status: 'restarting', exitCode: code })
+      const restartFlags = lastRuntimeFlags ?? flags
+      try {
+        await startPythonBackend(restartFlags)
+      } catch {
+        publishBackendHealthStatus({ status: 'dead', exitCode: code })
+      }
     })
 
     // Timeout after 5 minutes (model loading can take a while on first run)
     setTimeout(() => {
-      if (!started) {
-        reject(new Error('Python backend failed to start within 5 minutes'))
+      if (startupSettled || started) {
+        return
       }
+
+      try {
+        pythonProcess?.kill('SIGTERM')
+      } catch {
+        // Process may already be dead.
+      }
+      backendOwnership = null
+      publishBackendHealthStatus({ status: 'dead' })
+      settleReject(new Error('Python backend failed to start within 5 minutes'))
     }, 300000)
   })
+
+  try {
+    await startPromise
+  } finally {
+    startPromise = null
+  }
 }
 
 export function stopPythonBackend(): void {
   if (pythonProcess) {
+    isIntentionalShutdown = true
     console.log('Stopping Python backend...')
     const pid = pythonProcess.pid
     pythonProcess.kill('SIGTERM')
@@ -169,5 +393,11 @@ export function stopPythonBackend(): void {
         }
       }, 5000)
     }
+    return
+  }
+
+  if (backendOwnership === 'adopted') {
+    backendOwnership = null
+    latestBackendHealthStatus = null
   }
 }

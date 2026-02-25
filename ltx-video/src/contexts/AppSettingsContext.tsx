@@ -43,6 +43,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   lockedSeed: 42,
 }
 
+type BackendProcessStatus = 'alive' | 'restarting' | 'dead'
+
 interface AppSettingsContextValue {
   settings: AppSettings
   isLoaded: boolean
@@ -53,6 +55,18 @@ interface AppSettingsContextValue {
 }
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null)
+
+function toBackendProcessStatus(value: unknown): BackendProcessStatus | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const record = value as { status?: unknown }
+  if (record.status === 'alive' || record.status === 'restarting' || record.status === 'dead') {
+    return record.status
+  }
+  return null
+}
 
 function normalizeAppSettings(data: Partial<AppSettings>): AppSettings {
   return {
@@ -78,6 +92,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [backendUrl, setBackendUrl] = useState<string | null>(null)
   const [forceApiGenerations, setForceApiGenerations] = useState(true)
+  const [backendProcessStatus, setBackendProcessStatus] = useState<BackendProcessStatus | null>(null)
 
   useEffect(() => {
     window.electronAPI.getBackendUrl().then(setBackendUrl).catch(() => setBackendUrl(null))
@@ -85,6 +100,35 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       .getRuntimeFlags()
       .then((flags) => setForceApiGenerations(flags.forceApiGenerations))
       .catch(() => setForceApiGenerations(true))
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const applyStatus = (value: unknown) => {
+      const nextStatus = toBackendProcessStatus(value)
+      if (!nextStatus || cancelled) {
+        return
+      }
+      setBackendProcessStatus(nextStatus)
+    }
+
+    const unsubscribe = window.electronAPI.onBackendHealthStatus((data) => {
+      applyStatus(data)
+    })
+
+    void window.electronAPI.getBackendHealthStatus()
+      .then((snapshot) => {
+        applyStatus(snapshot)
+      })
+      .catch(() => {
+        // Snapshot is optional at startup; subscription continues to listen for pushes.
+      })
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [])
 
   const refreshSettings = useCallback(async () => {
@@ -99,7 +143,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   }, [backendUrl])
 
   useEffect(() => {
-    if (!backendUrl || isLoaded) return
+    if (!backendUrl || isLoaded || backendProcessStatus !== 'alive') return
 
     let cancelled = false
     let retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -121,10 +165,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       cancelled = true
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [backendUrl, isLoaded, refreshSettings])
+  }, [backendProcessStatus, backendUrl, isLoaded, refreshSettings])
 
   useEffect(() => {
-    if (!backendUrl || !isLoaded) return
+    if (!backendUrl || !isLoaded || backendProcessStatus !== 'alive') return
     const syncTimer = setTimeout(async () => {
       try {
         await fetch(`${backendUrl}/api/settings`, {
@@ -137,7 +181,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       }
     }, 150)
     return () => clearTimeout(syncTimer)
-  }, [backendUrl, isLoaded, settings])
+  }, [backendProcessStatus, backendUrl, isLoaded, settings])
 
   const updateSettings = useCallback((patch: Partial<AppSettings> | ((prev: AppSettings) => AppSettings)) => {
     if (typeof patch === 'function') {

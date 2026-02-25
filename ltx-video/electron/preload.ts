@@ -94,11 +94,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkPythonReady: (): Promise<{ ready: boolean }> => ipcRenderer.invoke('check-python-ready'),
   startPythonSetup: (): Promise<void> => ipcRenderer.invoke('start-python-setup'),
   startPythonBackend: (): Promise<void> => ipcRenderer.invoke('start-python-backend'),
+  getBackendHealthStatus: (): Promise<BackendHealthStatus | null> => ipcRenderer.invoke('get-backend-health-status'),
   onPythonSetupProgress: (cb: (data: unknown) => void) => {
     ipcRenderer.on('python-setup-progress', (_: unknown, data: unknown) => cb(data))
   },
   removePythonSetupProgress: () => {
     ipcRenderer.removeAllListeners('python-setup-progress')
+  },
+  onBackendHealthStatus: (cb: (data: BackendHealthStatus) => void) => {
+    const listener = (_: unknown, data: BackendHealthStatus) => cb(data)
+    ipcRenderer.on('backend-health-status', listener)
+    return () => {
+      ipcRenderer.removeListener('backend-health-status', listener)
+    }
   },
 
   // Platform info
@@ -109,6 +117,11 @@ interface LogsResponse {
   logPath: string
   lines: string[]
   error?: string
+}
+
+interface BackendHealthStatus {
+  status: 'alive' | 'restarting' | 'dead'
+  exitCode?: number | null
 }
 
 // Type definitions for the exposed API
@@ -155,8 +168,10 @@ declare global {
       checkPythonReady: () => Promise<{ ready: boolean }>
       startPythonSetup: () => Promise<void>
       startPythonBackend: () => Promise<void>
+      getBackendHealthStatus: () => Promise<BackendHealthStatus | null>
       onPythonSetupProgress: (cb: (data: unknown) => void) => void
       removePythonSetupProgress: () => void
+      onBackendHealthStatus: (cb: (data: BackendHealthStatus) => void) => (() => void)
       platform: string
     }
   }

@@ -4,7 +4,7 @@ import fs from 'fs'
 import { BACKEND_BASE_URL } from '../config'
 import { checkGPU } from '../gpu'
 import { isPythonReady, downloadPythonEmbed } from '../python-setup'
-import { startPythonBackend } from '../python-backend'
+import { getBackendHealthStatus, startPythonBackend } from '../python-backend'
 import { getMainWindow } from '../window'
 
 function getModelsPath(): string {
@@ -149,6 +149,10 @@ export function registerAppHandlers(runtimeFlags: RuntimeFlags): void {
 
   ipcMain.handle('start-python-backend', async () => {
     await startPythonBackend(runtimeFlags)
+  })
+
+  ipcMain.handle('get-backend-health-status', () => {
+    return getBackendHealthStatus()
   })
 
 }
