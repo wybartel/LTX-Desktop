@@ -274,13 +274,21 @@ export function useEditorKeyboard(params: UseEditorKeyboardParams) {
         case 'edit.delete':
           if (sel.size > 0) {
             refs.pushUndoRef.current()
-            const deleteIds = new Set(sel)
+            const deleteIds = new Set<string>()
             for (const id of sel) {
               const clip = refs.clipsRef.current.find(cl => cl.id === id)
               if (clip && refs.tracksRef.current[clip.trackIndex]?.locked) continue
-              if (clip?.linkedClipIds) clip.linkedClipIds.forEach(lid => deleteIds.add(lid))
+              deleteIds.add(id)
+              if (clip?.linkedClipIds) {
+                const allLinkedSelected = clip.linkedClipIds.every(lid => sel.has(lid))
+                if (allLinkedSelected) clip.linkedClipIds.forEach(lid => deleteIds.add(lid))
+              }
             }
-            setters.setClips(prev => prev.filter(cl => !deleteIds.has(cl.id)))
+            setters.setClips(prev => prev.filter(cl => !deleteIds.has(cl.id)).map(cl => {
+              if (!cl.linkedClipIds) return cl
+              const remaining = cl.linkedClipIds.filter(lid => !deleteIds.has(lid))
+              return { ...cl, linkedClipIds: remaining.length ? remaining : undefined }
+            }))
             setters.setSelectedClipIds(new Set())
           } else if (context.selectedGap) {
             refs.pushUndoRef.current(); context.deleteGapRef.current(context.selectedGap)

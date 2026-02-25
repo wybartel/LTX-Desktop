@@ -10,6 +10,7 @@ export interface DraggingClipState {
   originalTrackIndex: number
   originalPositions: Record<string, { startTime: number; trackIndex: number }>
   isDuplicate?: boolean
+  altHeld?: boolean
 }
 
 export interface ResizingClipState {
@@ -303,14 +304,9 @@ export function useTimelineDrag(params: UseTimelineDragParams) {
           setSelectedClipIds(effectiveSelection)
         }
       } else {
-        // Normal click: if clip is already part of multi-selection, keep it
-        // otherwise select only this clip (+ its linked pair)
-        if (selectedClipIds.has(clip.id)) {
-          effectiveSelection = selectedClipIds
-        } else {
-          effectiveSelection = expandWithLinkedClips(new Set([clip.id]))
-          setSelectedClipIds(effectiveSelection)
-        }
+        // Normal click: select this clip + its linked clips
+        effectiveSelection = expandWithLinkedClips(new Set([clip.id]))
+        setSelectedClipIds(effectiveSelection)
       }
       
       // Record undo before drag begins
@@ -329,57 +325,17 @@ export function useTimelineDrag(params: UseTimelineDragParams) {
         originalPositions[clip.id] = { startTime: clip.startTime, trackIndex: clip.trackIndex }
       }
       
-      // --- Alt+drag: duplicate clips instead of moving originals ---
-      if (e.altKey) {
-        // Create duplicate clips for all selected clips
-        const idMap = new Map<string, string>() // old id → new id
-        const duplicateClips: TimelineClip[] = []
-        for (const c of clips) {
-          if (!originalPositions[c.id]) continue
-          const newId = `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          idMap.set(c.id, newId)
-          duplicateClips.push({
-            ...c,
-            id: newId,
-            isRegenerating: false,
-          })
-        }
-        
-        // Add duplicates to the timeline (originals stay in place)
-        setClips(prev => [...prev, ...duplicateClips])
-        
-        // Build originalPositions for the NEW duplicate clips
-        const dupOrigPositions: Record<string, { startTime: number; trackIndex: number }> = {}
-        for (const [oldId, pos] of Object.entries(originalPositions)) {
-          const newId = idMap.get(oldId)
-          if (newId) dupOrigPositions[newId] = { ...pos }
-        }
-        
-        // Select the duplicates
-        const newPrimaryId = idMap.get(clip.id) || clip.id
-        setSelectedClipIds(new Set(Object.keys(dupOrigPositions)))
-        
-        // Start dragging the duplicates
-        setDraggingClip({
-          clipId: newPrimaryId,
-          startX: e.clientX,
-          startY: e.clientY,
-          originalStartTime: clip.startTime,
-          originalTrackIndex: clip.trackIndex,
-          originalPositions: dupOrigPositions,
-          isDuplicate: true,
-        })
-      } else {
-        // Normal drag: move originals
-        setDraggingClip({
-          clipId: clip.id,
-          startX: e.clientX,
-          startY: e.clientY,
-          originalStartTime: clip.startTime,
-          originalTrackIndex: clip.trackIndex,
-          originalPositions,
-        })
-      }
+      // Set up dragging. Alt+drag duplication is deferred to first mouseMove
+      // so that Alt+click (no drag) only changes selection without creating duplicates.
+      setDraggingClip({
+        clipId: clip.id,
+        startX: e.clientX,
+        startY: e.clientY,
+        originalStartTime: clip.startTime,
+        originalTrackIndex: clip.trackIndex,
+        originalPositions,
+        altHeld: e.altKey || undefined,
+      })
     }
   }
   
@@ -391,6 +347,39 @@ export function useTimelineDrag(params: UseTimelineDragParams) {
     }
     
     if (!draggingClip || !trackContainerRef.current) return
+
+    // Alt+drag: create duplicates on first significant movement (deferred from mouseDown)
+    if (draggingClip.altHeld && !draggingClip.isDuplicate) {
+      const dx = e.clientX - draggingClip.startX
+      const dy = e.clientY - draggingClip.startY
+      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return
+
+      const idMap = new Map<string, string>()
+      const duplicateClips: TimelineClip[] = []
+      for (const c of clips) {
+        if (!draggingClip.originalPositions[c.id]) continue
+        const newId = `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        idMap.set(c.id, newId)
+        duplicateClips.push({ ...c, id: newId, isRegenerating: false })
+      }
+      setClips(prev => [...prev, ...duplicateClips])
+
+      const dupOrigPositions: Record<string, { startTime: number; trackIndex: number }> = {}
+      for (const [oldId, pos] of Object.entries(draggingClip.originalPositions)) {
+        const newId = idMap.get(oldId)
+        if (newId) dupOrigPositions[newId] = { ...pos }
+      }
+      const newPrimaryId = idMap.get(draggingClip.clipId) || draggingClip.clipId
+      setSelectedClipIds(new Set(Object.keys(dupOrigPositions)))
+      setDraggingClip({
+        ...draggingClip,
+        clipId: newPrimaryId,
+        originalPositions: dupOrigPositions,
+        isDuplicate: true,
+        altHeld: false,
+      })
+      return
+    }
     
     const primaryClip = clips.find(c => c.id === draggingClip.clipId)
     if (!primaryClip) return
@@ -561,8 +550,9 @@ export function useTimelineDrag(params: UseTimelineDragParams) {
       lassoOriginRef.current = null
     }
     
-    // Resolve overlaps after drag or resize completes
-    if (draggingClip) {
+    // Resolve overlaps after drag or resize completes.
+    // Skip if it was an Alt+click with no actual drag (altHeld still true = duplicates never created).
+    if (draggingClip && !draggingClip.altHeld) {
       const movedIds = new Set(Object.keys(draggingClip.originalPositions))
       setClips(prev => resolveOverlaps(prev, movedIds))
     }
