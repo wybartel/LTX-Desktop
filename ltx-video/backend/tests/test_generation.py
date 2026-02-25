@@ -154,7 +154,7 @@ class TestForcedApiGenerate:
         assert r.json()["status"] == "complete"
         assert len(fake_services.ltx_api_client.text_to_video_calls) == 1
         call = fake_services.ltx_api_client.text_to_video_calls[0]
-        assert call["model"] == "ltx-2-fast"
+        assert call["model"] == "ltx-2-3-fast"
         assert call["resolution"] == "1920x1080"
         assert call["duration"] == 6.0
         assert call["fps"] == 50.0
@@ -185,7 +185,7 @@ class TestForcedApiGenerate:
         assert r.json()["status"] == "complete"
         assert len(fake_services.ltx_api_client.image_to_video_calls) == 1
         call = fake_services.ltx_api_client.image_to_video_calls[0]
-        assert call["model"] == "ltx-2-pro"
+        assert call["model"] == "ltx-2-3-pro"
         assert call["resolution"] == "3840x2160"
         assert call["duration"] == 8.0
         assert call["fps"] == 25.0
@@ -261,7 +261,7 @@ class TestForcedApiGenerate:
         assert r.json()["status"] == "complete"
         assert len(fake_services.ltx_api_client.image_to_video_calls) == 1
         call = fake_services.ltx_api_client.image_to_video_calls[0]
-        assert call["model"] == "ltx-2-fast"
+        assert call["model"] == "ltx-2-3-fast"
         assert call["resolution"] == "1920x1080"
         assert call["duration"] == 6.0
         assert call["fps"] == 25.0

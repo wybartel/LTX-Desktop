@@ -23,7 +23,7 @@ def test_generate_text_to_video_returns_binary_content() -> None:
     out = client.generate_text_to_video(
         api_key="test-key",
         prompt="A mountain",
-        model="ltx-2-pro",
+        model="ltx-2-3-pro",
         resolution="1920x1080",
         duration=5.0,
         fps=24.0,
@@ -83,7 +83,7 @@ def test_generate_image_to_video_uploads_image_then_downloads_video(tmp_path) ->
         api_key="test-key",
         prompt="Animate this frame",
         image_path=str(image_path),
-        model="ltx-2-pro",
+        model="ltx-2-3-pro",
         resolution="1920x1080",
         duration=4.0,
         fps=24.0,
@@ -117,7 +117,7 @@ def test_generate_text_to_video_omits_camera_motion_when_none() -> None:
     out = client.generate_text_to_video(
         api_key="test-key",
         prompt="A mountain",
-        model="ltx-2-pro",
+        model="ltx-2-3-pro",
         resolution="1920x1080",
         duration=5.0,
         fps=24.0,
@@ -148,7 +148,7 @@ def test_generate_text_to_video_raises_on_non_200() -> None:
         client.generate_text_to_video(
             api_key="bad-key",
             prompt="A mountain",
-            model="ltx-2-pro",
+            model="ltx-2-3-pro",
             resolution="1920x1080",
             duration=5.0,
             fps=24.0,

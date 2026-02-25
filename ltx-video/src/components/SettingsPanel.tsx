@@ -120,8 +120,8 @@ export function SettingsPanel({
           onChange={(e) => handleChange('model', e.target.value)}
           disabled={disabled}
         >
-          <option value="fast">LTX-2 Fast (API)</option>
-          <option value="pro">LTX-2 Pro (API)</option>
+          <option value="fast">LTX-2.3 Fast (API)</option>
+          <option value="pro">LTX-2.3 Pro (API)</option>
         </Select>
       )}
 

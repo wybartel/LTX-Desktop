@@ -500,12 +500,12 @@ function PromptBar({
               options={
                 forceApiGenerations
                   ? [
-                      { value: 'fast', label: 'LTX-2 Fast (API)' },
-                      { value: 'pro', label: 'LTX-2 Pro (API)' },
+                      { value: 'fast', label: 'LTX-2.3 Fast (API)' },
+                      { value: 'pro', label: 'LTX-2.3 Pro (API)' },
                     ]
                   : [
-                      { value: 'fast', label: 'LTX-2 Fast' },
-                      { value: 'pro', label: 'LTX-2 Pro' },
+                      { value: 'fast', label: 'LTX-2.3 Fast' },
+                      { value: 'pro', label: 'LTX-2.3 Pro' },
                     ]
               }
               trigger={
@@ -513,8 +513,8 @@ function PromptBar({
                   <LightricksIcon className="h-3.5 w-3.5" />
                   <span className="text-zinc-300 font-medium">
                     {settings.model === 'fast'
-                      ? (forceApiGenerations ? 'LTX-2 Fast (API)' : 'LTX-2 Fast')
-                      : (forceApiGenerations ? 'LTX-2 Pro (API)' : 'LTX-2 Pro')}
+                      ? (forceApiGenerations ? 'LTX-2.3 Fast (API)' : 'LTX-2.3 Fast')
+                      : (forceApiGenerations ? 'LTX-2.3 Pro (API)' : 'LTX-2.3 Pro')}
                   </span>
                 </>
               }

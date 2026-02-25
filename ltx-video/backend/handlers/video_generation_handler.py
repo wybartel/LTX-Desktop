@@ -36,8 +36,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 FORCED_API_MODEL_MAP: dict[str, str] = {
-    "fast": "ltx-2-fast",
-    "pro": "ltx-2-pro",
+    "fast": "ltx-2-3-fast",
+    "pro": "ltx-2-3-pro",
 }
 FORCED_API_RESOLUTION_MAP: dict[str, str] = {
     "1080p": "1920x1080",
