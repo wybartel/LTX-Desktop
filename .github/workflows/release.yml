@@ -118,6 +118,33 @@ jobs:
         shell: bash
         run: cat backend/.python-version backend/uv.lock | sha256sum | cut -d' ' -f1 > python-deps-hash.txt
 
+      # ── Stage 1: Build app (no signing secrets in environment) ────
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build app (macOS)
+        if: matrix.os == 'macos'
+        run: bash scripts/build-app.sh --platform mac --skip-npm
+
+      - name: Build app (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: scripts/build-app.ps1 -SkipNpm
+
+      # Download VC++ Redistributable for the Windows NSIS installer
+      - name: Download VC++ Redistributable (Windows)
+        if: matrix.os == 'windows'
+        shell: bash
+        run: |
+          curl -fSL -o resources/vc_redist.x64.exe \
+            "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+          ls -lh resources/vc_redist.x64.exe
+
+      # ── Stage 2: Package installer (signing secrets available) ───
+      # Only electron-builder runs here — the only step that needs
+      # access to code-signing certificates and notarization credentials.
+
       # Configure macOS signing + notarization env vars (tagged releases only).
       # CSC_LINK must NOT be set (even to empty string) on non-release builds —
       # electron-builder treats any value as a file path.
@@ -148,40 +175,28 @@ jobs:
           _APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           _APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 
-      # macOS build
-      - name: Build installer (macOS)
+      - name: Package installer (macOS)
         if: matrix.os == 'macos'
         run: |
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            PUBLISH_FLAG="--publish always"
+            PUBLISH="--publish always"
           else
-            PUBLISH_FLAG="--publish never"
+            PUBLISH="--publish never"
           fi
-          bash scripts/build-installer.sh --platform mac $PUBLISH_FLAG
+          bash scripts/package-installer.sh --platform mac $PUBLISH
 
           # Clean up API key
           [ -n "${APPLE_API_KEY:-}" ] && rm -f "$APPLE_API_KEY" || true
 
-      # Download VC++ Redistributable for the Windows NSIS installer
-      - name: Download VC++ Redistributable (Windows)
-        if: matrix.os == 'windows'
-        shell: bash
-        run: |
-          curl -fSL -o resources/vc_redist.x64.exe \
-            "https://aka.ms/vs/17/release/vc_redist.x64.exe"
-          ls -lh resources/vc_redist.x64.exe
-
-      # Windows build
-      - name: Build installer (Windows)
+      - name: Package installer (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
         run: |
           if ("${{ github.ref }}".StartsWith("refs/tags/v")) {
-            $params = @{ Publish = "always" }
+            scripts/package-installer.ps1 -Publish always
           } else {
-            $params = @{ Publish = "never" }
+            scripts/package-installer.ps1 -Publish never
           }
-          & scripts/build-installer.ps1 @params
         # env:
           # Uncomment when code signing certificates are configured:
           # CSC_LINK: ${{ secrets.WIN_CERTIFICATE }}

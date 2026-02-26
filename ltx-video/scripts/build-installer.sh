@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # build-installer.sh
 # Master build script for creating the LTX Desktop installer.
-# Works on macOS natively and can be used on Windows via Git Bash.
+# Prepares the app (Python env, npm deps, frontend) then packages with electron-builder.
 #
 # Usage:
 #   bash scripts/build-installer.sh [options]
@@ -16,55 +16,7 @@
 
 set -euo pipefail
 
-# ============================================================
-# Parse arguments
-# ============================================================
-SKIP_PYTHON=false
-SKIP_NPM=false
-CLEAN=false
-UNPACK=false
-PLATFORM=""
-PUBLISH=""
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --skip-python) SKIP_PYTHON=true ;;
-    --skip-npm)    SKIP_NPM=true ;;
-    --clean)       CLEAN=true ;;
-    --unpack)      UNPACK=true ;;
-    --publish)
-      PUBLISH="$2"
-      shift
-      ;;
-    --platform)
-      PLATFORM="$2"
-      shift
-      ;;
-    *)
-      echo "Unknown option: $1"
-      echo "Usage: $0 [--platform mac|win] [--skip-python] [--skip-npm] [--clean] [--unpack] [--publish always|never|onTag]"
-      exit 1
-      ;;
-  esac
-  shift
-done
-
-# Auto-detect platform if not specified
-if [ -z "$PLATFORM" ]; then
-  case "$(uname -s)" in
-    Darwin)          PLATFORM="mac" ;;
-    MINGW*|MSYS*|CYGWIN*) PLATFORM="win" ;;
-    Linux)           PLATFORM="linux" ;;
-    *)               echo "ERROR: Could not detect platform. Use --platform mac|win"; exit 1 ;;
-  esac
-fi
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-PYTHON_EMBED_DIR="$PROJECT_DIR/python-embed"
-RELEASE_DIR="$PROJECT_DIR/release"
-
-cd "$PROJECT_DIR"
 
 cat << 'BANNER'
 
@@ -78,115 +30,35 @@ cat << 'BANNER'
 
 BANNER
 
-echo "Platform: $PLATFORM"
-echo ""
+# Separate flags for each stage
+APP_ARGS=()
+PKG_ARGS=()
 
-# ============================================================
-# Step 0: Clean if requested
-# ============================================================
-if [ "$CLEAN" = true ]; then
-  echo "Cleaning previous build artifacts..."
-  rm -rf "$PYTHON_EMBED_DIR" "$RELEASE_DIR" dist dist-electron
-  echo "Clean complete."
-  echo ""
-fi
-
-# ============================================================
-# Step 1: Prepare Python environment
-# ============================================================
-if [ "$SKIP_PYTHON" = false ]; then
-  echo "[1/4] Preparing Python environment..."
-
-  if [ -d "$PYTHON_EMBED_DIR" ]; then
-    echo "  Python environment already exists. Use --clean to rebuild."
-  else
-    case "$PLATFORM" in
-      mac|linux)
-        bash "$SCRIPT_DIR/prepare-python.sh"
-        ;;
-      win)
-        powershell.exe -ExecutionPolicy Bypass -File "$SCRIPT_DIR/prepare-python.ps1"
-        ;;
-    esac
-  fi
-else
-  echo "[1/4] Skipping Python preparation (using existing)..."
-fi
-
-# Verify Python environment exists
-if [ ! -d "$PYTHON_EMBED_DIR" ]; then
-  echo "ERROR: Python environment not found at $PYTHON_EMBED_DIR"
-  echo "Run without --skip-python to create it."
-  exit 1
-fi
-echo ""
-
-# ============================================================
-# Step 2: Install npm dependencies
-# ============================================================
-if [ "$SKIP_NPM" = false ]; then
-  echo "[2/4] Installing npm dependencies..."
-  npm install
-else
-  echo "[2/4] Skipping npm install..."
-fi
-echo ""
-
-# ============================================================
-# Step 3: Build frontend and Electron
-# ============================================================
-echo "[3/4] Building frontend and Electron app..."
-npm run build:frontend
-echo ""
-
-# ============================================================
-# Step 4: Build with electron-builder
-# ============================================================
-BUILDER_ARGS=""
-case "$PLATFORM" in
-  mac)   BUILDER_ARGS="--mac" ;;
-  win)   BUILDER_ARGS="--win" ;;
-  linux) BUILDER_ARGS="--linux" ;;
-esac
-
-if [ "$UNPACK" = true ]; then
-  echo "[4/4] Building unpacked app (fast mode)..."
-  npx electron-builder $BUILDER_ARGS --dir
-else
-  PUBLISH_ARGS=""
-  if [ -n "$PUBLISH" ]; then
-    PUBLISH_ARGS="--publish $PUBLISH"
-  fi
-  echo "[4/4] Building installer..."
-  npx electron-builder $BUILDER_ARGS $PUBLISH_ARGS
-fi
-echo ""
-
-# ============================================================
-# Summary
-# ============================================================
-echo "========================================"
-echo "  Build Complete!"
-echo "========================================"
-
-if [ "$UNPACK" = true ]; then
-  case "$PLATFORM" in
-    mac)
-      echo ""
-      echo "Unpacked app ready!"
-      echo "Run: open \"$RELEASE_DIR/mac-arm64/LTX Desktop.app\""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-python|--skip-npm|--clean)
+      APP_ARGS+=("$1")
       ;;
-    win)
-      echo ""
-      echo "Unpacked app ready!"
-      echo "Run: $RELEASE_DIR/win-unpacked/LTX Desktop.exe"
+    --unpack)
+      PKG_ARGS+=("$1")
+      ;;
+    --platform)
+      APP_ARGS+=("$1" "$2")
+      PKG_ARGS+=("$1" "$2")
+      shift
+      ;;
+    --publish)
+      PKG_ARGS+=("$1" "$2")
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Usage: $0 [--platform mac|win] [--skip-python] [--skip-npm] [--clean] [--unpack] [--publish always|never|onTag]"
+      exit 1
       ;;
   esac
-else
-  echo ""
-  echo "Output: $RELEASE_DIR/"
-  ls -1 "$RELEASE_DIR/" 2>/dev/null | head -10
-fi
+  shift
+done
 
-echo ""
-echo "Note: AI models (~150GB) will be downloaded on first run."
+bash "$SCRIPT_DIR/build-app.sh" "${APP_ARGS[@]+"${APP_ARGS[@]}"}"
+bash "$SCRIPT_DIR/package-installer.sh" "${PKG_ARGS[@]+"${PKG_ARGS[@]}"}"
