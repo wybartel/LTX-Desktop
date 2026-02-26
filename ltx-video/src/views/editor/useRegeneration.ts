@@ -226,7 +226,7 @@ export function useRegeneration(params: UseRegenerationParams) {
             const data = await resp.json()
             if (data.suggested_prompt) {
               params = {
-                mode: asset.type === 'image' ? 'text-to-image' : 'image-to-video',
+                mode: asset.type === 'image' ? 'text-to-image' : 'text-to-video',
                 prompt: data.suggested_prompt,
                 model: 'fast',
                 duration: asset.duration || 5,
@@ -234,7 +234,6 @@ export function useRegeneration(params: UseRegenerationParams) {
                 fps: 24,
                 audio: false,
                 cameraMotion: 'none',
-                inputImageUrl: asset.type === 'video' ? clipSrc : undefined,
               }
               // Save the generated params back to the asset so future regenerations are instant
               // (update the asset in project context)
