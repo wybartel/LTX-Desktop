@@ -273,19 +273,11 @@ export function useRegeneration(params: UseRegenerationParams) {
         variations: 1,
       })
     } else {
-      const isImageExt = (url: string) => /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i.test(url)
-      const hasVideoInput =
-        params.mode === 'image-to-video' && params.inputImageUrl && !isImageExt(params.inputImageUrl)
-      const imagePath =
-        params.mode === 'image-to-video' && params.inputImageUrl && isImageExt(params.inputImageUrl)
-          ? fileUrlToPath(params.inputImageUrl)
-          : null
-
-      if (hasVideoInput && currentProjectId) {
-        updateAsset(currentProjectId, assetId, {
-          generationParams: { ...params, mode: 'text-to-video', inputImageUrl: undefined },
-        })
-      }
+      // For video generation (T2V or I2V)
+      // Extract filesystem path from the input image URL if present
+      const imagePath = params.mode === 'image-to-video' && params.inputImageUrl
+        ? fileUrlToPath(params.inputImageUrl)
+        : null
 
       const rawVideoSettings: GenerationSettings = {
         model: params.model as 'fast' | 'pro',
