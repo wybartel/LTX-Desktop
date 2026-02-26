@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from datetime import datetime
-from io import BytesIO
 from pathlib import Path
 from threading import RLock
 from typing import TYPE_CHECKING
@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from PIL import Image
 
 from _routes._errors import HTTPError
-from api_types import GenerateImageRequest, GenerateImageResponse
+from api_types import EditImageRequest, GenerateImageRequest, GenerateImageResponse
 from handlers.base import StateHandlerBase
 from handlers.generation_handler import GenerationHandler
 from handlers.pipelines_handler import PipelinesHandler
@@ -25,8 +25,6 @@ if TYPE_CHECKING:
     from runtime_config.runtime_config import RuntimeConfig
 
 logger = logging.getLogger(__name__)
-
-MultipartForm = dict[str, list[bytes]]
 
 
 class ImageGenerationHandler(StateHandlerBase):
@@ -93,40 +91,35 @@ class ImageGenerationHandler(StateHandlerBase):
                 return GenerateImageResponse(status="cancelled")
             raise HTTPError(500, str(e)) from e
 
-    def edit(self, form: MultipartForm) -> GenerateImageResponse:
+    def edit(self, req: EditImageRequest) -> GenerateImageResponse:
         if self._generation.is_generation_running():
             raise HTTPError(409, "Generation already in progress")
 
-        def get_form_value(key: str, default: str) -> str:
-            raw = form.get(key, [default.encode()])[0]
-            return raw.decode()
+        if not req.imagePaths:
+            raise HTTPError(400, "At least one input image path is required for editing")
 
-        prompt = get_form_value("prompt", "Edit this image")
-        width = int(get_form_value("width", "1024"))
-        height = int(get_form_value("height", "1024"))
-        num_steps = int(get_form_value("numSteps", "4"))
+        for path in req.imagePaths:
+            if not os.path.isfile(path):
+                raise HTTPError(400, f"Image file not found: {path}")
 
-        width = (width // 16) * 16
-        height = (height // 16) * 16
-
-        image_bytes_list = self._extract_input_image_bytes(form)
-        if not image_bytes_list:
-            raise HTTPError(400, "At least one input image is required for editing")
+        width = (req.width // 16) * 16
+        height = (req.height // 16) * 16
 
         if self._config.force_api_generations:
+            image_bytes_list = [Path(p).read_bytes() for p in req.imagePaths]
             return self._edit_via_api(
-                prompt=prompt,
+                prompt=req.prompt,
                 input_images=image_bytes_list,
                 width=width,
                 height=height,
-                num_inference_steps=num_steps,
+                num_inference_steps=req.numSteps,
             )
 
         input_images: list[Image.Image] = []
-        for image_data in image_bytes_list:
-            input_images.append(Image.open(BytesIO(image_data)).convert("RGB"))
+        for path in req.imagePaths:
+            input_images.append(Image.open(path).convert("RGB"))
 
-        logger.info("Image edit request: %s reference(s), %sx%s, %s steps", len(input_images), width, height, num_steps)
+        logger.info("Image edit request: %s reference(s), %sx%s, %s steps", len(input_images), width, height, req.numSteps)
 
         generation_id = uuid.uuid4().hex[:8]
         settings = self.state.app_settings.model_copy(deep=True)
@@ -140,11 +133,11 @@ class ImageGenerationHandler(StateHandlerBase):
             self._pipelines.load_flux_to_gpu()
             self._generation.start_generation(generation_id)
             output_paths = self.edit_image(
-                prompt=prompt,
+                prompt=req.prompt,
                 input_images=input_images,
                 width=width,
                 height=height,
-                num_inference_steps=num_steps,
+                num_inference_steps=req.numSteps,
                 seed=seed,
             )
             self._generation.complete_generation(output_paths)
@@ -366,12 +359,3 @@ class ImageGenerationHandler(StateHandlerBase):
                 return GenerateImageResponse(status="cancelled")
             raise HTTPError(500, str(e)) from e
 
-    @staticmethod
-    def _extract_input_image_bytes(form: MultipartForm) -> list[bytes]:
-        input_images: list[bytes] = []
-        for idx in range(1, 9):
-            key = "image" if idx == 1 else f"image{idx}"
-            image_data = form.get(key, [b""])[0]
-            if image_data:
-                input_images.append(image_data)
-        return input_images

@@ -15,7 +15,7 @@ export interface UseGapGenerationParams {
   resolveClipSrc: (clip: TimelineClip | null) => string
   regenGenerate: (prompt: string, imagePath: string | null, settings: GenerationSettings) => Promise<void>
   regenGenerateImage: (prompt: string, settings: GenerationSettings) => Promise<void>
-  regenEditImage: (prompt: string, inputImages: File[], settings: GenerationSettings) => Promise<void>
+  regenEditImage: (prompt: string, imagePaths: string[], settings: GenerationSettings) => Promise<void>
   regenVideoUrl: string | null
   regenVideoPath: string | null
   regenImageUrl: string | null
@@ -182,7 +182,22 @@ export function useGapGeneration({
     
     try {
       if (mode === 'text-to-image' && gapImageFile) {
-        await regenEditImage(finalPrompt, [gapImageFile], settings)
+        // Extract filesystem path from the File object
+        let imagePath: string
+        const electronPath = (gapImageFile as any).path as string | undefined
+        if (electronPath) {
+          imagePath = electronPath
+        } else {
+          // In-memory file (e.g. canvas capture) — save to temp file
+          const buf = await gapImageFile.arrayBuffer()
+          const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
+          const modelsPath = await window.electronAPI.getModelsPath()
+          const tmpDir = modelsPath.replace(/[/\\]models$/, '')
+          const tmpPath = `${tmpDir}/tmp_gap_edit_image_${Date.now()}.png`
+          await window.electronAPI.saveFile(tmpPath, b64, 'base64')
+          imagePath = tmpPath
+        }
+        await regenEditImage(finalPrompt, [imagePath], settings)
       } else if (mode === 'text-to-image') {
         await regenGenerateImage(finalPrompt, settings)
       } else {

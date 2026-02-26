@@ -828,54 +828,31 @@ export function GenSpace() {
     if (mode === 'image') {
       if (inputImage) {
         // Image + input image → edit image mode (auto-detected)
-        let imageFile: File | null = null
+        let imagePath: string | null = null
         try {
-          if (inputImage.startsWith('blob:')) {
-            const response = await fetch(inputImage)
-            const blob = await response.blob()
-            imageFile = new File([blob], 'input-image.png', { type: blob.type })
-          } else if (inputImage.startsWith('file:///') || inputImage.startsWith('file://')) {
-            let filePath = inputImage
-            if (filePath.startsWith('file:///')) filePath = filePath.slice(8)
-            else if (filePath.startsWith('file://')) filePath = filePath.slice(7)
-            filePath = decodeURIComponent(filePath)
-            const fileName = filePath.split(/[/\\]/).pop() || 'input-image.png'
-            
-            const img = document.createElement('img')
-            img.crossOrigin = 'anonymous'
-            const blob = await new Promise<Blob>((resolve, reject) => {
-              img.onload = () => {
-                const canvas = document.createElement('canvas')
-                canvas.width = img.naturalWidth
-                canvas.height = img.naturalHeight
-                const ctx = canvas.getContext('2d')
-                if (!ctx) { reject(new Error('No canvas context')); return }
-                ctx.drawImage(img, 0, 0)
-                canvas.toBlob((b) => {
-                  if (b) resolve(b)
-                  else reject(new Error('Failed to convert canvas to blob'))
-                }, 'image/png')
-              }
-              img.onerror = () => reject(new Error('Failed to load image'))
-              img.src = inputImage
-            })
-            imageFile = new File([blob], fileName, { type: 'image/png' })
-          } else if (inputImage.startsWith('http://') || inputImage.startsWith('https://')) {
-            const response = await fetch(inputImage)
-            const blob = await response.blob()
-            imageFile = new File([blob], 'input-image.png', { type: blob.type })
+          if (inputImage.startsWith('file://')) {
+            imagePath = fileUrlToPath(inputImage)
+          } else if (inputImage.startsWith('data:')) {
+            // data: URL (e.g. frame capture) — decode base64 and save to temp file
+            const base64 = inputImage.split(',')[1]
+            if (!base64) throw new Error('Invalid data URL')
+            const modelsPath = await window.electronAPI.getModelsPath()
+            const tmpDir = modelsPath.replace(/[/\\]models$/, '')
+            const tmpPath = `${tmpDir}/tmp_edit_image_${Date.now()}.png`
+            await window.electronAPI.saveFile(tmpPath, base64, 'base64')
+            imagePath = tmpPath
           }
         } catch (e) {
-          logger.error(`Failed to convert input image for editing: ${e}`)
+          logger.error(`Failed to resolve input image path: ${e}`)
           setLocalError(e instanceof Error ? e.message : 'Failed to prepare the input image.')
           return
         }
-        
-        if (!imageFile) return
-        
+
+        if (!imagePath) return
+
         editImage(
           prompt,
-          [imageFile],
+          [imagePath],
           {
             model: 'fast' as 'fast' | 'pro',
             duration: 5,

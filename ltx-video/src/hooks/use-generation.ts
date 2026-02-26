@@ -24,7 +24,7 @@ interface GenerationProgress {
 interface UseGenerationReturn extends GenerationState {
   generate: (prompt: string, imagePath: string | null, settings: GenerationSettings) => Promise<void>
   generateImage: (prompt: string, settings: GenerationSettings) => Promise<void>
-  editImage: (prompt: string, inputImages: File[], settings: GenerationSettings) => Promise<void>
+  editImage: (prompt: string, imagePaths: string[], settings: GenerationSettings) => Promise<void>
   cancel: () => void
   reset: () => void
 }
@@ -446,10 +446,10 @@ export function useGeneration(): UseGenerationReturn {
 
   const editImage = useCallback(async (
     prompt: string,
-    inputImages: File[],
+    imagePaths: string[],
     settings: GenerationSettings
   ) => {
-    if (inputImages.length === 0) return
+    if (imagePaths.length === 0) return
 
     setState({
       isGenerating: true,
@@ -495,22 +495,10 @@ export function useGeneration(): UseGenerationReturn {
 
       const progressInterval = setInterval(pollProgress, 500)
 
-      // Build multipart form data
-      const formData = new FormData()
-      formData.append('prompt', prompt)
-      formData.append('width', String(dims.width))
-      formData.append('height', String(dims.height))
-      formData.append('numSteps', String(numSteps))
-
-      // Attach input images
-      formData.append('image', inputImages[0])
-      for (let i = 1; i < inputImages.length; i++) {
-        formData.append(`image${i + 1}`, inputImages[i])
-      }
-
       const response = await fetch(`${backendUrl}/api/edit-image`, {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, width: dims.width, height: dims.height, numSteps, imagePaths }),
         signal: abortControllerRef.current.signal,
       })
 
