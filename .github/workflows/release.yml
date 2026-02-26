@@ -157,20 +157,19 @@ jobs:
       - name: Build installer (macOS)
         if: matrix.os == 'macos'
         run: |
-          # Raise fd limit — signing the large PyTorch file tree needs it
           ulimit -n 65536
 
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             PUBLISH_FLAG="--publish always"
           else
             PUBLISH_FLAG="--publish never"
-            # Skip ad-hoc signing on non-release builds
-            export CSC_IDENTITY_AUTO_DISCOVERY=false
           fi
           bash scripts/build-installer.sh --platform mac $PUBLISH_FLAG
 
           # Clean up API key
           [ -n "${APPLE_API_KEY:-}" ] && rm -f "$APPLE_API_KEY"
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
       # Download VC++ Redistributable for the Windows NSIS installer
       - name: Download VC++ Redistributable (Windows)
