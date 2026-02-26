@@ -27,7 +27,7 @@ export interface UseGapGenerationParams {
   regenReset: () => void
   regenError: string | null
   assetSavePath: string | undefined | null
-  forceApiGenerations?: boolean
+  forceApiGenerations: boolean
 }
 
 export function useGapGeneration({
@@ -51,7 +51,7 @@ export function useGapGeneration({
   regenReset,
   regenError,
   assetSavePath,
-  forceApiGenerations = false,
+  forceApiGenerations,
 }: UseGapGenerationParams) {
   // Gap selection and generation
   const [selectedGap, setSelectedGap] = useState<{ trackIndex: number; startTime: number; endTime: number } | null>(null)
