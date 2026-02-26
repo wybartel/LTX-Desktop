@@ -3,8 +3,6 @@ import type { TimelineClip, Track, SubtitleClip, Asset } from '../../types/proje
 import { DEFAULT_COLOR_CORRECTION } from '../../types/project'
 import type { GenerationSettings } from '../../components/SettingsPanel'
 import { copyToAssetFolder } from '../../lib/asset-copy'
-import { sanitizeForcedApiVideoSettings } from '../../lib/api-video-options'
-import { logger } from '../../lib/logger'
 
 export interface UseGapGenerationParams {
   clips: TimelineClip[]
@@ -27,7 +25,6 @@ export interface UseGapGenerationParams {
   regenReset: () => void
   regenError: string | null
   assetSavePath: string | undefined | null
-  forceApiGenerations: boolean
 }
 
 export function useGapGeneration({
@@ -51,7 +48,6 @@ export function useGapGeneration({
   regenReset,
   regenError,
   assetSavePath,
-  forceApiGenerations,
 }: UseGapGenerationParams) {
   // Gap selection and generation
   const [selectedGap, setSelectedGap] = useState<{ trackIndex: number; startTime: number; endTime: number } | null>(null)
@@ -76,12 +72,6 @@ export function useGapGeneration({
   const gapImageInputRef = useRef<HTMLInputElement>(null)
   const [gapApplyAudioToTrack, setGapApplyAudioToTrack] = useState(true)
 
-  useEffect(() => {
-    if (!forceApiGenerations) return
-    if (gapGenerateMode !== 'text-to-video' && gapGenerateMode !== 'image-to-video') return
-    setGapSettings((prev) => sanitizeForcedApiVideoSettings(prev))
-  }, [forceApiGenerations, gapGenerateMode])
-
   // Tracks the gap currently being generated in the background (after modal closes)
   const [generatingGap, setGeneratingGap] = useState<{
     trackIndex: number; startTime: number; endTime: number
@@ -94,6 +84,7 @@ export function useGapGeneration({
   const [gapSuggesting, setGapSuggesting] = useState(false)
   const [gapSuggestion, setGapSuggestion] = useState<string | null>(null)
   const [gapSuggestionError, setGapSuggestionError] = useState(false)
+  const [gapSuggestionNoApiKey, setGapSuggestionNoApiKey] = useState(false)
   const gapSuggestionAbortRef = useRef<AbortController | null>(null)
   // Frames extracted from neighboring clips for the gap animation header
   const [gapBeforeFrame, setGapBeforeFrame] = useState<string | null>(null)
@@ -168,14 +159,10 @@ export function useGapGeneration({
       }
     }
     
-    const rawSettings: GenerationSettings = {
+    const settings: GenerationSettings = {
       ...gapSettings,
       duration: Math.min(Math.max(1, Math.round(gapDuration)), gapSettings.model === 'pro' ? 10 : 20),
     }
-    const settings =
-      forceApiGenerations && (mode === 'text-to-video' || mode === 'image-to-video')
-        ? sanitizeForcedApiVideoSettings(rawSettings)
-        : rawSettings
 
     // Save generating gap state so we can show indicator and place result later
     setGeneratingGap({
@@ -219,10 +206,10 @@ export function useGapGeneration({
         await regenGenerate(finalPrompt, imagePath, settings)
       }
     } catch (err) {
-      logger.error(`Gap generation failed: ${err}`)
+      console.error('Gap generation failed:', err)
       setGeneratingGap(null)
     }
-  }, [selectedGap, gapGenerateMode, gapPrompt, gapShotType, gapCameraAngle, gapSettings, gapImageFile, gapApplyAudioToTrack, currentProjectId, regenGenerate, regenGenerateImage, regenEditImage, forceApiGenerations])
+  }, [selectedGap, gapGenerateMode, gapPrompt, gapShotType, gapCameraAngle, gapSettings, gapImageFile, gapApplyAudioToTrack, currentProjectId, regenGenerate, regenGenerateImage, regenEditImage])
 
   // When generation completes, place the result in the gap
   useEffect(() => {
@@ -258,7 +245,7 @@ export function useGapGeneration({
           mode: (isImageResult ? 'text-to-image' : (gap.imageFile ? 'image-to-video' : 'text-to-video')) as 'text-to-video' | 'image-to-video' | 'text-to-image',
           prompt: gap.prompt,
           model: gap.settings.model,
-          duration: gap.settings.duration,
+          duration: Math.min(Math.max(1, Math.round(gapDuration)), gap.settings.model === 'pro' ? 10 : 20),
           resolution: isImageResult ? gap.settings.imageResolution : gap.settings.videoResolution,
           fps: gap.settings.fps,
           audio: gap.settings.audio,
@@ -388,6 +375,7 @@ export function useGapGeneration({
       setGapSuggesting(true)
       setGapSuggestion(null)
       setGapSuggestionError(false)
+      setGapSuggestionNoApiKey(false)
       
       const { extractFrameAsBase64, extractImageAsBase64 } = await import('../../lib/thumbnails')
       
@@ -499,8 +487,19 @@ export function useGapGeneration({
       })
       
       if (abortController.signal.aborted) return
-      
-      if (response.ok) {
+
+      if (!response.ok) {
+        let isApiKeyError = response.status === 401 || response.status === 403
+        try {
+          const errData = await response.json()
+          const errStr = JSON.stringify(errData).toLowerCase()
+          if (errStr.includes('api_key') || errStr.includes('gemini') || errStr.includes('no api key') || errStr.includes('api key')) {
+            isApiKeyError = true
+          }
+        } catch {}
+        if (isApiKeyError) setGapSuggestionNoApiKey(true)
+        else setGapSuggestionError(true)
+      } else {
         const data = await response.json()
         if (data.suggested_prompt && !abortController.signal.aborted) {
           setGapSuggestion(data.suggested_prompt)
@@ -511,7 +510,7 @@ export function useGapGeneration({
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
-      logger.warn(`Gap prompt suggestion failed: ${err}`)
+      console.warn('Gap prompt suggestion failed:', err)
       setGapSuggestionError(true)
     } finally {
       if (!abortController.signal.aborted) {
@@ -529,6 +528,8 @@ export function useGapGeneration({
     if (!selectedGap || !gapGenerateMode) {
       setGapSuggesting(false)
       setGapSuggestion(null)
+      setGapSuggestionError(false)
+      setGapSuggestionNoApiKey(false)
       setGapBeforeFrame(null)
       setGapAfterFrame(null)
       gapSuggestionAbortRef.current?.abort()
@@ -590,6 +591,7 @@ export function useGapGeneration({
     gapSuggesting,
     gapSuggestion,
     gapSuggestionError,
+    gapSuggestionNoApiKey,
     gapBeforeFrame,
     gapAfterFrame,
     gapShotType,

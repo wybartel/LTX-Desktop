@@ -976,7 +976,7 @@ export function VideoEditor() {
     selectedGap, setSelectedGap, gapGenerateMode, setGapGenerateMode, gapGenerateModeRef,
     gapPrompt, setGapPrompt, gapSettings, setGapSettings,
     gapImageFile, setGapImageFile, gapImageInputRef,
-    gapSuggesting, gapSuggestion, gapSuggestionError, gapBeforeFrame, gapAfterFrame,
+    gapSuggesting, gapSuggestion, gapSuggestionError, gapSuggestionNoApiKey, gapBeforeFrame, gapAfterFrame,
     gapShotType, setGapShotType, gapCameraAngle, setGapCameraAngle,
     gapApplyAudioToTrack, setGapApplyAudioToTrack,
     regenerateSuggestion,
@@ -4197,7 +4197,7 @@ export function VideoEditor() {
           setGapApplyAudioToTrack={setGapApplyAudioToTrack}
           regenerateSuggestion={regenerateSuggestion}
           gapSuggestionError={gapSuggestionError}
-          forceApiGenerations={forceApiGenerations}
+          gapSuggestionNoApiKey={gapSuggestionNoApiKey}
         />
       )}
 
