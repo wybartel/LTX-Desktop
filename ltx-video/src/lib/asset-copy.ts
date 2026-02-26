@@ -1,3 +1,5 @@
+import { logger } from './logger'
+
 /**
  * Copy a generated file to the project's configured asset save folder.
  * Returns the new path + URL if successful, or the originals as fallback.
@@ -20,7 +22,7 @@ export async function copyToAssetFolder(
       return { path: destPath, url: fileUrl }
     }
   } catch (e) {
-    console.warn('Failed to copy asset to project folder:', e)
+    logger.warn(`Failed to copy asset to project folder: ${e}`)
   }
   return { path: origPath, url: origUrl }
 }

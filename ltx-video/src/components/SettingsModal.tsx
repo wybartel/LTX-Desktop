@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react'
-import { X, Settings, Zap, Sliders, Download, Check, AlertCircle, Sparkles, RotateCcw } from 'lucide-react'
+import { AlertCircle, Check, Download, Info, RotateCcw, Settings, Sliders, Sparkles, X, Zap } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
 import { Button } from './ui/button'
+import { useAppSettings, type AppSettings } from '../contexts/AppSettingsContext'
+import { logger } from '../lib/logger'
 
 const DEFAULT_T2V_SYSTEM_PROMPT = `You are a prompt enhancer for a text-to-video model. Your task is to take user input and expand it into a fully realized, visually and acoustically specific scene.
 
@@ -57,54 +59,47 @@ interface TextEncoderStatus {
   expected_size_gb: number
 }
 
-interface InferenceSettings {
-  steps: number
-  useUpscaler: boolean
-}
-
-interface FastModelSettings {
-  useUpscaler: boolean
-}
-
-interface AppSettings {
-  useTorchCompile: boolean
-  loadOnStartup: boolean
-  ltxApiKey: string
-  useLocalTextEncoder: boolean
-  fastModel: FastModelSettings
-  proModel: InferenceSettings
-  promptCacheSize: number
-  // Prompt Enhancer settings
-  promptEnhancerEnabledT2V: boolean
-  promptEnhancerEnabledI2V: boolean
-  geminiApiKey: string
-  t2vSystemPrompt: string
-  i2vSystemPrompt: string
-  // Seed settings
-  seedLocked: boolean
-  lockedSeed: number
-}
-
 interface SettingsModalProps {
   isOpen: boolean
   onClose: () => void
-  settings: AppSettings
-  onSettingsChange: (settings: AppSettings) => void
+  initialTab?: TabId
 }
 
-type TabId = 'general' | 'inference' | 'promptEnhancer'
+type TabId = 'general' | 'inference' | 'promptEnhancer' | 'about'
 
-export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProps) {
+  const { settings, updateSettings } = useAppSettings()
+  const onSettingsChange = (next: AppSettings) => updateSettings(next)
   const [activeTab, setActiveTab] = useState<TabId>('general')
   const [textEncoderStatus, setTextEncoderStatus] = useState<TextEncoderStatus | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const [showResetConfirm, setShowResetConfirm] = useState<'t2v' | 'i2v' | null>(null)
+  const [appVersion, setAppVersion] = useState('')
+  const [noticesText, setNoticesText] = useState<string | null>(null)
+  const [noticesLoading, setNoticesLoading] = useState(false)
+  const [showNotices, setShowNotices] = useState(false)
+  const [modelLicenseText, setModelLicenseText] = useState<string | null>(null)
+  const [modelLicenseLoading, setModelLicenseLoading] = useState(false)
+  const [showModelLicense, setShowModelLicense] = useState(false)
+
+  // Sync active tab with initialTab prop when modal opens
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab)
+    }
+  }, [isOpen, initialTab])
+
+  // Fetch app version when About tab is shown
+  useEffect(() => {
+    if (activeTab !== 'about' || appVersion) return
+    window.electronAPI.getAppInfo().then(info => setAppVersion(info.version)).catch(() => {})
+  }, [activeTab, appVersion])
 
   // Fetch text encoder status when modal opens
   useEffect(() => {
     if (!isOpen) return
-    
+
     const fetchStatus = async () => {
       try {
         const backendUrl = await window.electronAPI.getBackendUrl()
@@ -114,10 +109,10 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
           setTextEncoderStatus(data.text_encoder_status)
         }
       } catch (e) {
-        console.error('Failed to fetch text encoder status:', e)
+        logger.error(`Failed to fetch text encoder status: ${e}`)
       }
     }
-    
+
     fetchStatus()
     // Poll while downloading
     const interval = setInterval(fetchStatus, 2000)
@@ -132,7 +127,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
       const backendUrl = await window.electronAPI.getBackendUrl()
       const response = await fetch(`${backendUrl}/api/text-encoder/download`, { method: 'POST' })
       const data = await response.json()
-      
+
       if (data.status === 'already_downloaded') {
         setTextEncoderStatus(prev => prev ? { ...prev, downloaded: true } : null)
       }
@@ -152,7 +147,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
           // ignore
         }
       }, 2000)
-      
+
       // Timeout after 30 minutes
       setTimeout(() => {
         clearInterval(pollInterval)
@@ -293,20 +288,47 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
     setShowResetConfirm(null)
   }
 
+  const handleLoadModelLicense = async () => {
+    setModelLicenseLoading(true)
+    try {
+      const text = await window.electronAPI.fetchLicenseText()
+      setModelLicenseText(text)
+      setShowModelLicense(true)
+    } catch (e) {
+      logger.error(`Failed to load model license: ${e}`)
+    } finally {
+      setModelLicenseLoading(false)
+    }
+  }
+
+  const handleLoadNotices = async () => {
+    setNoticesLoading(true)
+    try {
+      const text = await window.electronAPI.getNoticesText()
+      setNoticesText(text)
+      setShowNotices(true)
+    } catch (e) {
+      logger.error(`Failed to load notices: ${e}`)
+    } finally {
+      setNoticesLoading(false)
+    }
+  }
+
   const tabs = [
     { id: 'general' as TabId, label: 'General', icon: Settings },
     { id: 'inference' as TabId, label: 'Inference', icon: Sliders },
     { id: 'promptEnhancer' as TabId, label: 'Prompt Enhancer', icon: Sparkles },
+    { id: 'about' as TabId, label: 'About', icon: Info },
   ]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      
+
       {/* Modal */}
       <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-lg mx-4">
         {/* Header */}
@@ -345,7 +367,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
             )
           })}
         </div>
-        
+
         {/* Content */}
         <div className="px-6 py-5 space-y-6 max-h-[60vh] overflow-y-auto">
           {activeTab === 'general' && (
@@ -359,13 +381,13 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                   </svg>
                   <h3 className="text-sm font-semibold text-white">Text Encoding</h3>
                 </div>
-                
+
                 <p className="text-xs text-zinc-500 leading-relaxed">
                   Text encoding converts your prompt into data the AI understands. Choose how to do this.
                 </p>
 
                 {/* LTX API Option (Default) */}
-                <div 
+                <div
                   className={`bg-zinc-800/50 rounded-lg p-4 border-2 transition-colors cursor-pointer ${
                     !settings.useLocalTextEncoder ? 'border-blue-500' : 'border-transparent hover:border-zinc-600'
                   }`}
@@ -388,7 +410,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                       {!settings.useLocalTextEncoder && <Check className="h-3 w-3 text-white" />}
                     </div>
                   </div>
-                  
+
                   {/* API Key Input - show when this option is selected */}
                   {!settings.useLocalTextEncoder && (
                     <div className="mt-3 pt-3 border-t border-zinc-700/50">
@@ -402,8 +424,8 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                       />
                       <div className="flex items-center justify-between mt-2">
                         <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
-                          settings.ltxApiKey 
-                            ? 'bg-green-500/10 text-green-400' 
+                          settings.ltxApiKey
+                            ? 'bg-green-500/10 text-green-400'
                             : 'bg-amber-500/10 text-amber-400'
                         }`}>
                           {settings.ltxApiKey ? (
@@ -418,9 +440,9 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                             </>
                           )}
                         </div>
-                        <a 
-                          href="https://console.ltx.video/api-keys/" 
-                          target="_blank" 
+                        <a
+                          href="https://console.ltx.video/api-keys/"
+                          target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           className="text-xs text-blue-400 hover:text-blue-300 underline"
@@ -428,7 +450,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                           Get a free key
                         </a>
                       </div>
-                      
+
                       {/* Prompt Cache Size */}
                       {settings.ltxApiKey && (
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-700/50">
@@ -452,7 +474,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                 </div>
 
                 {/* Local Encoder Option */}
-                <div 
+                <div
                   className={`bg-zinc-800/50 rounded-lg p-4 border-2 transition-colors cursor-pointer ${
                     settings.useLocalTextEncoder ? 'border-blue-500' : 'border-transparent hover:border-zinc-600'
                   }`}
@@ -477,7 +499,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                       {settings.useLocalTextEncoder && <Check className="h-3 w-3 text-white" />}
                     </div>
                   </div>
-                  
+
                   {/* Download Status - show when this option is selected */}
                   {settings.useLocalTextEncoder && (
                     <div className="mt-3 pt-3 border-t border-zinc-700/50">
@@ -517,7 +539,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                   )}
                 </div>
               </div>
-              
+
               {/* Load on Startup Setting */}
               <div className="space-y-3 pt-4 border-t border-zinc-800">
                 <div className="flex items-start justify-between gap-4">
@@ -531,13 +553,13 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                       </label>
                     </div>
                     <p className="text-xs text-zinc-500 leading-relaxed">
-                      Load AI models in the background after the app starts. The video model is loaded 
-                      and warmed up on GPU, and the image model is preloaded into CPU RAM for faster 
-                      first generation. When disabled, models load on first use (faster startup, slower 
+                      Load AI models in the background after the app starts. The video model is loaded
+                      and warmed up on GPU, and the image model is preloaded into CPU RAM for faster
+                      first generation. When disabled, models load on first use (faster startup, slower
                       first generation). Requires app restart to take effect.
                     </p>
                   </div>
-                  
+
                   {/* Toggle Switch */}
                   <button
                     onClick={handleToggleLoadOnStartup}
@@ -552,11 +574,11 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                     />
                   </button>
                 </div>
-                
+
                 {/* Status indicator */}
                 <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
-                  settings.loadOnStartup 
-                    ? 'bg-blue-500/10 text-blue-400' 
+                  settings.loadOnStartup
+                    ? 'bg-blue-500/10 text-blue-400'
                     : 'bg-zinc-800 text-zinc-500'
                 }`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${
@@ -565,7 +587,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                   {settings.loadOnStartup ? 'Models preload in background at startup' : 'Models load on first generation'}
                 </div>
               </div>
-              
+
               {/* Torch Compile Setting */}
               <div className="space-y-3 pt-4 border-t border-zinc-800">
                 <div className="flex items-start justify-between gap-4">
@@ -579,12 +601,12 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                       </label>
                     </div>
                     <p className="text-xs text-zinc-500 leading-relaxed">
-                      Compiles the model for optimized inference. <span className="text-orange-400">Experimental:</span> First 
-                      generation can take 5-10+ minutes for compilation. Subsequent generations may be 
+                      Compiles the model for optimized inference. <span className="text-orange-400">Experimental:</span> First
+                      generation can take 5-10+ minutes for compilation. Subsequent generations may be
                       20-40% faster. Requires app restart to take effect.
                     </p>
                   </div>
-                  
+
                   {/* Toggle Switch */}
                   <button
                     onClick={handleToggleTorchCompile}
@@ -599,11 +621,11 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                     />
                   </button>
                 </div>
-                
+
                 {/* Status indicator */}
                 <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
-                  settings.useTorchCompile 
-                    ? 'bg-orange-500/10 text-orange-400' 
+                  settings.useTorchCompile
+                    ? 'bg-orange-500/10 text-orange-400'
                     : 'bg-zinc-800 text-zinc-500'
                 }`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${
@@ -612,7 +634,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                   {settings.useTorchCompile ? 'Optimized inference (recommended)' : 'Standard inference'}
                 </div>
               </div>
-              
+
               {/* Seed Lock Setting */}
               <div className="space-y-3 pt-4 border-t border-zinc-800">
                 <div className="flex items-start justify-between gap-4">
@@ -630,7 +652,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                       Use the same seed for reproducible generations. When unlocked, a random seed is used each time.
                     </p>
                   </div>
-                  
+
                   {/* Toggle Switch */}
                   <button
                     onClick={handleToggleSeedLock}
@@ -645,7 +667,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                     />
                   </button>
                 </div>
-                
+
                 {/* Seed input - only show when locked */}
                 {settings.seedLocked && (
                   <div className="flex items-center gap-2">
@@ -671,11 +693,11 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                     </Button>
                   </div>
                 )}
-                
+
                 {/* Status indicator */}
                 <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
-                  settings.seedLocked 
-                    ? 'bg-emerald-500/10 text-emerald-400' 
+                  settings.seedLocked
+                    ? 'bg-emerald-500/10 text-emerald-400'
                     : 'bg-zinc-800 text-zinc-500'
                 }`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${
@@ -695,7 +717,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                   <Zap className="h-4 w-4 text-green-400" />
                   <h3 className="text-sm font-semibold text-white">Fast Model (Distilled)</h3>
                 </div>
-                
+
                 <div className="bg-zinc-800/50 rounded-lg p-4 space-y-4">
                   {/* Steps Info */}
                   <div className="flex items-center justify-between">
@@ -705,7 +727,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                     </div>
                     <span className="px-3 py-1.5 bg-zinc-700 rounded-lg text-sm text-zinc-400">8</span>
                   </div>
-                  
+
                   {/* Upscaler Toggle */}
                   <div className="flex items-center justify-between">
                     <div>
@@ -726,7 +748,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Summary */}
                 <div className="text-xs text-zinc-500">
                   Current: 8 steps, {settings.fastModel?.useUpscaler !== false ? 'with upscaler (2-stage, recommended)' : 'native resolution (experimental)'}
@@ -741,7 +763,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                   </svg>
                   <h3 className="text-sm font-semibold text-white">Pro Model (Full)</h3>
                 </div>
-                
+
                 <div className="bg-zinc-800/50 rounded-lg p-4 space-y-4">
                   {/* Steps */}
                   <div className="flex items-center justify-between">
@@ -758,7 +780,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                       className="w-20 px-3 py-1.5 bg-zinc-700 border border-zinc-600 rounded-lg text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  
+
                   {/* Upscaler Toggle */}
                   <div className="flex items-center justify-between">
                     <div>
@@ -779,7 +801,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Summary */}
                 <div className="text-xs text-zinc-500">
                   Current: {settings.proModel?.steps ?? 20} steps, {settings.proModel?.useUpscaler !== false ? 'with upscaler (2-stage, recommended)' : 'native resolution'}
@@ -789,7 +811,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
               {/* Info Box */}
               <div className="bg-zinc-800/30 rounded-lg p-3 mt-4">
                 <p className="text-xs text-zinc-400">
-                  <span className="text-blue-400 font-medium">Tip:</span> Lower steps = faster but lower quality. 
+                  <span className="text-blue-400 font-medium">Tip:</span> Lower steps = faster but lower quality.
                   Higher steps = better quality but slower.
                 </p>
               </div>
@@ -804,9 +826,9 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                   <Sparkles className="h-4 w-4 text-blue-400" />
                   <h3 className="text-sm font-semibold text-white">Prompt Enhancer</h3>
                 </div>
-                
+
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  Automatically enhances your prompts with rich visual details, sound descriptions, and motion cues 
+                  Automatically enhances your prompts with rich visual details, sound descriptions, and motion cues
                   to help the AI generate higher quality videos. Control independently for each generation type.
                 </p>
 
@@ -864,7 +886,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                     <Zap className="h-4 w-4 text-blue-400" />
                     <label className="text-sm font-medium text-white">Gemini API Key</label>
                   </div>
-                  
+
                   <input
                     type="password"
                     value={settings.geminiApiKey || ''}
@@ -872,11 +894,11 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                     placeholder="Enter your Gemini API key..."
                     className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
-                  
+
                   <div className="flex items-center justify-between">
                     <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
-                      settings.geminiApiKey 
-                        ? 'bg-green-500/10 text-green-400' 
+                      settings.geminiApiKey
+                        ? 'bg-green-500/10 text-green-400'
                         : 'bg-amber-500/10 text-amber-400'
                     }`}>
                       {settings.geminiApiKey ? (
@@ -891,9 +913,9 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                         </>
                       )}
                     </div>
-                    <a 
-                      href="https://aistudio.google.com/app/apikey" 
-                      target="_blank" 
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-blue-400 hover:text-blue-300 underline"
                     >
@@ -921,18 +943,18 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                       Reset
                     </Button>
                   </div>
-                  
+
                   <p className="text-xs text-zinc-500">
                     System prompt for enhancing text-to-video generations.
                   </p>
-                  
+
                   <textarea
                     value={settings.t2vSystemPrompt || DEFAULT_T2V_SYSTEM_PROMPT}
                     onChange={handleT2vSystemPromptChange}
                     rows={8}
                     className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono"
                   />
-                  
+
                   <p className="text-xs text-zinc-600">
                     {(settings.t2vSystemPrompt || DEFAULT_T2V_SYSTEM_PROMPT).length} characters
                   </p>
@@ -957,24 +979,24 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
                       Reset
                     </Button>
                   </div>
-                  
+
                   <p className="text-xs text-zinc-500">
                     System prompt for enhancing image-to-video generations.
                   </p>
-                  
+
                   <textarea
                     value={settings.i2vSystemPrompt || DEFAULT_I2V_SYSTEM_PROMPT}
                     onChange={handleI2vSystemPromptChange}
                     rows={8}
                     className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono"
                   />
-                  
+
                   <p className="text-xs text-zinc-600">
                     {(settings.i2vSystemPrompt || DEFAULT_I2V_SYSTEM_PROMPT).length} characters
                   </p>
                 </div>
               )}
-              
+
               {/* Note about T2I */}
               {anyEnhancerEnabled && (
                 <div className="bg-zinc-800/30 rounded-lg p-3 mt-2">
@@ -987,7 +1009,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
               {/* Reset Confirmation Modal */}
               {showResetConfirm && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center">
-                  <div 
+                  <div
                     className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                     onClick={() => setShowResetConfirm(null)}
                   />
@@ -1018,8 +1040,118 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
               )}
             </>
           )}
+
+          {activeTab === 'about' && (
+            <>
+              {showModelLicense ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-white">LTX-2 Model License</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowModelLicense(false)}
+                      className="h-7 px-2 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    >
+                      Back
+                    </Button>
+                  </div>
+                  <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-mono bg-zinc-800/50 rounded-lg p-4 max-h-[50vh] overflow-y-auto border border-zinc-700/50">
+                    {modelLicenseText}
+                  </pre>
+                </div>
+              ) : showNotices ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-white">Third-Party Notices</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowNotices(false)}
+                      className="h-7 px-2 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    >
+                      Back
+                    </Button>
+                  </div>
+                  <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-mono bg-zinc-800/50 rounded-lg p-4 max-h-[50vh] overflow-y-auto border border-zinc-700/50">
+                    {noticesText}
+                  </pre>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* App Identity */}
+                  <div className="text-center space-y-2">
+                    <h3 className="text-lg font-bold text-white">LTX Desktop</h3>
+                    <p className="text-sm text-zinc-400">Version {appVersion || '...'}</p>
+                    <p className="text-xs text-zinc-500">AI-Powered Video Editor</p>
+                  </div>
+
+                  {/* License */}
+                  <div className="bg-zinc-800/50 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Info className="h-4 w-4 text-blue-400" />
+                      <span className="text-sm font-medium text-white">License</span>
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      Licensed under the Apache License, Version 2.0
+                    </p>
+                  </div>
+
+                  {/* LTX-2 Model License */}
+                  <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <svg className="h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                      </svg>
+                      <span className="text-sm font-medium text-white">LTX-2 Model License</span>
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      The LTX-2 model is subject to the LTX-2 Community License Agreement, accepted during first-run setup.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={handleLoadModelLicense}
+                      disabled={modelLicenseLoading}
+                      className="w-full bg-zinc-700 hover:bg-zinc-600 text-white text-xs"
+                    >
+                      {modelLicenseLoading ? 'Loading...' : 'View Model License'}
+                    </Button>
+                  </div>
+
+                  {/* Third-Party Notices */}
+                  <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <svg className="h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                      </svg>
+                      <span className="text-sm font-medium text-white">Third-Party Notices</span>
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      This application uses open-source software and AI models subject to their own license terms.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={handleLoadNotices}
+                      disabled={noticesLoading}
+                      className="w-full bg-zinc-700 hover:bg-zinc-600 text-white text-xs"
+                    >
+                      {noticesLoading ? 'Loading...' : 'View Third-Party Notices'}
+                    </Button>
+                  </div>
+
+                  {/* Copyright */}
+                  <p className="text-center text-xs text-zinc-600">
+                    Copyright © 2026 Lightricks
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </div>
-        
+
         {/* Footer */}
         <div className="px-6 py-4 border-t border-zinc-800 flex justify-end">
           <Button
@@ -1034,4 +1166,4 @@ export function SettingsModal({ isOpen, onClose, settings, onSettingsChange }: S
   )
 }
 
-export type { AppSettings, InferenceSettings }
+export type { AppSettings, TabId as SettingsTabId }

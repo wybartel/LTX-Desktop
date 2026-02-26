@@ -94,7 +94,11 @@ class ModelsHandler(StateHandlerBase):
         models: list[ModelFileStatus] = []
         total_size = 0
         downloaded_size = 0
-        required_types = resolve_required_model_types(self._config.required_model_types, has_api_key, settings.use_local_text_encoder)
+        required_types = resolve_required_model_types(
+            self._config.required_model_types,
+            has_api_key,
+            settings.use_local_text_encoder,
+        )
 
         for model_type in MODEL_FILE_ORDER:
             spec = self._config.spec_for(model_type)

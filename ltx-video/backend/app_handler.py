@@ -24,12 +24,14 @@ from runtime_config.runtime_config import RuntimeConfig
 from services.interfaces import (
     FastNativeVideoPipeline,
     FastVideoPipeline,
+    FluxAPIClient,
     ImageGenerationPipeline,
     GpuCleaner,
     GpuInfo,
     HTTPClient,
     IcLoraModelDownloader,
     IcLoraPipeline,
+    LTXAPIClient,
     ModelDownloader,
     ProNativeVideoPipeline,
     ProVideoPipeline,
@@ -54,6 +56,8 @@ class AppHandler:
         video_processor: VideoProcessor,
         text_encoder: TextEncoder,
         task_runner: TaskRunner,
+        ltx_api_client: LTXAPIClient,
+        flux_api_client: FluxAPIClient,
         fast_video_pipeline_class: type[FastVideoPipeline],
         fast_native_video_pipeline_class: type[FastNativeVideoPipeline],
         pro_video_pipeline_class: type[ProVideoPipeline],
@@ -71,6 +75,8 @@ class AppHandler:
         self.gpu_info = gpu_info
         self.video_processor = video_processor
         self.task_runner = task_runner
+        self.ltx_api_client = ltx_api_client
+        self.flux_api_client = flux_api_client
         self.fast_video_pipeline_class = fast_video_pipeline_class
         self.fast_native_video_pipeline_class = fast_native_video_pipeline_class
         self.pro_video_pipeline_class = pro_video_pipeline_class
@@ -91,6 +97,7 @@ class AppHandler:
             },
             downloading_session=None,
             gpu_slot=None,
+            api_generation=None,
             cpu_slot=None,
             text_encoder=TextEncoderState(service=text_encoder),
             startup=StartupPending(message="Not started"),
@@ -154,6 +161,7 @@ class AppHandler:
             generation_handler=self.generation,
             pipelines_handler=self.pipelines,
             text_handler=self.text,
+            ltx_api_client=ltx_api_client,
             outputs_dir=config.outputs_dir,
             config=config,
             camera_motion_prompts=config.camera_motion_prompts,
@@ -166,6 +174,8 @@ class AppHandler:
             generation_handler=self.generation,
             pipelines_handler=self.pipelines,
             outputs_dir=config.outputs_dir,
+            config=config,
+            flux_api_client=flux_api_client,
         )
 
         self.health = HealthHandler(
@@ -215,6 +225,8 @@ class ServiceBundle:
     video_processor: VideoProcessor
     text_encoder: TextEncoder
     task_runner: TaskRunner
+    ltx_api_client: LTXAPIClient
+    flux_api_client: FluxAPIClient
     fast_video_pipeline_class: type[FastVideoPipeline]
     fast_native_video_pipeline_class: type[FastNativeVideoPipeline]
     pro_video_pipeline_class: type[ProVideoPipeline]
@@ -228,12 +240,14 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
     """Build real runtime services with lazy heavy imports isolated from tests."""
     from services.fast_native_video_pipeline.ltx_fast_native_video_pipeline import LTXFastNativeVideoPipeline
     from services.fast_video_pipeline.ltx_fast_video_pipeline import LTXFastVideoPipeline
+    from services.flux_api_client.flux_api_client_impl import FluxAPIClientImpl
     from services.gpu_cleaner.torch_cleaner import TorchCleaner
     from services.gpu_info.gpu_info_impl import GpuInfoImpl
     from services.http_client.http_client_impl import HTTPClientImpl
     from services.ic_lora_model_downloader.ic_lora_model_downloader_impl import IcLoraModelDownloaderImpl
     from services.ic_lora_pipeline.ltx_ic_lora_pipeline import LTXIcLoraPipeline
     from services.image_generation_pipeline.flux_image_generation_pipeline import FluxImageGenerationPipeline
+    from services.ltx_api_client.ltx_api_client_impl import LTXAPIClientImpl
     from services.model_downloader.hugging_face_downloader import HuggingFaceDownloader
     from services.pro_native_video_pipeline.ltx_pro_native_video_pipeline import LTXProNativeVideoPipeline
     from services.pro_video_pipeline.ltx_pro_video_pipeline import LTXProVideoPipeline
@@ -255,6 +269,8 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
             ltx_api_base_url=config.ltx_api_base_url,
         ),
         task_runner=ThreadingRunner(),
+        ltx_api_client=LTXAPIClientImpl(http=http, ltx_api_base_url=config.ltx_api_base_url),
+        flux_api_client=FluxAPIClientImpl(http=http),
         fast_video_pipeline_class=LTXFastVideoPipeline,
         fast_native_video_pipeline_class=LTXFastNativeVideoPipeline,
         pro_video_pipeline_class=LTXProVideoPipeline,
@@ -282,6 +298,8 @@ def build_initial_state(
         video_processor=bundle.video_processor,
         text_encoder=bundle.text_encoder,
         task_runner=bundle.task_runner,
+        ltx_api_client=bundle.ltx_api_client,
+        flux_api_client=bundle.flux_api_client,
         fast_video_pipeline_class=bundle.fast_video_pipeline_class,
         fast_native_video_pipeline_class=bundle.fast_native_video_pipeline_class,
         pro_video_pipeline_class=bundle.pro_video_pipeline_class,

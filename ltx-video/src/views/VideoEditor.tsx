@@ -16,8 +16,10 @@ import {
 } from 'lucide-react'
 import { useProjects } from '../contexts/ProjectContext'
 import { useKeyboardShortcuts } from '../contexts/KeyboardShortcutsContext'
+import { useAppSettings } from '../contexts/AppSettingsContext'
 import { useGeneration } from '../hooks/use-generation'
 import { Button } from '../components/ui/button'
+import { logger } from '../lib/logger'
 import { Tooltip } from '../components/ui/tooltip'
 import { ExportModal } from '../components/ExportModal'
 import { MenuBar, type MenuDefinition } from '../components/MenuBar'
@@ -74,6 +76,7 @@ export function VideoEditor() {
   } = useProjects()
 
   const { activeLayout: kbLayout, isEditorOpen: isKbEditorOpen, setEditorOpen: setKbEditorOpen } = useKeyboardShortcuts()
+  const { forceApiGenerations } = useAppSettings()
   const kbLayoutRef = useRef(kbLayout)
   kbLayoutRef.current = kbLayout
   const isKbEditorOpenRef = useRef(isKbEditorOpen)
@@ -974,6 +977,7 @@ export function VideoEditor() {
     regenVideoUrl, regenVideoPath, regenImageUrl,
     isRegenerating, regenProgress, regenCancel, regenReset, regenError,
     assetSavePath: currentProject?.assetSavePath,
+    forceApiGenerations,
   })
   deleteGapRef.current = deleteGap
 
@@ -1062,6 +1066,7 @@ export function VideoEditor() {
     isRegenerating, regenProgress, regenStatusMessage,
     regenCancel, regenReset, regenError,
     assetSavePath: currentProject?.assetSavePath,
+    forceApiGenerations,
   })
   
   useEditorKeyboard({
@@ -1460,7 +1465,7 @@ export function VideoEditor() {
       
       return base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`
     } catch (err) {
-      console.error('Failed to extract frame:', err)
+      logger.error(`Failed to extract frame: ${err}`)
       return null
     }
   }, [currentTime, resolveClipSrc])
@@ -4169,6 +4174,7 @@ export function VideoEditor() {
           setGapApplyAudioToTrack={setGapApplyAudioToTrack}
           regenerateSuggestion={regenerateSuggestion}
           gapSuggestionError={gapSuggestionError}
+          forceApiGenerations={forceApiGenerations}
         />
       )}
 
@@ -4186,6 +4192,7 @@ export function VideoEditor() {
         regenProgress={regenProgress}
         regenReset={regenReset}
         handleI2vGenerate={handleI2vGenerate}
+        forceApiGenerations={forceApiGenerations}
       />
       
       {subtitleTrackStyleIdx !== null && (

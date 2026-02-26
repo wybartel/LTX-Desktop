@@ -3,6 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import os from 'os'
 import { getAllowedRoots } from '../config'
+import { logger } from '../logger'
 import { validatePath } from '../path-validation'
 import { findFfmpegPath, runFfmpeg, urlToFilePath, stopExportProcess } from './ffmpeg-utils'
 import { flattenTimeline } from './timeline'
@@ -54,7 +55,7 @@ export function registerExportHandlers(): void {
 
     try {
       // STEP 1: Export video-only (simple concat, no audio complexity)
-      console.log(`[Export] Step 1: Video-only export (${segments.length} segments)`)
+      logger.info( `[Export] Step 1: Video-only export (${segments.length} segments)`)
       {
         const { inputs, filterScript } = buildVideoFilterGraph(segments, { width, height, fps, letterbox, subtitles })
 
@@ -70,7 +71,7 @@ export function registerExportHandlers(): void {
       }
 
       // STEP 2: Audio mixdown (PCM buffer approach)
-      console.log('[Export] Step 2: Audio mixdown (PCM buffer approach)')
+      logger.info( '[Export] Step 2: Audio mixdown (PCM buffer approach)')
       let totalDuration = segments.reduce((max, s) => Math.max(max, s.startTime + s.duration), 0)
       for (const c of clips) {
         totalDuration = Math.max(totalDuration, c.startTime + c.duration)
@@ -80,7 +81,7 @@ export function registerExportHandlers(): void {
 
       const tmpRawPcm = path.join(tmpDir, `ltx-pcm-${ts}.raw`)
       fs.writeFileSync(tmpRawPcm, pcmBuffer)
-      console.log(`[Export] Wrote raw PCM: ${pcmBuffer.length} bytes (${totalDuration.toFixed(2)}s)`)
+      logger.info( `[Export] Wrote raw PCM: ${pcmBuffer.length} bytes (${totalDuration.toFixed(2)}s)`)
 
       {
         const r = await runFfmpeg(ffmpegPath, [
@@ -92,7 +93,7 @@ export function registerExportHandlers(): void {
       }
 
       // STEP 3: Combine video + audio (no re-encode of video)
-      console.log('[Export] Step 3: Combining video + audio')
+      logger.info( '[Export] Step 3: Combining video + audio')
       let videoCodecArgs: string[]
       let audioCodecArgs: string[]
       if (codec === 'h264') {
@@ -120,7 +121,7 @@ export function registerExportHandlers(): void {
 
       cleanup()
       if (!r.success) return { error: r.error }
-      console.log(`[Export] Done: ${outputPath}`)
+      logger.info( `[Export] Done: ${outputPath}`)
       return { success: true }
     } catch (err) {
       cleanup()

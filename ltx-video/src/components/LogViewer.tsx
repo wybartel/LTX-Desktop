@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, FolderOpen, RefreshCw, ChevronDown, ChevronUp, Download } from 'lucide-react'
 import { Button } from './ui/button'
+import { logger } from '../lib/logger'
 
 interface LogViewerProps {
   isOpen: boolean
   onClose: () => void
+  embedded?: boolean
 }
 
-export function LogViewer({ isOpen, onClose }: LogViewerProps) {
+export function LogViewer({ isOpen, onClose, embedded = false }: LogViewerProps) {
   const [logs, setLogs] = useState<string[]>([])
   const [logPath, setLogPath] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -23,7 +25,7 @@ export function LogViewer({ isOpen, onClose }: LogViewerProps) {
       setLogs(result.lines || [])
       setLogPath(result.logPath || '')
     } catch (error) {
-      console.error('Failed to fetch logs:', error)
+      logger.error(`Failed to fetch logs: ${error}`)
     } finally {
       setIsLoading(false)
     }
@@ -56,20 +58,19 @@ export function LogViewer({ isOpen, onClose }: LogViewerProps) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = logPath ? logPath.split(/[/\\]/).pop() || 'backend.log' : 'backend.log'
+    a.download = logPath ? logPath.split(/[/\\]/).pop() || 'session.log' : 'session.log'
     a.click()
     URL.revokeObjectURL(url)
   }
 
   if (!isOpen) return null
 
-  return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 rounded-lg border border-zinc-700 w-full max-w-4xl h-[80vh] flex flex-col">
+  const panel = (
+    <div className={`bg-zinc-900 rounded-lg border border-zinc-700 w-full ${embedded ? 'h-full' : 'max-w-4xl h-[80vh]'} flex flex-col`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-700">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-white">Backend Logs</h2>
+            <h2 className="text-lg font-semibold text-white">Logs</h2>
             <span className="text-xs text-zinc-500 font-mono truncate max-w-[300px]" title={logPath}>
               {logPath}
             </span>
@@ -113,14 +114,16 @@ export function LogViewer({ isOpen, onClose }: LogViewerProps) {
             >
               {autoScroll ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="text-zinc-400 hover:text-white"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            {!embedded && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="text-zinc-400 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -164,6 +167,15 @@ export function LogViewer({ isOpen, onClose }: LogViewerProps) {
           <span>Auto-refreshing every 2s</span>
         </div>
       </div>
+  )
+
+  if (embedded) {
+    return panel
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      {panel}
     </div>
   )
 }

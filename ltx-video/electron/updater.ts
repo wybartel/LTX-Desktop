@@ -1,4 +1,5 @@
 import { autoUpdater, UpdateDownloadedEvent } from 'electron-updater';
+import { logger } from './logger';
 import { preDownloadPythonForUpdate } from './python-setup';
 import { getMainWindow } from './window';
 
@@ -27,7 +28,7 @@ export function initAutoUpdater(
 
     // Windows: pre-download python-embed if deps changed before restarting
     const newVersion = info.version
-    console.log(`[updater] Update downloaded: v${newVersion}, checking python deps...`)
+    logger.info( `[updater] Update downloaded: v${newVersion}, checking python deps...`)
 
     try {
       const didDownload = await preDownloadPythonForUpdate(newVersion, (progress) => {
@@ -36,22 +37,22 @@ export function initAutoUpdater(
       })
 
       if (didDownload) {
-        console.log('[updater] Python pre-download complete, installing update...')
+        logger.info( '[updater] Python pre-download complete, installing update...')
       } else {
-        console.log('[updater] No python changes needed, installing update...')
+        logger.info( '[updater] No python changes needed, installing update...')
       }
     } catch (err) {
       // Pre-download failed — install anyway; the app will download at next launch
-      console.error('[updater] Python pre-download failed, proceeding with update:', err)
+      logger.error( `[updater] Python pre-download failed, proceeding with update: ${err}`)
     }
 
     autoUpdater.quitAndInstall(false, true)
   })
 
   const update = () => {
-    console.log('Checking for update...');
+    logger.info( 'Checking for update...');
     autoUpdater.checkForUpdatesAndNotify().catch((e) => {
-      console.error(`Failed checking for updates:`, e);
+      logger.error( `Failed checking for updates: ${e}`);
     });
   }
 

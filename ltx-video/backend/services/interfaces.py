@@ -6,6 +6,7 @@ from typing import Literal
 
 from services.fast_native_video_pipeline.fast_native_video_pipeline import FastNativeVideoPipeline
 from services.fast_video_pipeline.fast_video_pipeline import FastVideoPipeline
+from services.flux_api_client.flux_api_client import FluxAPIClient
 from services.gpu_cleaner.gpu_cleaner import GpuCleaner
 from services.gpu_info.gpu_info import GpuInfo, GpuTelemetryPayload
 from services.http_client.http_client import HTTPClient, HttpResponseLike, HttpTimeoutError
@@ -16,6 +17,7 @@ from services.ic_lora_model_downloader.ic_lora_model_downloader import (
 )
 from services.ic_lora_pipeline.ic_lora_pipeline import IcLoraPipeline
 from services.image_generation_pipeline.image_generation_pipeline import ImageGenerationPipeline
+from services.ltx_api_client.ltx_api_client import LTXAPIClient
 from services.model_downloader.model_downloader import ModelDownloader
 from services.pro_native_video_pipeline.pro_native_video_pipeline import ProNativeVideoPipeline
 from services.pro_video_pipeline.pro_video_pipeline import ProVideoPipeline
@@ -44,10 +46,12 @@ __all__ = [
     "VideoPipelineModelType",
     "FastVideoPipeline",
     "FastNativeVideoPipeline",
+    "FluxAPIClient",
     "ProVideoPipeline",
     "ProNativeVideoPipeline",
     "ImageGenerationPipeline",
     "IcLoraPipeline",
     "IcLoraModelDownloader",
+    "LTXAPIClient",
     "TextEncoder",
 ]

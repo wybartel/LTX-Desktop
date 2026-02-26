@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   // Get the backend URL
   getBackendUrl: (): Promise<string> => ipcRenderer.invoke('get-backend-url'),
+  getRuntimeFlags: (): Promise<{ forceApiGenerations: boolean }> => ipcRenderer.invoke('get-runtime-flags'),
   
   // Get the path where models are stored
   getModelsPath: (): Promise<string> => ipcRenderer.invoke('get-models-path'),
@@ -22,10 +23,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('get-app-info'),
   
   // First-run setup
-  checkFirstRun: (): Promise<boolean> => ipcRenderer.invoke('check-first-run'),
+  checkFirstRun: (): Promise<{ needsSetup: boolean; needsLicense: boolean }> => ipcRenderer.invoke('check-first-run'),
+  acceptLicense: (): Promise<boolean> => ipcRenderer.invoke('accept-license'),
   completeSetup: (): Promise<boolean> => ipcRenderer.invoke('complete-setup'),
+  fetchLicenseText: (): Promise<string> => ipcRenderer.invoke('fetch-license-text'),
+  getNoticesText: (): Promise<string> => ipcRenderer.invoke('get-notices-text'),
   
   // Open folder in file explorer
+  openExternalUrl: (url: string): Promise<boolean> => ipcRenderer.invoke('open-external-url', url),
   openFolder: (folderPath: string): Promise<void> => ipcRenderer.invoke('open-folder', folderPath),
   
   // Reveal a specific file in the OS file manager (Explorer/Finder)
@@ -89,12 +94,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkPythonReady: (): Promise<{ ready: boolean }> => ipcRenderer.invoke('check-python-ready'),
   startPythonSetup: (): Promise<void> => ipcRenderer.invoke('start-python-setup'),
   startPythonBackend: (): Promise<void> => ipcRenderer.invoke('start-python-backend'),
+  getBackendHealthStatus: (): Promise<BackendHealthStatus | null> => ipcRenderer.invoke('get-backend-health-status'),
   onPythonSetupProgress: (cb: (data: unknown) => void) => {
     ipcRenderer.on('python-setup-progress', (_: unknown, data: unknown) => cb(data))
   },
   removePythonSetupProgress: () => {
     ipcRenderer.removeAllListeners('python-setup-progress')
   },
+  onBackendHealthStatus: (cb: (data: BackendHealthStatus) => void) => {
+    const listener = (_: unknown, data: BackendHealthStatus) => cb(data)
+    ipcRenderer.on('backend-health-status', listener)
+    return () => {
+      ipcRenderer.removeListener('backend-health-status', listener)
+    }
+  },
+
+  // Write a log line to the session log file
+  writeLog: (level: string, message: string): Promise<void> =>
+    ipcRenderer.invoke('write-log', level, message),
 
   // Platform info
   platform: process.platform,
@@ -106,17 +123,27 @@ interface LogsResponse {
   error?: string
 }
 
+interface BackendHealthStatus {
+  status: 'alive' | 'restarting' | 'dead'
+  exitCode?: number | null
+}
+
 // Type definitions for the exposed API
 declare global {
   interface Window {
     electronAPI: {
       getBackendUrl: () => Promise<string>
+      getRuntimeFlags: () => Promise<{ forceApiGenerations: boolean }>
       getModelsPath: () => Promise<string>
       readLocalFile: (filePath: string) => Promise<{ data: string; mimeType: string }>
       checkGpu: () => Promise<{ available: boolean; name?: string; vram?: number }>
       getAppInfo: () => Promise<{ version: string; isPackaged: boolean; modelsPath: string; userDataPath: string }>
-      checkFirstRun: () => Promise<boolean>
+      checkFirstRun: () => Promise<{ needsSetup: boolean; needsLicense: boolean }>
+      acceptLicense: () => Promise<boolean>
       completeSetup: () => Promise<boolean>
+      fetchLicenseText: () => Promise<string>
+      getNoticesText: () => Promise<string>
+      openExternalUrl: (url: string) => Promise<boolean>
       openFolder: (folderPath: string) => Promise<void>
       showItemInFolder: (filePath: string) => Promise<void>
       getLogs: () => Promise<LogsResponse>
@@ -145,8 +172,11 @@ declare global {
       checkPythonReady: () => Promise<{ ready: boolean }>
       startPythonSetup: () => Promise<void>
       startPythonBackend: () => Promise<void>
+      getBackendHealthStatus: () => Promise<BackendHealthStatus | null>
       onPythonSetupProgress: (cb: (data: unknown) => void) => void
       removePythonSetupProgress: () => void
+      onBackendHealthStatus: (cb: (data: BackendHealthStatus) => void) => (() => void)
+      writeLog: (level: string, message: string) => Promise<void>
       platform: string
     }
   }

@@ -3,6 +3,8 @@ import type { Asset, TimelineClip } from '../../types/project'
 import type { GenerationSettings } from '../../components/SettingsPanel'
 import { copyToAssetFolder } from '../../lib/asset-copy'
 import { fileUrlToPath } from '../../lib/url-to-path'
+import { sanitizeForcedApiVideoSettings } from '../../lib/api-video-options'
+import { logger } from '../../lib/logger'
 
 export interface UseRegenerationParams {
   clips: TimelineClip[]
@@ -27,6 +29,7 @@ export interface UseRegenerationParams {
   regenReset: () => void
   regenError: string | null
   assetSavePath: string | undefined | null
+  forceApiGenerations: boolean
 }
 
 export function useRegeneration(params: UseRegenerationParams) {
@@ -40,6 +43,7 @@ export function useRegeneration(params: UseRegenerationParams) {
     regenCancel, regenReset,
     regenError,
     assetSavePath,
+    forceApiGenerations,
   } = params
 
   // Track which asset/clip is being regenerated
@@ -74,6 +78,11 @@ export function useRegeneration(params: UseRegenerationParams) {
     imageSteps: 30,
   })
 
+  useEffect(() => {
+    if (!forceApiGenerations) return
+    setI2vSettings((prev) => sanitizeForcedApiVideoSettings(prev))
+  }, [forceApiGenerations])
+
   const handleI2vGenerate = useCallback(async () => {
     if (!i2vClipId || !i2vPrompt.trim() || !currentProjectId) return
 
@@ -86,19 +95,20 @@ export function useRegeneration(params: UseRegenerationParams) {
 
     const imagePath = fileUrlToPath(imageUrl)
     if (!imagePath) {
-      console.error('I2V: cannot extract path from', imageUrl)
+      logger.error(`I2V: cannot extract path from ${imageUrl}`)
       return
     }
 
-    const settings: GenerationSettings = {
+    const rawSettings: GenerationSettings = {
       ...i2vSettings,
       duration: Math.min(Math.max(1, Math.round(clip.duration)), i2vSettings.model === 'pro' ? 10 : 20),
     }
+    const settings = forceApiGenerations ? sanitizeForcedApiVideoSettings(rawSettings) : rawSettings
 
     try {
       await regenGenerate(i2vPrompt, imagePath, settings)
     } catch (err) {
-      console.error('I2V generation failed:', err)
+      logger.error(`I2V generation failed: ${err}`)
     }
   }, [i2vClipId, i2vPrompt, i2vSettings, currentProjectId, clips, resolveClipSrc, regenGenerate])
 
@@ -110,26 +120,35 @@ export function useRegeneration(params: UseRegenerationParams) {
     const clip = clips.find(c => c.id === i2vClipId)
     if (!clip) { setI2vClipId(null); return }
 
-    ;(async () => {
-      const { path: finalPath, url: finalUrl } = await copyToAssetFolder(regenVideoPath || regenVideoUrl, regenVideoUrl, assetSavePath)
+      ;(async () => {
+        const { path: finalPath, url: finalUrl } = await copyToAssetFolder(regenVideoPath || regenVideoUrl, regenVideoUrl, assetSavePath)
+        const savedI2vSettings = forceApiGenerations
+          ? sanitizeForcedApiVideoSettings({
+              ...i2vSettings,
+              duration: Math.min(Math.max(1, Math.round(clip.duration)), i2vSettings.model === 'pro' ? 10 : 20),
+            })
+          : {
+              ...i2vSettings,
+              duration: Math.min(Math.max(1, Math.round(clip.duration)), i2vSettings.model === 'pro' ? 10 : 20),
+            }
 
-      const asset = addAsset(currentProjectId, {
-        type: 'video',
-        path: finalPath,
-        url: finalUrl,
-        prompt: i2vPrompt,
-        resolution: i2vSettings.videoResolution,
-        duration: clip.duration,
-        generationParams: {
-          mode: 'image-to-video',
+        const asset = addAsset(currentProjectId, {
+          type: 'video',
+          path: finalPath,
+          url: finalUrl,
           prompt: i2vPrompt,
-          model: i2vSettings.model,
-          duration: Math.min(Math.max(1, Math.round(clip.duration)), i2vSettings.model === 'pro' ? 10 : 20),
-          resolution: i2vSettings.videoResolution,
-          fps: i2vSettings.fps,
-          audio: i2vSettings.audio,
-          cameraMotion: i2vSettings.cameraMotion,
-        },
+          resolution: savedI2vSettings.videoResolution,
+          duration: clip.duration,
+          generationParams: {
+            mode: 'image-to-video',
+            prompt: i2vPrompt,
+            model: savedI2vSettings.model,
+            duration: savedI2vSettings.duration,
+            resolution: savedI2vSettings.videoResolution,
+            fps: savedI2vSettings.fps,
+            audio: savedI2vSettings.audio,
+            cameraMotion: savedI2vSettings.cameraMotion,
+          },
         takes: [{
           url: finalUrl,
           path: finalPath,
@@ -153,7 +172,7 @@ export function useRegeneration(params: UseRegenerationParams) {
       regenReset()
     })()
 
-  }, [regenVideoUrl, isRegenerating])
+  }, [regenVideoUrl, isRegenerating, regenVideoPath, currentProjectId, clips, i2vClipId, i2vPrompt, i2vSettings, addAsset, setClips, regenReset, assetSavePath, forceApiGenerations])
 
   // Clean up I2V state when generation fails
   useEffect(() => {
@@ -226,7 +245,7 @@ export function useRegeneration(params: UseRegenerationParams) {
           }
         }
       } catch (err) {
-        console.warn('Failed to auto-generate prompt for imported asset:', err)
+        logger.warn(`Failed to auto-generate prompt for imported asset: ${err}`)
       }
 
       if (!params) {
@@ -261,7 +280,7 @@ export function useRegeneration(params: UseRegenerationParams) {
         ? fileUrlToPath(params.inputImageUrl)
         : null
 
-      regenGenerate(params.prompt, imagePath, {
+      const rawVideoSettings: GenerationSettings = {
         model: params.model as 'fast' | 'pro',
         duration: params.duration,
         videoResolution: params.resolution,
@@ -271,9 +290,14 @@ export function useRegeneration(params: UseRegenerationParams) {
         imageResolution: '1080p',
         imageAspectRatio: params.imageAspectRatio || '16:9',
         imageSteps: params.imageSteps || 4,
-      })
+      }
+      const videoSettings = forceApiGenerations
+        ? sanitizeForcedApiVideoSettings(rawVideoSettings)
+        : rawVideoSettings
+
+      regenGenerate(params.prompt, imagePath, videoSettings)
     }
-  }, [currentProjectId, isRegenerating, assets, clips, regenGenerate, regenGenerateImage, resolveClipSrc, updateAsset])
+  }, [currentProjectId, isRegenerating, assets, clips, regenGenerate, regenGenerateImage, resolveClipSrc, updateAsset, forceApiGenerations])
 
   const handleCancelRegeneration = useCallback(() => {
     regenCancel()
@@ -421,13 +445,13 @@ export function useRegeneration(params: UseRegenerationParams) {
       } else {
         const errorMsg = data.error || 'Unknown error'
         setRetakeStatus(`Error: ${errorMsg}`)
-        console.error('Retake failed:', errorMsg)
+        logger.error(`Retake failed: ${errorMsg}`)
         setTimeout(() => {
           setRetakeStatus('')
         }, 5000)
       }
     } catch (error) {
-      console.error('Retake error:', error)
+      logger.error(`Retake error: ${error}`)
       setRetakeStatus(`Error: ${(error as Error).message}`)
       setTimeout(() => {
         setRetakeStatus('')

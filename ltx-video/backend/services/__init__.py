@@ -3,6 +3,7 @@
 from services.interfaces import (
     FastNativeVideoPipeline,
     FastVideoPipeline,
+    FluxAPIClient,
     ImageGenerationPipeline,
     GpuCleaner,
     GpuInfo,
@@ -11,6 +12,7 @@ from services.interfaces import (
     HttpTimeoutError,
     IcLoraModelDownloader,
     IcLoraPipeline,
+    LTXAPIClient,
     ModelDownloader,
     ProNativeVideoPipeline,
     ProVideoPipeline,
@@ -33,9 +35,11 @@ __all__ = [
     "VideoPipelineModelType",
     "FastVideoPipeline",
     "FastNativeVideoPipeline",
+    "FluxAPIClient",
     "ProVideoPipeline",
     "ProNativeVideoPipeline",
     "ImageGenerationPipeline",
     "IcLoraPipeline",
     "IcLoraModelDownloader",
+    "LTXAPIClient",
 ]

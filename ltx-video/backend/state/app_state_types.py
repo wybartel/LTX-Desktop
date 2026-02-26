@@ -122,8 +122,8 @@ class ICLoraState:
 class GenerationProgress:
     phase: str
     progress: float
-    current_step: int
-    total_steps: int
+    current_step: int | None
+    total_steps: int | None
 
 
 @dataclass
@@ -208,6 +208,7 @@ class AppState:
     available_files: AvailableFiles
     downloading_session: DownloadingSession
     gpu_slot: GpuSlot | None
+    api_generation: GenerationState | None
     cpu_slot: CpuSlot | None
     text_encoder: TextEncoderState | None
     startup: StartupState

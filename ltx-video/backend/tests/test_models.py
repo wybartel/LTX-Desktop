@@ -39,6 +39,17 @@ class TestModelsStatus:
         te_model = next(m for m in r.json()["models"] if m["name"] == "text_encoder")
         assert te_model["required"] is False
 
+    def test_forced_mode_requires_no_local_models(self, client, test_state):
+        test_state.config.force_api_generations = True
+        test_state.config.required_model_types = frozenset()
+
+        r = client.get("/api/models/status")
+        data = r.json()
+        assert data["all_downloaded"] is True
+
+        required_names = {m["name"] for m in data["models"] if m["required"]}
+        assert required_names == set()
+
 
 class TestDownloadProgress:
     def test_idle(self, client):
@@ -91,6 +102,17 @@ class TestModelDownload:
         r = client.post("/api/models/download", json={})
         assert r.status_code == 200
         assert r.json()["skippingTextEncoder"] is True
+
+    def test_forced_mode_downloads_no_local_models(self, client, test_state):
+        test_state.config.force_api_generations = True
+        test_state.config.required_model_types = frozenset()
+
+        r = client.post("/api/models/download", json={})
+        assert r.status_code == 200
+
+        calls = test_state.model_downloader.calls
+        assert len(calls) == 0
+        assert r.json()["skippingTextEncoder"] is False
 
 
 class TestTextEncoderDownload:

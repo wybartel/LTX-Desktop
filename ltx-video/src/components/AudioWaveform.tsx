@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { Music } from 'lucide-react'
+import { logger } from '../lib/logger'
 
 interface AudioClipInfo {
   url: string
@@ -95,7 +96,7 @@ export function AudioWaveform({ audioClips, currentTime, isPlaying }: AudioWavef
           if (cancelled) return
           newMap.set(clip.url, peaks)
         } catch (e) {
-          console.warn('Failed to decode audio waveform:', clip.url, e)
+          logger.warn(`Failed to decode audio waveform: ${clip.url} ${e}`)
         }
       }
       if (!cancelled) setWaveforms(newMap)

@@ -81,6 +81,7 @@ interface GapGenerationModalProps {
   setGapApplyAudioToTrack: (v: boolean) => void
   regenerateSuggestion: () => void
   gapSuggestionError?: boolean
+  forceApiGenerations: boolean
 }
 
 function Dropdown({ label, value, onChange, options }: {
@@ -137,6 +138,7 @@ export function GapGenerationModal({
   regenerateSuggestion,
   gapSuggestionError,
   anchorPosition,
+  forceApiGenerations,
 }: GapGenerationModalProps) {
   if (!selectedGap) return null
 
@@ -379,6 +381,7 @@ export function GapGenerationModal({
                     onSettingsChange={setGapSettings}
                     disabled={isRegenerating}
                     mode={settingsMode}
+                    forceApiGenerations={forceApiGenerations}
                   />
                 </div>
               </div>

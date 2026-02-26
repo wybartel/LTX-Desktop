@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { Play, Pause, Download, RefreshCw, RotateCcw, Volume2, VolumeX, Maximize2 } from 'lucide-react'
 import { Button } from './ui/button'
+import { logger } from '../lib/logger'
 
 interface VideoPlayerProps {
   videoUrl: string | null
@@ -309,7 +310,7 @@ export function VideoPlayer({ videoUrl, videoPath, videoResolution, isGenerating
                   playsInline
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
-                  onError={(e) => console.error('Video error:', e, 'URL:', displayedVideoUrl)}
+                  onError={(e) => logger.error(`Video error: ${e} URL: ${displayedVideoUrl}`)}
                 />
               )}
               

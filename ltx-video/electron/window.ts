@@ -2,6 +2,7 @@ import { app, BrowserWindow, nativeImage } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { isDev, getCurrentDir } from './config'
+import { logger } from './logger'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -14,7 +15,7 @@ export function createWindow(): BrowserWindow {
   // App icon — use .ico on Windows, .png elsewhere
   const iconExt = process.platform === 'win32' ? 'icon.ico' : 'icon.png'
   const iconPath = path.join(getCurrentDir(), 'resources', iconExt)
-  console.log('[icon] Loading app icon from:', iconPath, '| exists:', fs.existsSync(iconPath))
+  logger.info(`[icon] Loading app icon from: ${iconPath} | exists: ${fs.existsSync(iconPath)}`)
   const appIcon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : undefined
 
   mainWindow = new BrowserWindow({

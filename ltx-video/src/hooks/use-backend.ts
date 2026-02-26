@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { logger } from '../lib/logger'
 
 interface BackendStatus {
   connected: boolean
@@ -18,13 +19,37 @@ interface ModelStatus {
   downloadProgress: number
 }
 
+export type BackendProcessStatus = 'alive' | 'restarting' | 'dead'
+
+interface BackendHealthStatusPayload {
+  status: BackendProcessStatus
+  exitCode?: number | null
+}
+
 interface UseBackendReturn {
   status: BackendStatus
   models: ModelStatus[]
+  processStatus: BackendProcessStatus | null
   isLoading: boolean
   error: string | null
   checkHealth: () => Promise<boolean>
   downloadModel: (modelId: string) => Promise<void>
+}
+
+function toBackendHealthStatus(value: unknown): BackendHealthStatusPayload | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const record = value as { status?: unknown; exitCode?: unknown }
+  if (record.status !== 'alive' && record.status !== 'restarting' && record.status !== 'dead') {
+    return null
+  }
+
+  return {
+    status: record.status,
+    exitCode: typeof record.exitCode === 'number' || record.exitCode === null ? record.exitCode : undefined,
+  }
 }
 
 export function useBackend(): UseBackendReturn {
@@ -34,30 +59,32 @@ export function useBackend(): UseBackendReturn {
     gpuInfo: null,
   })
   const [models, setModels] = useState<ModelStatus[]>([])
+  const [processStatus, setProcessStatus] = useState<BackendProcessStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const checkHealth = useCallback(async (): Promise<boolean> => {
     try {
       const backendUrl = await window.electronAPI.getBackendUrl()
-      console.log('Checking backend health at:', backendUrl)
+      logger.info(`Checking backend health at: ${backendUrl}`)
       const response = await fetch(`${backendUrl}/health`)
 
       if (response.ok) {
         const data = await response.json()
-        console.log('Backend health:', data)
+        logger.info(`Backend health: ${JSON.stringify(data)}`)
 
         setStatus({
           connected: true,
           modelsLoaded: data.models_loaded,
           gpuInfo: data.gpu_info,
         })
+        setError(null)
         return true
       }
-      console.warn('Backend health check failed with status:', response.status)
+      logger.warn(`Backend health check failed with status: ${response.status}`)
       return false
     } catch (err) {
-      console.error('Backend health check error:', err)
+      logger.error(`Backend health check error: ${err}`)
       setStatus(prev => ({ ...prev, connected: false }))
       return false
     }
@@ -73,7 +100,7 @@ export function useBackend(): UseBackendReturn {
         setModels(data.models)
       }
     } catch (err) {
-      console.error('Failed to fetch models:', err)
+      logger.error(`Failed to fetch models: ${err}`)
     }
   }, [])
 
@@ -111,72 +138,65 @@ export function useBackend(): UseBackendReturn {
     }
   }, [])
 
-  // Initial health check and polling
+  const handleBackendStatus = useCallback(async (payload: BackendHealthStatusPayload) => {
+    setProcessStatus(payload.status)
+
+    if (payload.status === 'alive') {
+      const healthy = await checkHealth()
+      if (healthy) {
+        await fetchModels()
+      } else {
+        setError('Failed to connect to backend')
+      }
+      setIsLoading(false)
+      return
+    }
+
+    if (payload.status === 'restarting') {
+      return
+    }
+
+    setStatus((prev) => ({ ...prev, connected: false }))
+    setError('The backend process crashed and could not be restarted')
+    setIsLoading(false)
+  }, [checkHealth, fetchModels])
+
   useEffect(() => {
-    let intervalId: NodeJS.Timeout
     let cancelled = false
 
-    const init = async () => {
-      console.log('Starting backend connection...')
-      setIsLoading(true)
-
-      // Poll for backend connection (up to 5 minutes for model loading)
-      const maxAttempts = 300  // 5 minutes at 1 second intervals
-      let attempts = 0
-      let connected = false
-
-      while (attempts < maxAttempts && !cancelled) {
-        try {
-          const healthy = await checkHealth()
-          console.log(`Health check attempt ${attempts + 1}: ${healthy}`)
-          if (healthy) {
-            connected = true
-            try {
-              await fetchModels()
-            } catch (e) {
-              console.warn('Failed to fetch models:', e)
-            }
-            break
-          }
-        } catch (e) {
-          console.warn('Health check failed:', e)
-        }
-        attempts++
-        await new Promise(r => setTimeout(r, 1000))
+    const applyStatus = async (value: unknown) => {
+      const payload = toBackendHealthStatus(value)
+      if (!payload || cancelled) {
+        return
       }
+      await handleBackendStatus(payload)
+    }
 
-      if (!cancelled) {
-        if (!connected && attempts >= maxAttempts) {
-          setError('Failed to connect to backend after 5 minutes')
-        }
-        console.log('Setting isLoading to false, connected:', connected)
-        setIsLoading(false)
+    const unsubscribe = window.electronAPI.onBackendHealthStatus((data: BackendHealthStatusPayload) => {
+      void applyStatus(data)
+    })
 
-        // Fixed 5s polling interval
-        const pollInterval = async () => {
-          if (cancelled) return
-
-          await checkHealth()
-
-          if (!cancelled) {
-            intervalId = setTimeout(pollInterval, 5000)
-          }
-        }
-        intervalId = setTimeout(pollInterval, 5000)
+    const init = async () => {
+      try {
+        const snapshot = await window.electronAPI.getBackendHealthStatus()
+        await applyStatus(snapshot)
+      } catch (err) {
+        logger.error(`Failed to load backend health status snapshot: ${err}`)
       }
     }
 
-    init()
+    void init()
 
     return () => {
       cancelled = true
-      if (intervalId) clearTimeout(intervalId)
+      unsubscribe()
     }
-  }, [checkHealth, fetchModels])
+  }, [handleBackendStatus])
 
   return {
     status,
     models,
+    processStatus,
     isLoading,
     error,
     checkHealth,

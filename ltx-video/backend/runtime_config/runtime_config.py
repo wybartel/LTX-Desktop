@@ -22,6 +22,7 @@ class RuntimeConfig:
     ic_lora_dir: Path
     settings_file: Path
     ltx_api_base_url: str
+    force_api_generations: bool
     use_sage_attention: bool
     camera_motion_prompts: dict[str, str]
     default_negative_prompt: str

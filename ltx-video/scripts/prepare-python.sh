@@ -176,6 +176,11 @@ rm -rf "$OUTPUT_PATH/lib/python"*/site-packages/setuptools-*.dist-info 2>/dev/nu
 find "$OUTPUT_PATH/lib" -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
 find "$OUTPUT_PATH/lib" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
 
+# Remove C/C++ headers (~10k files in torch/include alone). These are only
+# needed for building native extensions, not at runtime. Without this,
+# electron-builder hits the macOS 10240 open-files-per-process hard limit.
+find "$OUTPUT_PATH/lib" -type d -name "include" -exec rm -rf {} + 2>/dev/null || true
+
 # Remove temp directory and generated requirements file
 rm -rf "$TEMP_DIR"
 rm -f "$REQUIREMENTS_FILE"

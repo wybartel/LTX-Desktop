@@ -6,15 +6,25 @@ interface LogsResponse {
   error?: string
 }
 
+interface BackendHealthStatus {
+  status: 'alive' | 'restarting' | 'dead'
+  exitCode?: number | null
+}
+
 interface Window {
   electronAPI: {
     getBackendUrl: () => Promise<string>
+    getRuntimeFlags: () => Promise<{ forceApiGenerations: boolean }>
     getModelsPath: () => Promise<string>
     readLocalFile: (filePath: string) => Promise<{ data: string; mimeType: string }>
     checkGpu: () => Promise<{ available: boolean; name?: string; vram?: number }>
     getAppInfo: () => Promise<{ version: string; isPackaged: boolean; modelsPath: string; userDataPath: string }>
-    checkFirstRun: () => Promise<boolean>
+    checkFirstRun: () => Promise<{ needsSetup: boolean; needsLicense: boolean }>
+    acceptLicense: () => Promise<boolean>
     completeSetup: () => Promise<boolean>
+    fetchLicenseText: () => Promise<string>
+    getNoticesText: () => Promise<string>
+    openExternalUrl: (url: string) => Promise<boolean>
     openFolder: (folderPath: string) => Promise<void>
     showItemInFolder: (filePath: string) => Promise<void>
     getLogs: () => Promise<LogsResponse>
@@ -43,8 +53,11 @@ interface Window {
     checkPythonReady: () => Promise<{ ready: boolean }>
     startPythonSetup: () => Promise<void>
     startPythonBackend: () => Promise<void>
+    getBackendHealthStatus: () => Promise<BackendHealthStatus | null>
     onPythonSetupProgress: (cb: (data: unknown) => void) => void
     removePythonSetupProgress: () => void
+    onBackendHealthStatus: (cb: (data: BackendHealthStatus) => void) => (() => void)
+    writeLog: (level: string, message: string) => Promise<void>
     platform: string
   }
 }

@@ -118,6 +118,36 @@ jobs:
         shell: bash
         run: cat backend/.python-version backend/uv.lock | sha256sum | cut -d' ' -f1 > python-deps-hash.txt
 
+      # Configure macOS signing + notarization env vars (tagged releases only).
+      # CSC_LINK must NOT be set (even to empty string) on non-release builds —
+      # electron-builder treats any value as a file path.
+      - name: Configure macOS signing (release only)
+        if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "CSC_LINK=${_CSC_LINK}"                                       >> "$GITHUB_ENV"
+          echo "CSC_KEY_PASSWORD=${_CSC_KEY_PASSWORD}"                       >> "$GITHUB_ENV"
+          echo "APPLE_ID=${_APPLE_ID}"                                       >> "$GITHUB_ENV"
+          echo "APPLE_APP_SPECIFIC_PASSWORD=${_APPLE_APP_SPECIFIC_PASSWORD}" >> "$GITHUB_ENV"
+          echo "APPLE_TEAM_ID=${_APPLE_TEAM_ID}"                             >> "$GITHUB_ENV"
+          echo "APPLE_API_KEY_ID=${_APPLE_API_KEY_ID}"                       >> "$GITHUB_ENV"
+          echo "APPLE_API_ISSUER=${_APPLE_API_ISSUER}"                       >> "$GITHUB_ENV"
+
+          # Write API key .p8 to temp file if provided
+          if [ -n "$_APPLE_API_KEY_CONTENT" ]; then
+            APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
+            printf '%s\n' "$_APPLE_API_KEY_CONTENT" > "$APPLE_API_KEY"
+            echo "APPLE_API_KEY=$APPLE_API_KEY" >> "$GITHUB_ENV"
+          fi
+        env:
+          _CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
+          _CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          _APPLE_ID: ${{ secrets.APPLE_ID }}
+          _APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          _APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          _APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY }}
+          _APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          _APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+
       # macOS build
       - name: Build installer (macOS)
         if: matrix.os == 'macos'
@@ -128,13 +158,9 @@ jobs:
             PUBLISH_FLAG="--publish never"
           fi
           bash scripts/build-installer.sh --platform mac $PUBLISH_FLAG
-        # env:
-          # Uncomment when code signing certificates are configured:
-          # CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
-          # CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+          # Clean up API key
+          [ -n "${APPLE_API_KEY:-}" ] && rm -f "$APPLE_API_KEY" || true
 
       # Download VC++ Redistributable for the Windows NSIS installer
       - name: Download VC++ Redistributable (Windows)
@@ -234,6 +260,40 @@ jobs:
             ltx-video/python-embed-win32.tar.gz.part-*
           retention-days: 7
 
+      # Upload installer files to GCS (tagged releases only)
+      - name: Authenticate to GCP (macOS)
+        if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/361900799277/locations/global/workloadIdentityPools/push-docker-images/providers/github
+          service_account: ltx-desktop-ci@ltx-vl-web-prd.iam.gserviceaccount.com
+
+      - name: Set up gcloud CLI (macOS)
+        if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload installer to GCS (macOS)
+        if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          DEST="gs://ltx-desktop-artifacts/releases/${TAG}"
+          for f in release/*.dmg; do
+            echo "Uploading $(basename "$f") → ${DEST}/"
+            gcloud storage cp "$f" "${DEST}/$(basename "$f")"
+          done
+
+      - name: Upload installer to GCS (Windows)
+        if: matrix.os == 'windows' && startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          DEST="gs://ltx-desktop-artifacts/releases/${TAG}"
+          for f in release/*Setup*.exe; do
+            echo "Uploading $(basename "$f") → ${DEST}/"
+            gcloud storage cp "$f" "${DEST}/$(basename "$f")"
+          done
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -257,6 +317,8 @@ jobs:
     # To require manual approval before going live, uncomment:
     # environment: production
     steps:
+      - uses: actions/checkout@v4
+
       - name: Verify release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

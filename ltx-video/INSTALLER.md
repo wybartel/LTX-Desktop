@@ -146,8 +146,8 @@ Place icon files in `resources/` before building:
 ### Model Storage
 
 Models are stored in:
-- **macOS**: `~/.ltx-video-studio/models/`
-- **Windows**: `%APPDATA%/ltx-video/models/`
+- **macOS**: `~/.LTXDesktop/models/`
+- **Windows**: `%LOCALAPPDATA%\LTXDesktop\models\`
 
 This location persists across app updates.
 
@@ -179,7 +179,7 @@ npm run dev             # Start in dev mode
 |--------|-------------|------------|
 | Python | `.venv` in backend/ | Bundled standalone Python |
 | Backend | Local files | In app resources |
-| Models | Project folder | AppData / ~/.ltx-video-studio |
+| Models | Project folder | %LOCALAPPDATA%\LTXDesktop / ~/.LTXDesktop |
 | Hot reload | Yes | No |
 | Isolation | venv | Embedded (fully self-contained) |
 

@@ -214,7 +214,7 @@ export function buildMenuDefinitions(p: MenuDepsParams): MenuDefinition[] {
       label: 'Help',
       items: [
         { id: 'shortcuts', label: 'Keyboard Shortcuts...', action: () => p.setKbEditorOpen(true) },
-        { id: 'about', label: 'About LTX Desktop', action: () => alert('LTX Desktop - AI-Powered Video Editor\nBuilt with Electron, React & LTX-2') },
+        { id: 'about', label: 'About LTX Desktop', action: () => window.dispatchEvent(new CustomEvent('open-settings', { detail: { tab: 'about' } })) },
       ],
     },
   ]

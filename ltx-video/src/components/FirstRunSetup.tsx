@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react'
+import { logger } from '../lib/logger'
 import './FirstRunSetup.css'
 
 interface FirstRunSetupProps {
-  onComplete: () => void
+  licenseOnly?: boolean
+  showLicenseStep?: boolean
+  onComplete: () => Promise<void>
+  onAcceptLicense?: () => Promise<void>
 }
+
+type Step = 'license' | 'location' | 'installing' | 'complete'
 
 interface DownloadProgress {
   status: 'idle' | 'downloading' | 'complete' | 'error'
@@ -30,8 +36,9 @@ const INSTALL_MESSAGES = [
   "Finalizing installation..."
 ]
 
-export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
-  const [currentStep, setCurrentStep] = useState(1)
+
+export function FirstRunSetup({ licenseOnly, showLicenseStep = true, onComplete, onAcceptLicense }: FirstRunSetupProps) {
+  const [currentStep, setCurrentStep] = useState<Step>(showLicenseStep ? 'license' : 'location')
   const [installPath, setInstallPath] = useState('')
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -40,6 +47,11 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
   const [videoPath, setVideoPath] = useState('/splash/splash.mp4')
   const [ltxApiKey, setLtxApiKey] = useState('')
   const [backendUrl, setBackendUrl] = useState<string | null>(null)
+  const [licenseAccepted, setLicenseAccepted] = useState(false)
+  const [licenseText, setLicenseText] = useState<string | null>(null)
+  const [licenseError, setLicenseError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [isActionPending, setIsActionPending] = useState(false)
 
   // Format bytes to human readable
   const formatBytes = (bytes: number): string => {
@@ -66,6 +78,18 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
     const speedBytesPerSec = downloadProgress.speedMbps * 1024 * 1024
     const secondsRemaining = remainingBytes / speedBytesPerSec
     return formatTimeRemaining(secondsRemaining)
+  }
+
+  // Fetch license text
+  const fetchLicense = async () => {
+    setLicenseError(null)
+    setLicenseText(null)
+    try {
+      const text = await window.electronAPI.fetchLicenseText()
+      setLicenseText(text)
+    } catch (e) {
+      setLicenseError(e instanceof Error ? e.message : 'Failed to fetch license text.')
+    }
   }
 
   // Initialize
@@ -95,21 +119,24 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
             }
           }
         } catch (e) {
-          console.error('Failed to get models path:', e)
+          logger.error(`Failed to get models path: ${e}`)
         }
 
         // TODO: Get actual available space
         setAvailableSpace('1.8 TB')
       } catch (e) {
-        console.error('Init error:', e)
+        logger.error(`Init error: ${e}`)
       }
     }
     init()
-  }, [])
+    if (showLicenseStep) {
+      void fetchLicense()
+    }
+  }, [showLicenseStep])
 
   // Cycle install messages
   useEffect(() => {
-    if (currentStep !== 2) return
+    if (currentStep !== 'installing') return
     let index = 0
     const interval = setInterval(() => {
       index = (index + 1) % INSTALL_MESSAGES.length
@@ -120,7 +147,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
 
   // Poll download progress during installation
   useEffect(() => {
-    if (currentStep !== 2 || !backendUrl) return
+    if (currentStep !== 'installing' || !backendUrl) return
 
     const pollProgress = async () => {
       try {
@@ -132,11 +159,11 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
           if (progress.status === 'error') {
             setDownloadError(progress.error || 'Download failed.')
           } else if (progress.status === 'complete') {
-            setTimeout(() => setCurrentStep(3), 600)
+            setTimeout(() => setCurrentStep('complete'), 600)
           }
         }
       } catch (e) {
-        console.error('Progress poll error:', e)
+        logger.error(`Progress poll error: ${e}`)
       }
     }
 
@@ -148,7 +175,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
   // Start installation
   const startInstallation = async () => {
     if (!backendUrl) return
-    setCurrentStep(2)
+    setCurrentStep('installing')
     try {
       // If API key is provided, save it to settings first and skip text encoder download
       if (ltxApiKey.trim()) {
@@ -159,7 +186,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
             body: JSON.stringify({ ltxApiKey: ltxApiKey.trim() }),
           })
         } catch (e) {
-          console.error('Failed to save API key:', e)
+          logger.error(`Failed to save API key: ${e}`)
         }
       }
 
@@ -170,7 +197,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
         body: JSON.stringify({ skipTextEncoder: !!ltxApiKey.trim() }),
       })
     } catch (e) {
-      console.error('Download start error:', e)
+      logger.error(`Download start error: ${e}`)
       setDownloadError(e instanceof Error ? e.message : 'Failed to start model download.')
     }
   }
@@ -181,30 +208,74 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
   }
 
   // Handle next button
-  const handleNext = () => {
-    if (currentStep === 1) {
+  const handleNext = async () => {
+    setActionError(null)
+    if (currentStep === 'license') {
+      if (!licenseAccepted) return
+      setIsActionPending(true)
+      try {
+        if (onAcceptLicense) {
+          await onAcceptLicense()
+        }
+        if (licenseOnly) {
+          await onComplete()
+          return
+        }
+        setCurrentStep('location')
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Failed to accept license.')
+      } finally {
+        setIsActionPending(false)
+      }
+      return
+    }
+    if (currentStep === 'location') {
       startInstallation()
-    } else if (currentStep === 3) {
-      handleFinish()
+      return
+    }
+    if (currentStep === 'complete') {
+      await handleFinish()
     }
   }
 
   // Handle cancel/finish
   const handleCancel = async () => {
-    await window.electronAPI.completeSetup()
-    onComplete()
+    setActionError(null)
+    setIsActionPending(true)
+    try {
+      await onComplete()
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to complete setup.')
+    } finally {
+      setIsActionPending(false)
+    }
   }
 
   const handleFinish = async () => {
-    await window.electronAPI.completeSetup()
-    onComplete()
+    setActionError(null)
+    setIsActionPending(true)
+    try {
+      await onComplete()
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to complete setup.')
+    } finally {
+      setIsActionPending(false)
+    }
   }
 
   // Get button text
   const getNextButtonText = () => {
-    if (currentStep === 1) return 'Install'
-    if (currentStep === 3) return 'Finish'
+    if (currentStep === 'license') return licenseOnly ? 'Accept' : 'Next'
+    if (currentStep === 'location') return 'Install'
+    if (currentStep === 'complete') return 'Finish'
     return 'Continue'
+  }
+
+  // Check if next button should be disabled
+  const isNextDisabled = () => {
+    if (currentStep === 'license') return !licenseAccepted || isActionPending
+    if (currentStep === 'complete') return isActionPending
+    return false
   }
 
   return (
@@ -224,7 +295,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
         // @ts-expect-error - Electron-specific CSS property
         WebkitAppRegion: 'drag'
       }}>
-        <span style={{ fontSize: 13, color: '#a0a0a0' }}>LTX Video Studio</span>
+        <span style={{ fontSize: 13, color: '#a0a0a0' }}>LTX Desktop</span>
       </div>
 
       {/* Main Container */}
@@ -232,12 +303,14 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
         display: 'flex',
         flexDirection: 'column',
         flex: 1,
+        overflow: 'hidden',
+        minHeight: 0,
         // @ts-expect-error - Electron-specific CSS property
         WebkitAppRegion: 'no-drag'
       }}>
         {/* Header */}
         <div style={{
-          padding: currentStep === 2 ? '12px 32px' : '16px 32px',
+          padding: currentStep === 'installing' ? '12px 32px' : '16px 32px',
           borderBottom: '1px solid #1a1a1a'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -247,27 +320,144 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
               <path d="M36.5888 31.9926C34.4062 31.9876 32.492 31.6543 30.8413 30.9878C29.1906 30.3214 27.9104 29.2346 26.9981 27.7227C26.0856 26.2132 25.6333 24.2137 25.6382 21.7269L25.6532 13.7194L21.7016 13.7119C21.3486 13.7119 21.0528 13.5876 20.8116 13.3365C20.5705 13.0853 20.4512 12.7819 20.4537 12.4164L20.4636 7.39299C20.4636 7.02744 20.5854 6.72154 20.8265 6.47288C21.0677 6.22422 21.3635 6.09983 21.7165 6.10233L25.6681 6.10983L25.6779 1.29066C25.6779 0.925114 25.7998 0.619208 26.041 0.370548C26.2821 0.121887 26.5779 0 26.9309 0L33.9065 0.0124913C34.2595 0.0124913 34.5554 0.136772 34.7965 0.387931C35.0376 0.639089 35.1569 0.944995 35.1545 1.30805L35.1445 6.12721L41.2078 6.13959C41.5608 6.13959 41.8566 6.26398 42.0977 6.51514C42.3389 6.76629 42.4582 7.0722 42.4557 7.43525L42.4458 12.4586C42.4458 12.8242 42.3239 13.1301 42.0829 13.3787C41.8417 13.6274 41.5434 13.7518 41.1928 13.7493L35.1296 13.7368L35.1171 20.8988C35.1171 21.8613 35.3061 22.6148 35.6914 23.1618C36.0767 23.7089 36.6833 23.985 37.5186 23.985L41.5608 23.9925C41.9138 23.9925 42.2096 24.1168 42.4507 24.368C42.6919 24.6192 42.8113 24.9251 42.8088 25.2881L42.7988 30.7093C42.7988 31.075 42.677 31.3808 42.4358 31.6294C42.1947 31.8782 41.8963 32.0025 41.5459 32L36.5913 31.9901L36.5888 31.9926Z" fill="white"/>
               <path d="M47.5486 31.9851C47.2282 31.9851 46.965 31.8682 46.7589 31.6369C46.5503 31.4056 46.4485 31.1395 46.4485 30.841C46.4485 30.7416 46.4634 30.6248 46.4957 30.4929C46.5279 30.3611 46.5926 30.2268 46.6869 30.0951L54.3506 18.9342C54.4648 18.7675 54.4673 18.5463 54.3556 18.3771L47.4543 8.01457C47.3896 7.91517 47.335 7.79827 47.2854 7.6664C47.2382 7.53463 47.2133 7.40036 47.2133 7.26859C47.2133 6.97017 47.3251 6.70403 47.5486 6.47275C47.7722 6.24147 48.0279 6.12458 48.316 6.12458H55.6444C56.0914 6.12458 56.4267 6.23158 56.6501 6.44787C56.8737 6.66426 57.0327 6.85328 57.1295 7.01993L60.3082 11.8169C60.5043 12.1128 60.939 12.1128 61.1352 11.8169L64.3139 7.01993C64.4405 6.85328 64.6094 6.66426 64.8156 6.44787C65.0216 6.23158 65.3494 6.12458 65.7964 6.12458H72.7896C73.0778 6.12458 73.331 6.24147 73.557 6.47275C73.7805 6.70403 73.8922 6.95268 73.8922 7.21883C73.8922 7.38547 73.8748 7.53463 73.8451 7.6664C73.8128 7.79827 73.7482 7.91517 73.6539 8.01457L66.6159 18.3747C66.4992 18.5463 66.5017 18.77 66.6209 18.9392L74.4212 30.0975C74.5181 30.2293 74.5801 30.3636 74.6124 30.4954C74.6448 30.6273 74.6596 30.744 74.6596 30.8435C74.6596 31.142 74.5479 31.4081 74.3244 31.6394C74.1008 31.8707 73.8451 31.9874 73.557 31.9874H65.8934C65.4786 31.9874 65.1756 31.888 64.9844 31.689C64.7932 31.4901 64.6317 31.3086 64.5051 31.142L60.9886 25.9544C60.7924 25.671 60.3753 25.6685 60.1766 25.9471L56.4118 31.1395C56.3149 31.3061 56.1634 31.4876 55.9573 31.6865C55.7488 31.8855 55.4383 31.9851 55.0236 31.9851H47.5486Z" fill="white"/>
             </svg>
-            <span style={{
-              fontSize: 13,
-              color: '#a0a0a0',
-              paddingLeft: 12,
-              borderLeft: '1px solid #333'
-            }}>
-              Video Studio
-            </span>
           </div>
         </div>
 
         {/* Content Area */}
         <div style={{
           flex: 1,
-          padding: currentStep === 2 ? 0 : '28px 32px',
+          padding: currentStep === 'installing' ? 0 : '28px 32px',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
-          {/* Step 1: Choose Location */}
-          {currentStep === 1 && (
+          {/* Step 1: Model License */}
+          {currentStep === 'license' && (
+            <div style={{ animation: 'fadeIn 0.25s ease', display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+              <h2 style={{
+                fontFamily: "'Miriam Libre', serif",
+                fontSize: 24,
+                fontWeight: 700,
+                marginBottom: 6
+              }}>
+                LTX-2 Model License
+              </h2>
+              <p style={{ color: '#a0a0a0', fontSize: 14, marginBottom: 16 }}>
+                The LTX-2 model is subject to the following license agreement. Please review and accept before downloading.
+              </p>
+
+              <div style={{
+                background: '#2e3445',
+                borderRadius: 12,
+                padding: '14px 18px',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                minHeight: 0
+              }}>
+                <div style={{
+                  flex: 1,
+                  overflow: 'hidden',
+                  borderRadius: 8,
+                  minHeight: 0
+                }}>
+                  {licenseError ? (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      gap: 12
+                    }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      <span style={{ color: '#f87171', fontSize: 13, textAlign: 'center' }}>{licenseError}</span>
+                      <button
+                        onClick={fetchLicense}
+                        style={{
+                          padding: '6px 20px',
+                          borderRadius: 9999,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          background: 'linear-gradient(125deg, #A98BD9, #6D28D9)',
+                          border: 'none',
+                          color: '#ffffff',
+                        }}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : licenseText === null ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      gap: 10
+                    }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" style={{ animation: 'spin 1s linear infinite' }}>
+                        <circle cx="12" cy="12" r="10" stroke="#6D28D9" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" strokeLinecap="round" />
+                      </svg>
+                      <span style={{ color: '#a0a0a0', fontSize: 13 }}>Loading license...</span>
+                    </div>
+                  ) : (
+                    <div style={{
+                      overflowY: 'auto',
+                      height: '100%',
+                      background: '#1a1a1a',
+                      borderRadius: 8,
+                      padding: '14px'
+                    }}>
+                      <pre style={{
+                        fontFamily: "'Consolas', 'Monaco', monospace",
+                        fontSize: 11,
+                        lineHeight: 1.5,
+                        color: '#d0d0d0',
+                        margin: 0,
+                        whiteSpace: 'pre-wrap',
+                        wordWrap: 'break-word'
+                      }}>
+                        {licenseText}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginTop: 14,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  userSelect: 'none'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={licenseAccepted}
+                    onChange={(e) => setLicenseAccepted(e.target.checked)}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      accentColor: '#6D28D9',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  />
+                  <span>I have read and agree to the LTX-2 Community License Agreement</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Choose Location */}
+          {currentStep === 'location' && (
             <div style={{ animation: 'fadeIn 0.25s ease' }}>
               <h2 style={{
                 fontFamily: "'Miriam Libre', serif",
@@ -383,8 +573,8 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
             </div>
           )}
 
-          {/* Step 2: Installing */}
-          {currentStep === 2 && (
+          {/* Step 3: Installing */}
+          {currentStep === 'installing' && (
             <div style={{
               position: 'relative',
               height: '100%',
@@ -460,7 +650,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
                   <span style={{ color: '#f87171', fontSize: 13, textAlign: 'center', maxWidth: 400 }}>{downloadError}</span>
                   <div style={{ display: 'flex', gap: 10 }}>
                     <button
-                      onClick={() => { setDownloadError(null); setCurrentStep(1) }}
+                      onClick={() => { setDownloadError(null); setCurrentStep('location') }}
                       style={{
                         padding: '6px 20px',
                         borderRadius: 9999,
@@ -576,8 +766,8 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
             </div>
           )}
 
-          {/* Step 3: Complete */}
-          {currentStep === 3 && (
+          {/* Step 4: Complete */}
+          {currentStep === 'complete' && (
             <div style={{
               flex: 1,
               display: 'flex',
@@ -642,7 +832,7 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
 
         {/* Footer */}
         <div style={{
-          padding: currentStep === 2 ? '12px 24px' : '16px 32px',
+          padding: currentStep === 'installing' ? '12px 24px' : '16px 32px',
           borderTop: '1px solid #1a1a1a',
           display: 'flex',
           justifyContent: 'space-between',
@@ -652,39 +842,43 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
 
           <div style={{ display: 'flex', gap: 10 }}>
             {/* Cancel Button */}
-            {currentStep < 3 && (
+            {currentStep !== 'complete' && currentStep !== 'license' && (
               <button
                 onClick={handleCancel}
+                disabled={isActionPending}
                 style={{
                   padding: '10px 28px',
                   borderRadius: 9999,
                   fontSize: 13,
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  cursor: isActionPending ? 'not-allowed' : 'pointer',
                   background: 'transparent',
                   border: '1px solid #444',
                   color: '#ffffff',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  opacity: isActionPending ? 0.6 : 1
                 }}
               >
                 Cancel
               </button>
             )}
 
-            {/* Install/Finish Button */}
-            {currentStep !== 2 && (
+            {/* Next/Install/Finish Button */}
+            {currentStep !== 'installing' && (
               <button
-                onClick={handleNext}
+                onClick={() => void handleNext()}
+                disabled={isNextDisabled()}
                 style={{
                   padding: '10px 28px',
                   borderRadius: 9999,
                   fontSize: 13,
                   fontWeight: 700,
-                  cursor: 'pointer',
-                  background: '#ffffff',
+                  cursor: isNextDisabled() ? 'not-allowed' : 'pointer',
+                  background: isNextDisabled() ? '#555' : '#ffffff',
                   border: 'none',
-                  color: '#000000',
-                  transition: 'all 0.2s ease'
+                  color: isNextDisabled() ? '#999' : '#000000',
+                  transition: 'all 0.2s ease',
+                  opacity: isNextDisabled() ? 0.6 : 1
                 }}
               >
                 {getNextButtonText()}
@@ -692,6 +886,11 @@ export function FirstRunSetup({ onComplete }: FirstRunSetupProps) {
             )}
           </div>
         </div>
+        {actionError && (
+          <div style={{ padding: '0 32px 12px 32px', color: '#fca5a5', fontSize: 12 }}>
+            {actionError}
+          </div>
+        )}
       </div>
 
     </div>

@@ -6,6 +6,7 @@ import https from 'https'
 import { load as loadYaml } from 'js-yaml'
 import path from 'path'
 import { isDev } from './config'
+import { logger } from './logger'
 
 export interface PythonSetupProgress {
   status: 'downloading' | 'extracting' | 'complete' | 'error'
@@ -94,7 +95,7 @@ export function isPythonReady(): { ready: boolean } {
   const nextDir = path.join(app.getPath('userData'), 'python-next')
   const nextHash = readHash(path.join(nextDir, 'deps-hash.txt'))
   if (bundledHash && nextHash && bundledHash === nextHash) {
-    console.log('[python-setup] Promoting staged python-next/ to python/')
+    logger.info( '[python-setup] Promoting staged python-next/ to python/')
     try {
       const destDir = path.join(app.getPath('userData'), 'python')
       if (fs.existsSync(destDir)) {
@@ -103,7 +104,7 @@ export function isPythonReady(): { ready: boolean } {
       fs.renameSync(nextDir, destDir)
       return { ready: true }
     } catch (err) {
-      console.error('[python-setup] Failed to promote staged python:', err)
+      logger.error( `[python-setup] Failed to promote staged python: ${err}`)
       // Fall through to normal check
     }
   }
@@ -149,25 +150,25 @@ export async function preDownloadPythonForUpdate(
       await downloadFileRaw(hashUrl, hashDest)
       newHash = readHash(hashDest)
     } catch (err) {
-      console.log('[python-setup] Could not fetch new version deps hash:', err)
+      logger.warn( `[python-setup] Could not fetch new version deps hash: ${err}`)
     } finally {
       try { fs.unlinkSync(hashDest) } catch { /* ignore */ }
     }
   }
 
   if (!newHash) {
-    console.log('[python-setup] No deps hash available for new version, skipping pre-download')
+    logger.info( '[python-setup] No deps hash available for new version, skipping pre-download')
     return false
   }
 
   // Compare with currently installed hash
   const installedHash = readHash(getInstalledHashPath())
   if (newHash === installedHash) {
-    console.log('[python-setup] Python deps unchanged in new version, no pre-download needed')
+    logger.info( '[python-setup] Python deps unchanged in new version, no pre-download needed')
     return false
   }
 
-  console.log(`[python-setup] Python deps changed (${installedHash} → ${newHash}), pre-downloading`)
+  logger.info( `[python-setup] Python deps changed (${installedHash} → ${newHash}), pre-downloading`)
 
   // Download to python-next/
   const nextDir = path.join(app.getPath('userData'), 'python-next')
@@ -193,8 +194,8 @@ export async function preDownloadPythonForUpdate(
       if (!fallbackUrl || isLocalPath(baseUrl)) {
         throw primaryErr
       }
-      console.warn(`[python-setup] Pre-download primary failed: ${primaryErr}`)
-      console.log(`[python-setup] Falling back to CDN: ${fallbackUrl}`)
+      logger.warn( `[python-setup] Pre-download primary failed: ${primaryErr}`)
+      logger.info( `[python-setup] Falling back to CDN: ${fallbackUrl}`)
       try { fs.unlinkSync(archivePath) } catch { /* ignore */ }
       for (const f of cleanupFiles) { try { fs.unlinkSync(f) } catch { /* ignore */ } }
       cleanupFiles.length = 0
@@ -212,10 +213,10 @@ export async function preDownloadPythonForUpdate(
     // Write the new hash into python-next/ so isPythonReady can verify it on next launch
     fs.writeFileSync(path.join(nextDir, 'deps-hash.txt'), newHash)
 
-    console.log('[python-setup] Pre-download complete, staged at python-next/')
+    logger.info( '[python-setup] Pre-download complete, staged at python-next/')
     return true
   } catch (err) {
-    console.error('[python-setup] Pre-download failed:', err)
+    logger.error( `[python-setup] Pre-download failed: ${err}`)
     try { fs.rmSync(nextDir, { recursive: true, force: true }) } catch { /* ignore */ }
     return false
   } finally {
@@ -327,7 +328,7 @@ export async function downloadPythonEmbed(
 
   try {
     const base = getArchiveBase()
-    console.log(`[python-setup] Archive base: ${base}`)
+    logger.info( `[python-setup] Archive base: ${base}`)
 
     try {
       await acquireArchive(base, archivePath, cleanupFiles, onProgress)
@@ -338,8 +339,8 @@ export async function downloadPythonEmbed(
         throw primaryErr
       }
 
-      console.warn(`[python-setup] Primary download failed: ${primaryErr}`)
-      console.log(`[python-setup] Falling back to CDN: ${fallbackUrl}`)
+      logger.warn( `[python-setup] Primary download failed: ${primaryErr}`)
+      logger.info( `[python-setup] Falling back to CDN: ${fallbackUrl}`)
 
       // Clean up any partial primary download
       try { fs.unlinkSync(archivePath) } catch { /* ignore */ }
@@ -353,7 +354,7 @@ export async function downloadPythonEmbed(
 
     // Extract
     onProgress({ status: 'extracting', percent: 100, downloadedBytes: 0, totalBytes: 0, speed: 0 })
-    console.log(`[python-setup] Extracting to: ${tempDir}`)
+    logger.info( `[python-setup] Extracting to: ${tempDir}`)
     await extractTarGz(archivePath, tempDir)
 
     // Move into place (archive has top-level `python-embed/` directory)
@@ -372,7 +373,7 @@ export async function downloadPythonEmbed(
     }
 
     onProgress({ status: 'complete', percent: 100, downloadedBytes: 0, totalBytes: 0, speed: 0 })
-    console.log('[python-setup] Python environment ready')
+    logger.info( '[python-setup] Python environment ready')
   } catch (err) {
     try { fs.rmSync(tempDir, { recursive: true, force: true }) } catch { /* ignore */ }
     try { fs.rmSync(destDir, { recursive: true, force: true }) } catch { /* ignore */ }

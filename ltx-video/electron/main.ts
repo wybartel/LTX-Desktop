@@ -1,3 +1,4 @@
+import './app-paths'
 import { app } from 'electron'
 import { setupCSP } from './csp'
 import { registerExportHandlers } from './export/export-handler'
@@ -10,34 +11,59 @@ import { stopPythonBackend } from './python-backend'
 import { initAutoUpdater } from './updater'
 import { createWindow, getMainWindow } from './window'
 
-initSessionLog()
+const FORCE_API_GENERATIONS = true
 
-registerAppHandlers()
-registerFileHandlers()
-registerLogHandlers()
-registerExportHandlers()
+const gotLock = app.requestSingleInstanceLock()
 
-app.whenReady().then(async () => {
-  setupCSP()
-  createWindow()
-  initAutoUpdater()
-  // Python setup + backend start are now driven by the renderer via IPC
-})
+if (!gotLock) {
+  app.quit()
+} else {
+  initSessionLog()
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    stopPythonBackend();
-    app.quit();
-  }
-});
+  registerAppHandlers({ forceApiGenerations: FORCE_API_GENERATIONS })
+  registerFileHandlers()
+  registerLogHandlers()
+  registerExportHandlers()
 
-app.on('activate', () => {
-  if (getMainWindow() === null) {
-    createWindow();
-  }
-});
+  app.on('second-instance', () => {
+    const mainWindow = getMainWindow()
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore()
+      }
+      if (!mainWindow.isVisible()) {
+        mainWindow.show()
+      }
+      mainWindow.focus()
+      return
+    }
+    if (app.isReady()) {
+      createWindow()
+    }
+  })
 
-app.on('before-quit', () => {
-  stopExportProcess();
-  stopPythonBackend();
-});
+  app.whenReady().then(async () => {
+    setupCSP()
+    createWindow()
+    initAutoUpdater()
+    // Python setup + backend start are now driven by the renderer via IPC
+  })
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      stopPythonBackend()
+      app.quit()
+    }
+  })
+
+  app.on('activate', () => {
+    if (getMainWindow() === null) {
+      createWindow()
+    }
+  })
+
+  app.on('before-quit', () => {
+    stopExportProcess()
+    stopPythonBackend()
+  })
+}

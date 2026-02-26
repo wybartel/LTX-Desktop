@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { logger } from '../lib/logger'
 import { 
   X, FileVideo, FileAudio, Image, Check, AlertTriangle, 
   FolderOpen, RefreshCw, Loader2, FileText, Link2, 
@@ -54,7 +55,7 @@ export function ImportTimelineModal({ isOpen, onClose, onImport }: ImportTimelin
         found: r.resolvedPath ? (results[r.resolvedPath] || false) : false,
       }))
     } catch (err) {
-      console.error('Error checking files:', err)
+      logger.error(`Error checking files: ${err}`)
       return refs
     } finally {
       setIsChecking(false)
@@ -192,7 +193,7 @@ export function ImportTimelineModal({ isOpen, onClose, onImport }: ImportTimelin
         }))
       }
     } catch (err) {
-      console.error('Error searching directory:', err)
+      logger.error(`Error searching directory: ${err}`)
     } finally {
       setIsSearching(false)
     }

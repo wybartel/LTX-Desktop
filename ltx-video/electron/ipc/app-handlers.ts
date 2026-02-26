@@ -4,7 +4,7 @@ import fs from 'fs'
 import { BACKEND_BASE_URL } from '../config'
 import { checkGPU } from '../gpu'
 import { isPythonReady, downloadPythonEmbed } from '../python-setup'
-import { startPythonBackend } from '../python-backend'
+import { getBackendHealthStatus, startPythonBackend } from '../python-backend'
 import { getMainWindow } from '../window'
 
 function getModelsPath(): string {
@@ -15,15 +15,18 @@ function getModelsPath(): string {
   return modelsPath
 }
 
-function isFirstRun(settingsPath: string): boolean {
+function getSetupStatus(settingsPath: string): { needsSetup: boolean; needsLicense: boolean } {
   if (!fs.existsSync(settingsPath)) {
-    return true
+    return { needsSetup: true, needsLicense: true }
   }
   try {
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
-    return !settings.setupComplete
+    return {
+      needsSetup: !settings.setupComplete,
+      needsLicense: !settings.licenseAccepted,
+    }
   } catch {
-    return true
+    return { needsSetup: true, needsLicense: true }
   }
 }
 
@@ -39,14 +42,41 @@ function markSetupComplete(settingsPath: string): void {
   }
 
   settings.setupComplete = true
+  settings.licenseAccepted = true
+  settings.licenseAcceptedDate = new Date().toISOString()
   settings.setupDate = new Date().toISOString()
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
 }
 
-export function registerAppHandlers(): void {
+function markLicenseAccepted(settingsPath: string): void {
+  let settings: Record<string, unknown> = {}
+
+  try {
+    if (fs.existsSync(settingsPath)) {
+      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+    }
+  } catch {
+    settings = {}
+  }
+
+  settings.licenseAccepted = true
+  settings.licenseAcceptedDate = new Date().toISOString()
+
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
+}
+
+interface RuntimeFlags {
+  forceApiGenerations: boolean
+}
+
+export function registerAppHandlers(runtimeFlags: RuntimeFlags): void {
   ipcMain.handle('get-backend-url', () => {
     return BACKEND_BASE_URL
+  })
+
+  ipcMain.handle('get-runtime-flags', () => {
+    return runtimeFlags
   })
 
   ipcMain.handle('get-models-path', () => {
@@ -71,14 +101,33 @@ export function registerAppHandlers(): void {
   })
 
   ipcMain.handle('check-first-run', () => {
-    const settingsPath = path.join(app.getPath('userData'), 'settings.json')
-    return isFirstRun(settingsPath)
+    const settingsPath = path.join(app.getPath('userData'), 'app_state.json')
+    return getSetupStatus(settingsPath)
+  })
+
+  ipcMain.handle('accept-license', () => {
+    const settingsPath = path.join(app.getPath('userData'), 'app_state.json')
+    markLicenseAccepted(settingsPath)
+    return true
   })
 
   ipcMain.handle('complete-setup', () => {
-    const settingsPath = path.join(app.getPath('userData'), 'settings.json')
+    const settingsPath = path.join(app.getPath('userData'), 'app_state.json')
     markSetupComplete(settingsPath)
     return true
+  })
+
+  ipcMain.handle('fetch-license-text', async () => {
+    const resp = await fetch('https://huggingface.co/Lightricks/LTX-2/raw/main/LICENSE')
+    if (!resp.ok) {
+      throw new Error(`Failed to fetch license (HTTP ${resp.status})`)
+    }
+    return await resp.text()
+  })
+
+  ipcMain.handle('get-notices-text', async () => {
+    const noticesPath = path.join(app.getAppPath(), 'NOTICES.md')
+    return fs.readFileSync(noticesPath, 'utf-8')
   })
 
   ipcMain.handle('get-resource-path', () => {
@@ -99,7 +148,11 @@ export function registerAppHandlers(): void {
   })
 
   ipcMain.handle('start-python-backend', async () => {
-    await startPythonBackend()
+    await startPythonBackend(runtimeFlags)
+  })
+
+  ipcMain.handle('get-backend-health-status', () => {
+    return getBackendHealthStatus()
   })
 
 }

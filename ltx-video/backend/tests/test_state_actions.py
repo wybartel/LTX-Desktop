@@ -58,6 +58,34 @@ def test_generation_progress_resets_when_pipeline_unset(test_state):
     assert progress.status == "idle"
 
 
+def test_api_generation_does_not_require_gpu(test_state):
+    test_state.generation.start_api_generation("api-gen-1")
+    test_state.generation.update_progress("inference", 25, 1, 4)
+
+    progress = test_state.generation.get_generation_progress()
+    assert progress.status == "running"
+    assert progress.phase == "inference"
+    assert progress.progress == 25
+
+
+def test_cancel_marks_running_api_generation(test_state):
+    test_state.generation.start_api_generation("api-gen-1")
+
+    out = test_state.generation.cancel_generation()
+    assert out.status == "cancelling"
+    assert out.id == "api-gen-1"
+
+
+def test_gpu_cancel_state_not_affected_by_stale_api_cancel_state(test_state):
+    test_state.generation.start_api_generation("api-gen-1")
+    test_state.generation.cancel_generation()
+
+    test_state.pipelines.load_gpu_pipeline("fast")
+    test_state.generation.start_generation("gpu-gen-1")
+
+    assert test_state.generation.is_generation_cancelled() is False
+
+
 def test_startup_state_transitions_are_tracked(test_state):
     test_state.health.set_startup_pending("waiting")
     assert isinstance(test_state.state.startup, StartupPending)
@@ -125,3 +153,15 @@ def test_startup_warmup_keeps_fast_on_gpu_and_preloads_flux_on_cpu(test_state, f
     assert isinstance(test_state.state.cpu_slot, CpuSlot)
     assert test_state.state.cpu_slot.active_pipeline is fake_services.image_generation_pipeline
     assert fake_services.image_generation_pipeline.device is None
+
+
+def test_forced_mode_warmup_skips_fast_pipeline(test_state):
+    test_state.config.force_api_generations = True
+    test_state.config.required_model_types = frozenset()
+    test_state.state.app_settings.load_on_startup = True
+    test_state.state.app_settings.ltx_api_key = "api-key"
+
+    test_state.health.default_warmup()
+
+    assert test_state.state.gpu_slot is None
+    assert test_state.state.cpu_slot is None

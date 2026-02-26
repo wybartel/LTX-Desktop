@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Play, Pause, Volume2, VolumeX, Loader2, Film } from 'lucide-react'
+import { logger } from '../lib/logger'
 
 type RetakeMode = 'replace_audio_and_video' | 'replace_video' | 'replace_audio'
 
@@ -117,7 +118,7 @@ export function RetakeModal({
     }
 
     extractThumbnails().catch(err => {
-      console.warn('Filmstrip extraction failed:', err)
+      logger.warn(`Filmstrip extraction failed: ${err}`)
     })
   }, [isOpen, videoUrl, videoDuration, thumbCount])
 
