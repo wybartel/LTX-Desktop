@@ -160,7 +160,7 @@ jobs:
           bash scripts/build-installer.sh --platform mac $PUBLISH_FLAG
 
           # Clean up API key
-          [ -n "${APPLE_API_KEY:-}" ] && rm -f "$APPLE_API_KEY"
+          [ -n "${APPLE_API_KEY:-}" ] && rm -f "$APPLE_API_KEY" || true
 
       # Download VC++ Redistributable for the Windows NSIS installer
       - name: Download VC++ Redistributable (Windows)
