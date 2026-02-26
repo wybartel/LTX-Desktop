@@ -13,7 +13,7 @@ class TorchCleaner:
     """Wraps GPU memory cleanup operations."""
 
     def __init__(self, device: str | torch.device = "cpu") -> None:
-        self._device = str(device)
+        self._device = device
 
     def cleanup(self) -> None:
         empty_device_cache(self._device)
