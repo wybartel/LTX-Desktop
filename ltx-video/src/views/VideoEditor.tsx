@@ -1474,21 +1474,18 @@ export function VideoEditor() {
   }
 
   // Extract a frame from a clip at the current playhead position
+  // Returns a file:// URL (videos: extracted via ffmpeg, images: already on disk)
   const extractCurrentFrame = useCallback(async (clip: TimelineClip): Promise<string | null> => {
     try {
-      const { extractFrameAsBase64, extractImageAsBase64 } = await import('../lib/thumbnails')
       const clipSrc = resolveClipSrc(clip)
       if (!clipSrc) return null
-      
-      let base64: string
+
       if (clip.type === 'video') {
         const seekTime = Math.max(0, currentTime - clip.startTime) * clip.speed + clip.trimStart
-        base64 = await extractFrameAsBase64(clipSrc, seekTime, 1024, 0.95)
-      } else {
-        base64 = await extractImageAsBase64(clipSrc, 1024, 0.95)
+        const { url } = await window.electronAPI.extractVideoFrame(clipSrc, seekTime, 1024, 2)
+        return url // file:// URL
       }
-      
-      return base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`
+      return clipSrc // image — already a file:// URL
     } catch (err) {
       logger.error(`Failed to extract frame: ${err}`)
       return null

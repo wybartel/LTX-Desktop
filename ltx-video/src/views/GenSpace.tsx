@@ -828,26 +828,8 @@ export function GenSpace() {
     if (mode === 'image') {
       if (inputImage) {
         // Image + input image → edit image mode (auto-detected)
-        let imagePath: string | null = null
-        try {
-          if (inputImage.startsWith('file://')) {
-            imagePath = fileUrlToPath(inputImage)
-          } else if (inputImage.startsWith('data:')) {
-            // data: URL (e.g. frame capture) — decode base64 and save to temp file
-            const base64 = inputImage.split(',')[1]
-            if (!base64) throw new Error('Invalid data URL')
-            const modelsPath = await window.electronAPI.getModelsPath()
-            const tmpDir = modelsPath.replace(/[/\\]models$/, '')
-            const tmpPath = `${tmpDir}/tmp_edit_image_${Date.now()}.png`
-            await window.electronAPI.saveFile(tmpPath, base64, 'base64')
-            imagePath = tmpPath
-          }
-        } catch (e) {
-          logger.error(`Failed to resolve input image path: ${e}`)
-          setLocalError(e instanceof Error ? e.message : 'Failed to prepare the input image.')
-          return
-        }
-
+        // inputImage is always a file:// URL (frame capture via ffmpeg or image clip src)
+        const imagePath = fileUrlToPath(inputImage)
         if (!imagePath) return
 
         editImage(

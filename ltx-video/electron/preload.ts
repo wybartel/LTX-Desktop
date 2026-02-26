@@ -109,6 +109,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
+  // Extract a single video frame via ffmpeg (returns file path + file:// URL)
+  extractVideoFrame: (videoUrl: string, seekTime: number, width?: number, quality?: number): Promise<{ path: string; url: string }> =>
+    ipcRenderer.invoke('extract-video-frame', videoUrl, seekTime, width, quality),
+
   // Write a log line to the session log file
   writeLog: (level: string, message: string): Promise<void> =>
     ipcRenderer.invoke('write-log', level, message),
@@ -176,6 +180,7 @@ declare global {
       onPythonSetupProgress: (cb: (data: unknown) => void) => void
       removePythonSetupProgress: () => void
       onBackendHealthStatus: (cb: (data: BackendHealthStatus) => void) => (() => void)
+      extractVideoFrame: (videoUrl: string, seekTime: number, width?: number, quality?: number) => Promise<{ path: string; url: string }>
       writeLog: (level: string, message: string) => Promise<void>
       platform: string
     }

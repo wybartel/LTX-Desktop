@@ -57,6 +57,7 @@ interface Window {
     onPythonSetupProgress: (cb: (data: unknown) => void) => void
     removePythonSetupProgress: () => void
     onBackendHealthStatus: (cb: (data: BackendHealthStatus) => void) => (() => void)
+    extractVideoFrame: (videoUrl: string, seekTime: number, width?: number, quality?: number) => Promise<{ path: string; url: string }>
     writeLog: (level: string, message: string) => Promise<void>
     platform: string
   }

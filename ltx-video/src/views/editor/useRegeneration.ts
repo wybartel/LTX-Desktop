@@ -198,16 +198,16 @@ export function useRegeneration(params: UseRegenerationParams) {
     let params = asset.generationParams
     if (!params) {
       try {
-        const { extractFrameAsBase64, extractImageAsBase64 } = await import('../../lib/thumbnails')
         const clipSrc = resolveClipSrc(clips.find(c => c.id === clipId) || { asset, assetId: asset.id } as any)
-        let frameBase64 = ''
+        let framePath = ''
         if (asset.type === 'video' && clipSrc) {
-          frameBase64 = await extractFrameAsBase64(clipSrc, 0.1)
+          const result = await window.electronAPI.extractVideoFrame(clipSrc, 0.1, 512, 3)
+          framePath = result.path
         } else if (asset.type === 'image' && clipSrc) {
-          frameBase64 = await extractImageAsBase64(clipSrc)
+          framePath = fileUrlToPath(clipSrc) || ''
         }
 
-        if (frameBase64) {
+        if (framePath) {
           // Ask Gemini to describe the frame
           const backendUrl = await window.electronAPI.getBackendUrl()
           const resp = await fetch(`${backendUrl}/api/suggest-gap-prompt`, {
@@ -218,7 +218,7 @@ export function useRegeneration(params: UseRegenerationParams) {
               mode: asset.type === 'image' ? 'text-to-image' : 'text-to-video',
               beforePrompt: '',
               afterPrompt: '',
-              beforeFrame: frameBase64,
+              beforeFrame: framePath,
               afterFrame: '',
             }),
           })

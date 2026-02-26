@@ -3,6 +3,7 @@ import type { TimelineClip, Track, SubtitleClip, Asset } from '../../types/proje
 import { DEFAULT_COLOR_CORRECTION } from '../../types/project'
 import type { GenerationSettings } from '../../components/SettingsPanel'
 import { copyToAssetFolder } from '../../lib/asset-copy'
+import { fileUrlToPath } from '../../lib/url-to-path'
 
 export interface UseGapGenerationParams {
   clips: TimelineClip[]
@@ -392,33 +393,35 @@ export function useGapGeneration({
       setGapSuggestionError(false)
       setGapSuggestionNoApiKey(false)
       
-      const { extractFrameAsBase64, extractImageAsBase64 } = await import('../../lib/thumbnails')
-      
       const trackClips = clipsRef.current
         .filter(c => c.trackIndex === gap.trackIndex && c.type !== 'audio')
         .sort((a, b) => a.startTime - b.startTime)
-      
+
       const clipBefore = trackClips.find(c => {
         const clipEnd = c.startTime + c.duration
         return Math.abs(clipEnd - gap.startTime) < 0.05
       })
-      
+
       const clipAfter = trackClips.find(c => {
         return Math.abs(c.startTime - gap.endTime) < 0.05
       })
-      
+
       if (!clipBefore && !clipAfter) {
         setGapSuggesting(false)
         return
       }
-      
+
+      // beforeFrame/afterFrame are now file paths (sent to backend which reads the file)
       let beforeFrame = ''
       let afterFrame = ''
       let beforePrompt = ''
       let afterPrompt = ''
-      
+      // file:// URLs for displaying frames in the UI
+      let beforeFrameUrl = ''
+      let afterFrameUrl = ''
+
       const framePromises: Promise<void>[] = []
-      
+
       if (clipBefore) {
         const clipSrc = resolveClipSrc(clipBefore)
         beforePrompt = clipBefore.asset?.prompt || ''
@@ -426,63 +429,54 @@ export function useGapGeneration({
           if (clipBefore.asset?.type === 'video') {
             const seekTime = clipBefore.trimStart + clipBefore.duration * clipBefore.speed - 0.1
             framePromises.push(
-              extractFrameAsBase64(clipSrc, Math.max(0, seekTime))
-                .then(b64 => { beforeFrame = b64 })
+              window.electronAPI.extractVideoFrame(clipSrc, Math.max(0, seekTime), 512, 3)
+                .then(result => { beforeFrame = result.path; beforeFrameUrl = result.url })
                 .catch(() => {})
             )
           } else if (clipBefore.asset?.type === 'image') {
-            framePromises.push(
-              extractImageAsBase64(clipSrc)
-                .then(b64 => { beforeFrame = b64 })
-                .catch(() => {})
-            )
+            beforeFrame = fileUrlToPath(clipSrc) || ''
+            beforeFrameUrl = clipSrc
           }
         }
       }
-      
+
       if (clipAfter) {
         const clipSrc = resolveClipSrc(clipAfter)
         afterPrompt = clipAfter.asset?.prompt || ''
         if (clipSrc) {
           if (clipAfter.asset?.type === 'video') {
             framePromises.push(
-              extractFrameAsBase64(clipSrc, clipAfter.trimStart + 0.1)
-                .then(b64 => { afterFrame = b64 })
+              window.electronAPI.extractVideoFrame(clipSrc, clipAfter.trimStart + 0.1, 512, 3)
+                .then(result => { afterFrame = result.path; afterFrameUrl = result.url })
                 .catch(() => {})
             )
           } else if (clipAfter.asset?.type === 'image') {
-            framePromises.push(
-              extractImageAsBase64(clipSrc)
-                .then(b64 => { afterFrame = b64 })
-                .catch(() => {})
-            )
+            afterFrame = fileUrlToPath(clipSrc) || ''
+            afterFrameUrl = clipSrc
           }
         }
       }
-      
+
       await Promise.all(framePromises)
-      
+
       if (abortController.signal.aborted) return
-      
-      if (beforeFrame) setGapBeforeFrame(beforeFrame.startsWith('data:') ? beforeFrame : `data:image/jpeg;base64,${beforeFrame}`)
-      if (afterFrame) setGapAfterFrame(afterFrame.startsWith('data:') ? afterFrame : `data:image/jpeg;base64,${afterFrame}`)
+
+      if (beforeFrameUrl) setGapBeforeFrame(beforeFrameUrl)
+      if (afterFrameUrl) setGapAfterFrame(afterFrameUrl)
       
       if (!beforeFrame && !afterFrame && !beforePrompt && !afterPrompt) {
         setGapSuggesting(false)
         return
       }
       
-      // Convert the user's input image to base64 if present (for edit-mode suggestions)
-      let inputImageB64 = ''
+      // Extract file path from the user's input image if present (for edit-mode suggestions)
+      let inputImagePath = ''
       const imageFile = gapImageFileRef.current
       if (imageFile && mode && mode.includes('image')) {
-        try {
-          const arrayBuf = await imageFile.arrayBuffer()
-          const bytes = new Uint8Array(arrayBuf)
-          let binary = ''
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-          inputImageB64 = btoa(binary)
-        } catch {}
+        const electronPath = (imageFile as any).path as string | undefined
+        if (electronPath) {
+          inputImagePath = electronPath
+        }
       }
       
       const backendUrl = await window.electronAPI.getBackendUrl()
@@ -496,7 +490,7 @@ export function useGapGeneration({
           afterPrompt,
           beforeFrame,
           afterFrame,
-          ...(inputImageB64 ? { inputImage: inputImageB64 } : {}),
+          ...(inputImagePath ? { inputImage: inputImagePath } : {}),
         }),
         signal: abortController.signal,
       })

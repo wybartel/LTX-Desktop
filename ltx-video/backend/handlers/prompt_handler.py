@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import logging
+from pathlib import Path
 from threading import RLock
 
 from api_types import (
@@ -42,6 +44,17 @@ def _extract_gemini_text(payload: object) -> str:
     except ValidationError:
         raise HTTPError(500, "GEMINI_PARSE_ERROR")
     return parsed.candidates[0].content.parts[0].text
+
+
+def _read_image_file_as_base64(file_path: str | None) -> str | None:
+    """Read an image file from disk and return its contents as base64."""
+    if not file_path:
+        return None
+    p = Path(file_path)
+    if not p.is_file():
+        logger.warning("Image file not found: %s", file_path)
+        return None
+    return base64.b64encode(p.read_bytes()).decode()
 
 
 class PromptHandler(StateHandlerBase):
@@ -111,9 +124,9 @@ class PromptHandler(StateHandlerBase):
         return EnhancePromptResponse(status="success", enhanced_prompt=enhanced_prompt, original_prompt=prompt)
 
     def suggest_gap(self, req: SuggestGapPromptRequest) -> SuggestGapPromptResponse:
-        before_frame = req.beforeFrame
-        after_frame = req.afterFrame
-        input_image = req.inputImage
+        before_frame = _read_image_file_as_base64(req.beforeFrame)
+        after_frame = _read_image_file_as_base64(req.afterFrame)
+        input_image = _read_image_file_as_base64(req.inputImage)
         before_prompt = req.beforePrompt
         after_prompt = req.afterPrompt
         gap_duration = req.gapDuration
