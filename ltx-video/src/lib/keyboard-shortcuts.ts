@@ -257,8 +257,8 @@ export const DAVINCI_LAYOUT: KeyboardLayout = {
   // Tools
   'tool.select':       [k('a')],         // DaVinci: A = selection
   'tool.blade':        [k('b')],         // DaVinci: B = blade
-  'tool.ripple':       [k('t')],         // DaVinci: T = trim
-  'tool.roll':         [k('t')],
+  'tool.ripple':       [k('t')],         // DaVinci: T = trim (contextual ripple/roll)
+  'tool.roll':         [k('g')],         // DaVinci has no separate roll key; G assigned to avoid conflict
   'tool.slide':        [k('u')],
   'tool.slip':         [k('s')],         // DaVinci: S = slip (not snap)
   'tool.trackForward': [k('y')],
@@ -338,12 +338,12 @@ export const AVID_LAYOUT: KeyboardLayout = {
   'edit.delete':        [k('delete'), k('backspace')],
   'edit.selectAll':     [k('a', { ctrl: true })],
   'edit.deselect':      [k('escape')],
-  'edit.insertEdit':    [k('v')],         // Avid: V = splice-in (closest to insert)
+  'edit.insertEdit':    [k('v', { shift: true })],  // Avid: Shift+V to avoid conflict with tool.select
   'edit.overwriteEdit': [k('b')],         // Avid: B = overwrite
   'edit.matchFrame':    [k('f')],         // Avid: match frame
   // Marking — Avid classic: I/O or E/R
   'mark.setIn':       [k('i'), k('e')],   // Avid: E = mark in
-  'mark.setOut':       [k('o'), k('r')],   // Avid: R = mark out (when not in trim mode)
+  'mark.setOut':       [k('o')],           // Avid: O = mark out (R removed to avoid conflict with tool.ripple)
   'mark.clearIn':      [k('i', { alt: true })],
   'mark.clearOut':     [k('o', { alt: true })],
   'mark.clearInOut':   [k('g')],           // Avid: G = clear both marks
