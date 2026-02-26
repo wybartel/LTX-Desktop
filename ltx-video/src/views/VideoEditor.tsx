@@ -185,7 +185,10 @@ export function VideoEditor() {
       const tlId = activeTimelineIdRef.current
       if (!tlId) return prev
       const current = prev[tlId] || { inPoint: null, outPoint: null }
-      const newIn = updater(current.inPoint)
+      let newIn = updater(current.inPoint)
+      if (newIn !== null && current.outPoint !== null && newIn >= current.outPoint) {
+        newIn = current.outPoint - 0.01
+      }
       return { ...prev, [tlId]: { ...current, inPoint: newIn } }
     })
   }, [])
@@ -195,7 +198,10 @@ export function VideoEditor() {
       const tlId = activeTimelineIdRef.current
       if (!tlId) return prev
       const current = prev[tlId] || { inPoint: null, outPoint: null }
-      const newOut = updater(current.outPoint)
+      let newOut = updater(current.outPoint)
+      if (newOut !== null && current.inPoint !== null && newOut <= current.inPoint) {
+        newOut = current.inPoint + 0.01
+      }
       return { ...prev, [tlId]: { ...current, outPoint: newOut } }
     })
   }, [])
