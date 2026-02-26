@@ -977,7 +977,6 @@ export function VideoEditor() {
     regenVideoUrl, regenVideoPath, regenImageUrl,
     isRegenerating, regenProgress, regenCancel, regenReset, regenError,
     assetSavePath: currentProject?.assetSavePath,
-    forceApiGenerations,
   })
   deleteGapRef.current = deleteGap
 

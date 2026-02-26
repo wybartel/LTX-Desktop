@@ -106,7 +106,6 @@ export function LeftPanel(props: LeftPanelProps) {
     handleImportFile,
     fileInputRef,
     setAssetActiveTake,
-    addClipToTimeline,
     setClips,
     deleteTakeFromAsset,
     deleteAsset,
@@ -438,7 +437,7 @@ export function LeftPanel(props: LeftPanelProps) {
                           pushAssetUndoRef.current()
                           setAssetActiveTake(currentProjectId, takesAsset.id, idx)
                         }
-                        addClipToTimeline({ ...takesAsset, url: take.url, path: take.path }, 0)
+                        loadSourceAsset({ ...takesAsset, url: take.url, path: take.path, thumbnail: take.thumbnail || takesAsset.thumbnail })
                       }}
                       onContextMenu={(e) => {
                         e.preventDefault()
