@@ -776,7 +776,11 @@ function MultiClipMenu({
       <Divider />
       <MenuItem icon={Trash2} label={`Delete ${n} Clips`} shortcut="Del" danger onClick={() => {
         pushUndo()
-        setClips(prev => prev.filter(c => !selectedClipIds.has(c.id)))
+        setClips(prev => prev.filter(c => !selectedClipIds.has(c.id)).map(c => {
+          if (!c.linkedClipIds) return c
+          const remaining = c.linkedClipIds.filter(lid => !selectedClipIds.has(lid))
+          return { ...c, linkedClipIds: remaining.length ? remaining : undefined }
+        }))
         setSelectedClipIds(new Set())
         close()
       }} />

@@ -3003,7 +3003,7 @@ export function VideoEditor() {
                       }}
                       onMouseDown={(e) => handleClipMouseDown(e, clip)}
                       onDoubleClick={() => {
-                        setSelectedClipIds(new Set([clip.id]))
+                        setSelectedClipIds(expandWithLinkedClips(new Set([clip.id])))
                         setShowPropertiesPanel(true)
                       }}
                       onMouseMove={(e) => {
