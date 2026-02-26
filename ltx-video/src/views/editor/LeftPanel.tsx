@@ -106,7 +106,6 @@ export function LeftPanel(props: LeftPanelProps) {
     handleImportFile,
     fileInputRef,
     setAssetActiveTake,
-    addClipToTimeline,
     setClips,
     deleteTakeFromAsset,
     deleteAsset,
