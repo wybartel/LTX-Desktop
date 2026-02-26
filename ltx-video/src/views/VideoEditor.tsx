@@ -417,10 +417,11 @@ export function VideoEditor() {
   // Undo/redo/clipboard (extracted hook)
   const {
     undoStackRef, redoStackRef, clipboardRef,
-    pushUndo, pushAssetUndo, handleUndo, handleRedo,
+    pushUndo, pushAssetUndo, pushTrackUndo, handleUndo, handleRedo,
     handleCopy, handlePaste, handleCut,
   } = useUndoRedo({
-    clips, setClips, assets, currentProjectId,
+    clips, setClips, tracks, setTracks, subtitles, setSubtitles,
+    assets, currentProjectId,
     deleteAsset, addAsset, updateAsset,
     selectedClipIds, setSelectedClipIds, currentTime,
   })
@@ -484,7 +485,7 @@ export function VideoEditor() {
     clips, setClips, tracks, setTracks, subtitles, setSubtitles,
     assets, currentTime, setCurrentTime, currentProjectId,
     selectedClipIds, setSelectedClipIds, setSelectedSubtitleId,
-    pushUndo, addAsset, addTimeline, updateTimeline,
+    pushUndo, pushTrackUndo, addAsset, addTimeline, updateTimeline,
     setActiveTimeline, setOpenTimelineIds, activeTimeline,
     fileInputRef, setHoveredCutPoint,
   })
@@ -2593,6 +2594,7 @@ export function VideoEditor() {
                               <button
                                 onClick={() => {
                                   if (confirm(`Delete subtitle track "${track.name}"?`)) {
+                                    pushTrackUndo()
                                     setTracks(tracks.filter((_, i) => i !== realIndex))
                                     setSubtitles(prev => prev.filter(s => s.trackIndex !== realIndex))
                                   }
