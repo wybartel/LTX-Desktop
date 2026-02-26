@@ -16,7 +16,7 @@ export type ToolDef = { id: ToolType; icon: any; label: string; actionId: Action
 
 export const PRIMARY_TOOLS: ToolDef[] = [
   { id: 'select', icon: MousePointer2, label: 'Selection Tool', actionId: 'tool.select' },
-  { id: 'trackForward', icon: ChevronRight, label: 'Track Select Forward', actionId: 'tool.trackForward' },
+  { id: 'trackForward', icon: ChevronRight, label: 'Track Select Forward (Shift: single track)', actionId: 'tool.trackForward' },
   { id: 'blade', icon: Scissors, label: 'Blade Tool', actionId: 'tool.blade' },
 ]
 

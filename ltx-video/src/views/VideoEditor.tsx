@@ -66,6 +66,12 @@ import { SubtitleTrackStyleEditor } from './editor/SubtitleTrackStyleEditor'
 const SCISSORS_CURSOR_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='6' cy='6' r='3'/><path d='M8.12 8.12 12 12'/><path d='M20 4 8.12 15.88'/><circle cx='6' cy='18' r='3'/><path d='M14.8 14.8 20 20'/></svg>`
 const SCISSORS_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(SCISSORS_CURSOR_SVG)}") 12 12, crosshair`
 
+// Track Select Forward cursors — stacked chevrons for all tracks, single for one track
+const TRACK_FWD_ALL_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='28' viewBox='0 0 24 28' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M8 1l5 5-5 5'/><path d='M8 16l5 5-5 5'/></svg>`
+const TRACK_FWD_ALL_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(TRACK_FWD_ALL_SVG)}") 12 12, e-resize`
+const TRACK_FWD_ONE_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M8 6l6 6-6 6'/></svg>`
+const TRACK_FWD_ONE_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(TRACK_FWD_ONE_SVG)}") 12 12, e-resize`
+
 export function VideoEditor() {
   const { 
     currentProject, currentProjectId, addAsset, deleteAsset, updateAsset, updateProject,
@@ -2749,7 +2755,11 @@ export function VideoEditor() {
                   onScroll={handleTimelineScroll}
                 >
                 <div 
-                  style={{ minWidth: `${totalDuration * pixelsPerSecond}px` }}
+                  style={{ minWidth: `${totalDuration * pixelsPerSecond}px`,
+                    ...(activeTool === 'blade' ? { cursor: SCISSORS_CURSOR }
+                      : activeTool === 'trackForward' ? { cursor: bladeShiftHeld ? TRACK_FWD_ONE_CURSOR : TRACK_FWD_ALL_CURSOR }
+                      : {}),
+                  }}
                   className="relative"
                   onDragOver={(e) => {
                     // Allow asset/timeline drops anywhere on the timeline area
@@ -2817,9 +2827,9 @@ export function VideoEditor() {
                           
                           const forwardClips = clips.filter(c => {
                             if (e.shiftKey) {
-                              return c.startTime >= clickTime - 0.01
-                            } else {
                               return c.trackIndex === clickedRealTrackIndex && c.startTime >= clickTime - 0.01
+                            } else {
+                              return c.startTime >= clickTime - 0.01
                             }
                           })
                           setSelectedClipIds(new Set(forwardClips.map(c => c.id)))
@@ -2983,7 +2993,7 @@ export function VideoEditor() {
                             ? `hover:brightness-125`
                             : 'border-zinc-600 hover:border-zinc-500'
                       } ${!clipColor ? (clip.type === 'audio' ? 'bg-green-900/50' : clip.type === 'adjustment' ? 'bg-blue-900/40 border-dashed' : clip.type === 'text' ? 'bg-cyan-900/50 border-cyan-600/40' : 'bg-zinc-800') : ''} ${
-                        activeTool === 'select' || activeTool === 'ripple' || activeTool === 'roll' || activeTool === 'trackForward' ? 'cursor-grab' : ''
+                        activeTool === 'select' || activeTool === 'ripple' || activeTool === 'roll' ? 'cursor-grab' : ''
                       } ${
                         activeTool === 'slip' ? 'cursor-ew-resize' : ''
                       } ${activeTool === 'slide' ? 'cursor-col-resize' : ''} ${
@@ -2995,7 +3005,9 @@ export function VideoEditor() {
                         width: `${clip.duration * pixelsPerSecond}px`,
                         top: `${trackTopPx(clip.trackIndex, 4)}px`,
                         height: `${getTrackHeight(clip.trackIndex) - 8}px`,
-                        ...(activeTool === 'blade' ? { cursor: SCISSORS_CURSOR } : {}),
+                        ...(activeTool === 'blade' ? { cursor: SCISSORS_CURSOR }
+                          : activeTool === 'trackForward' ? { cursor: bladeShiftHeld ? TRACK_FWD_ONE_CURSOR : TRACK_FWD_ALL_CURSOR }
+                          : {}),
                         ...(clipColor ? {
                           backgroundColor: `${clipColor.color}80`,
                           borderColor: selectedClipIds.has(clip.id) ? undefined : clipColor.color,
@@ -3043,7 +3055,8 @@ export function VideoEditor() {
                           </div>
                         )
                       })()}
-                      <div className="absolute left-0 top-0 bottom-0 w-4 flex items-center justify-center text-zinc-500 hover:text-white cursor-grab">
+                      <div className={`absolute left-0 top-0 bottom-0 w-4 flex items-center justify-center text-zinc-500 hover:text-white ${activeTool === 'trackForward' || activeTool === 'blade' ? '' : 'cursor-grab'}`}
+                        style={activeTool === 'blade' ? { cursor: SCISSORS_CURSOR } : activeTool === 'trackForward' ? { cursor: bladeShiftHeld ? TRACK_FWD_ONE_CURSOR : TRACK_FWD_ALL_CURSOR } : {}}>
                         <GripVertical className="h-3 w-3" />
                       </div>
                       
@@ -3220,11 +3233,12 @@ export function VideoEditor() {
                       })()}
 
                       <div 
-                        className={`absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize transition-colors flex items-center justify-center ${
+                        className={`absolute left-0 top-0 bottom-0 w-3 ${activeTool === 'trackForward' || activeTool === 'blade' ? '' : 'cursor-ew-resize'} transition-colors flex items-center justify-center ${
                           resizingClip?.clipId === clip.id && resizingClip?.edge === 'left'
                             ? activeTool === 'roll' ? 'bg-yellow-500' : activeTool === 'ripple' ? 'bg-green-500' : 'bg-blue-500'
                             : activeTool === 'roll' ? 'hover:bg-yellow-500/50' : activeTool === 'ripple' ? 'hover:bg-green-500/50' : 'hover:bg-blue-500/50'
                         }`}
+                        style={activeTool === 'blade' ? { cursor: SCISSORS_CURSOR } : activeTool === 'trackForward' ? { cursor: bladeShiftHeld ? TRACK_FWD_ONE_CURSOR : TRACK_FWD_ALL_CURSOR } : {}}
                         onMouseDown={(e) => handleResizeStart(e, clip, 'left')}
                       >
                         <div className={`w-0.5 h-6 rounded-full ${
@@ -3232,11 +3246,12 @@ export function VideoEditor() {
                         }`} />
                       </div>
                       <div 
-                        className={`absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize transition-colors flex items-center justify-center ${
+                        className={`absolute right-0 top-0 bottom-0 w-3 ${activeTool === 'trackForward' || activeTool === 'blade' ? '' : 'cursor-ew-resize'} transition-colors flex items-center justify-center ${
                           resizingClip?.clipId === clip.id && resizingClip?.edge === 'right'
                             ? activeTool === 'roll' ? 'bg-yellow-500' : activeTool === 'ripple' ? 'bg-green-500' : 'bg-blue-500'
                             : activeTool === 'roll' ? 'hover:bg-yellow-500/50' : activeTool === 'ripple' ? 'hover:bg-green-500/50' : 'hover:bg-blue-500/50'
                         }`}
+                        style={activeTool === 'blade' ? { cursor: SCISSORS_CURSOR } : activeTool === 'trackForward' ? { cursor: bladeShiftHeld ? TRACK_FWD_ONE_CURSOR : TRACK_FWD_ALL_CURSOR } : {}}
                         onMouseDown={(e) => handleResizeStart(e, clip, 'right')}
                       >
                         <div className={`w-0.5 h-6 rounded-full ${
