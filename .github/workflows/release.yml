@@ -118,21 +118,40 @@ jobs:
         shell: bash
         run: cat backend/.python-version backend/uv.lock | sha256sum | cut -d' ' -f1 > python-deps-hash.txt
 
+      # Configure macOS signing + notarization env vars (tagged releases only).
+      # CSC_LINK must NOT be set (even to empty string) on non-release builds —
+      # electron-builder treats any value as a file path.
+      - name: Configure macOS signing (release only)
+        if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "CSC_LINK=${_CSC_LINK}"                                       >> "$GITHUB_ENV"
+          echo "CSC_KEY_PASSWORD=${_CSC_KEY_PASSWORD}"                       >> "$GITHUB_ENV"
+          echo "APPLE_ID=${_APPLE_ID}"                                       >> "$GITHUB_ENV"
+          echo "APPLE_APP_SPECIFIC_PASSWORD=${_APPLE_APP_SPECIFIC_PASSWORD}" >> "$GITHUB_ENV"
+          echo "APPLE_TEAM_ID=${_APPLE_TEAM_ID}"                             >> "$GITHUB_ENV"
+          echo "APPLE_API_KEY_ID=${_APPLE_API_KEY_ID}"                       >> "$GITHUB_ENV"
+          echo "APPLE_API_ISSUER=${_APPLE_API_ISSUER}"                       >> "$GITHUB_ENV"
+
+          # Write API key .p8 to temp file if provided
+          if [ -n "$_APPLE_API_KEY_CONTENT" ]; then
+            APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
+            printf '%s\n' "$_APPLE_API_KEY_CONTENT" > "$APPLE_API_KEY"
+            echo "APPLE_API_KEY=$APPLE_API_KEY" >> "$GITHUB_ENV"
+          fi
+        env:
+          _CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
+          _CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          _APPLE_ID: ${{ secrets.APPLE_ID }}
+          _APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          _APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          _APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY }}
+          _APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          _APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+
       # macOS build
-      # Notarization: configure EITHER password secrets (APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD,
-      # APPLE_TEAM_ID) OR API key secrets (APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER).
-      # electron-builder checks password first, then API key; unconfigured secrets are empty → skipped.
-      # NOTE: CSC_LINK MUST NOT be set to an empty string — electron-builder treats it
-      # as a file path and fails. All signing env vars are set only for tagged builds.
       - name: Build installer (macOS)
         if: matrix.os == 'macos'
         run: |
-          # Write API key to temp file if provided
-          if [ -n "$APPLE_API_KEY_CONTENT" ]; then
-            export APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
-            printf '%s\n' "$APPLE_API_KEY_CONTENT" > "$APPLE_API_KEY"
-          fi
-
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             PUBLISH_FLAG="--publish always"
           else
@@ -142,18 +161,6 @@ jobs:
 
           # Clean up API key
           [ -n "${APPLE_API_KEY:-}" ] && rm -f "$APPLE_API_KEY"
-        env:
-          # Signing + notarization (only populated for tagged releases)
-          CSC_LINK: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.MAC_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.MAC_CERTIFICATE_PASSWORD }}
-          # Password-based notarization
-          APPLE_ID: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_TEAM_ID }}
-          # API key notarization
-          APPLE_API_KEY_CONTENT: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_API_ISSUER }}
 
       # Download VC++ Redistributable for the Windows NSIS installer
       - name: Download VC++ Redistributable (Windows)
