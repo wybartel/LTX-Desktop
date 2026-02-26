@@ -311,12 +311,12 @@ export function useTimelineDrag(params: UseTimelineDragParams) {
       
       // Record undo before drag begins
       pushUndo()
-      // Expand selection to include linked clips (audio ↔ video pairs), unless Alt held
-      const expandedSelection = e.altKey ? effectiveSelection : expandWithLinkedClips(effectiveSelection)
-      // Capture original positions of all clips in the expanded selection
+      // Only drag clips that are in the effective (visual) selection.
+      // This allows moving just the video or audio part of a linked clip
+      // when only that part is selected (e.g. via Alt+lasso). Links are preserved.
       const originalPositions: Record<string, { startTime: number; trackIndex: number }> = {}
       for (const c of clips) {
-        if (expandedSelection.has(c.id)) {
+        if (effectiveSelection.has(c.id)) {
           originalPositions[c.id] = { startTime: c.startTime, trackIndex: c.trackIndex }
         }
       }
