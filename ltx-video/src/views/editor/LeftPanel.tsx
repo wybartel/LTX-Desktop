@@ -438,7 +438,7 @@ export function LeftPanel(props: LeftPanelProps) {
                           pushAssetUndoRef.current()
                           setAssetActiveTake(currentProjectId, takesAsset.id, idx)
                         }
-                        addClipToTimeline({ ...takesAsset, url: take.url, path: take.path }, 0)
+                        loadSourceAsset({ ...takesAsset, url: take.url, path: take.path, thumbnail: take.thumbnail || takesAsset.thumbnail })
                       }}
                       onContextMenu={(e) => {
                         e.preventDefault()
@@ -673,12 +673,7 @@ export function LeftPanel(props: LeftPanelProps) {
                   }}
                   onDoubleClick={(e) => {
                     e.stopPropagation()
-                    if (asset.takes && asset.takes.length > 1) {
-                      setTakesViewAssetId(asset.id)
-                      setSelectedAssetIds(new Set())
-                    } else {
-                      loadSourceAsset(asset)
-                    }
+                    loadSourceAsset(asset)
                   }}
                   onContextMenu={(e) => {
                     e.preventDefault()
@@ -925,12 +920,7 @@ export function LeftPanel(props: LeftPanelProps) {
                     }}
                     onDoubleClick={(e) => {
                       e.stopPropagation()
-                      if (asset.takes && asset.takes.length > 1) {
-                        setTakesViewAssetId(asset.id)
-                        setSelectedAssetIds(new Set())
-                      } else {
-                        loadSourceAsset(asset)
-                      }
+                      loadSourceAsset(asset)
                     }}
                     onContextMenu={(e) => {
                       e.preventDefault()
