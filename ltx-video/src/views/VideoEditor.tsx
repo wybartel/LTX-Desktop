@@ -4165,7 +4165,7 @@ export function VideoEditor() {
       })()}
       */}
       
-      {selectedGap && (
+      {selectedGap && tracks[selectedGap.trackIndex]?.kind !== 'audio' && (
         <GapGenerationModal
           selectedGap={selectedGap}
           anchorPosition={selectedGapAnchor}
