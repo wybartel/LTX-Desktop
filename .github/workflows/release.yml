@@ -153,9 +153,6 @@ jobs:
         run: |
           echo "CSC_LINK=${_CSC_LINK}"                                       >> "$GITHUB_ENV"
           echo "CSC_KEY_PASSWORD=${_CSC_KEY_PASSWORD}"                       >> "$GITHUB_ENV"
-          echo "APPLE_ID=${_APPLE_ID}"                                       >> "$GITHUB_ENV"
-          echo "APPLE_APP_SPECIFIC_PASSWORD=${_APPLE_APP_SPECIFIC_PASSWORD}" >> "$GITHUB_ENV"
-          echo "APPLE_TEAM_ID=${_APPLE_TEAM_ID}"                             >> "$GITHUB_ENV"
           echo "APPLE_API_KEY_ID=${_APPLE_API_KEY_ID}"                       >> "$GITHUB_ENV"
           echo "APPLE_API_ISSUER=${_APPLE_API_ISSUER}"                       >> "$GITHUB_ENV"
 
@@ -168,9 +165,6 @@ jobs:
         env:
           _CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
           _CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
-          _APPLE_ID: ${{ secrets.APPLE_ID }}
-          _APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          _APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           _APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY }}
           _APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           _APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
