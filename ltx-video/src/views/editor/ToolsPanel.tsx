@@ -36,7 +36,7 @@ export function ToolsPanel({
         <Tooltip
           key={tool.id}
           side="right"
-          content={<>{tool.label} <span className="text-zinc-400">({getShortcutLabel(kbLayout, tool.actionId)})</span></>}
+          content={(() => { const s = getShortcutLabel(kbLayout, tool.actionId); return <>{tool.label}{s && <span className="text-zinc-400"> ({s})</span>}</>; })()}
         >
           <button
             onClick={() => setActiveTool(tool.id)}
@@ -60,7 +60,7 @@ export function ToolsPanel({
           <div className="relative flex-shrink-0">
             <Tooltip
               side="right"
-              content={<>{currentTrimTool.label} <span className="text-zinc-400">({getShortcutLabel(kbLayout, currentTrimTool.actionId)}) — right-click or hold for more</span></>}
+              content={(() => { const s = getShortcutLabel(kbLayout, currentTrimTool.actionId); return <>{currentTrimTool.label}<span className="text-zinc-400">{s ? ` (${s}) — ` : ' — '}right-click or hold for more</span></>; })()}
             >
               <button
                 onClick={() => {

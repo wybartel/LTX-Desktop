@@ -110,6 +110,11 @@ export function getShortcutLabel(layout: KeyboardLayout, actionId: ActionId): st
   return formatKeyCombo(combos[0])
 }
 
+/** Returns `"label (shortcut)"` when a shortcut exists, or just `"label"` when it doesn't. */
+export function tooltipLabel(label: string, shortcut: string): string {
+  return shortcut ? `${label} (${shortcut})` : label
+}
+
 /**
  * Overwrite helper: given a moved/placed clip, trim or split any clips
  * on the same track that it overlaps. Returns the updated clips array.
