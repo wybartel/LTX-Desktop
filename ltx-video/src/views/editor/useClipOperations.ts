@@ -501,7 +501,7 @@ export function useClipOperations(params: UseClipOperationsParams) {
     }
     
     pushUndo(clips)
-    setClips(prev => [...prev, newClip])
+    setClips(prev => resolveOverlaps([...prev, newClip], new Set([newClip.id])))
     setSelectedClipIds(new Set([newClip.id]))
     // Move playhead to middle of new clip so the text is immediately visible in the monitor
     setCurrentTime(insertTime + 0.1)
