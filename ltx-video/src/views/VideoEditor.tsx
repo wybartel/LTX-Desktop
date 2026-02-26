@@ -219,6 +219,11 @@ export function VideoEditor() {
   const [draggingMarker, setDraggingMarker] = useState<'timelineIn' | 'timelineOut' | 'sourceIn' | 'sourceOut' | null>(null)
   const draggingMarkerRef = useRef(draggingMarker)
   draggingMarkerRef.current = draggingMarker
+  const markerDragOriginRef = useRef<'timeline' | 'scrubbar' | null>(null)
+  const inPointRef = useRef(inPoint)
+  inPointRef.current = inPoint
+  const outPointRef = useRef(outPoint)
+  outPointRef.current = outPoint
 
   // Export modal
   const [showExportModal, setShowExportModal] = useState(false)
@@ -471,6 +476,11 @@ export function VideoEditor() {
     handleOverwriteEdit,
   } = useSourceMonitor({ currentTime, tracks, pushUndo, setClips })
 
+  const sourceInRef = useRef(sourceIn)
+  sourceInRef.current = sourceIn
+  const sourceOutRef = useRef(sourceOut)
+  sourceOutRef.current = sourceOut
+
   // Mutual exclusion: only one monitor can play at a time
   useEffect(() => {
     if (isPlaying && sourceIsPlaying) {
@@ -635,11 +645,15 @@ export function VideoEditor() {
       if (!marker) return
 
       if (marker === 'timelineIn' || marker === 'timelineOut') {
-        // Try the timeline ruler first, then fallback to program monitor scrub bar
         let time = 0
+        const origin = markerDragOriginRef.current
         const rulerEl = timelineRef.current
         const progScrub = document.getElementById('program-scrub-bar')
-        if (rulerEl) {
+        if (origin === 'scrubbar' && progScrub) {
+          const rect = progScrub.getBoundingClientRect()
+          const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+          time = pct * totalDuration
+        } else if (rulerEl) {
           const rect = rulerEl.getBoundingClientRect()
           const scrollLeft = rulerScrollRef.current?.scrollLeft ?? 0
           const px = e.clientX - rect.left + scrollLeft
@@ -649,12 +663,11 @@ export function VideoEditor() {
           const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
           time = pct * totalDuration
         }
-        // Snap: IN can't go past OUT, OUT can't go before IN
-        if (marker === 'timelineIn' && outPoint !== null) {
-          time = Math.min(time, outPoint - 0.01)
+        if (marker === 'timelineIn' && outPointRef.current !== null) {
+          time = Math.min(time, outPointRef.current - 0.01)
         }
-        if (marker === 'timelineOut' && inPoint !== null) {
-          time = Math.max(time, inPoint + 0.01)
+        if (marker === 'timelineOut' && inPointRef.current !== null) {
+          time = Math.max(time, inPointRef.current + 0.01)
         }
         time = Math.max(0, Math.min(time, totalDuration))
         if (marker === 'timelineIn') {
@@ -663,18 +676,17 @@ export function VideoEditor() {
           setOutPoint(() => time)
         }
       } else if (marker === 'sourceIn' || marker === 'sourceOut') {
-        // Source monitor scrub bar drag — find the scrub bar element
         const scrubEl = document.getElementById('source-scrub-bar')
         if (!scrubEl) return
         const rect = scrubEl.getBoundingClientRect()
         const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
         const dur = sourceAsset?.duration || 5
         let time = pct * dur
-        if (marker === 'sourceIn' && sourceOut !== null) {
-          time = Math.min(time, sourceOut - 0.01)
+        if (marker === 'sourceIn' && sourceOutRef.current !== null) {
+          time = Math.min(time, sourceOutRef.current - 0.01)
         }
-        if (marker === 'sourceOut' && sourceIn !== null) {
-          time = Math.max(time, sourceIn + 0.01)
+        if (marker === 'sourceOut' && sourceInRef.current !== null) {
+          time = Math.max(time, sourceInRef.current + 0.01)
         }
         time = Math.max(0, Math.min(time, dur))
         if (marker === 'sourceIn') {
@@ -686,6 +698,7 @@ export function VideoEditor() {
     }
 
     const handleMouseUp = () => {
+      markerDragOriginRef.current = null
       setDraggingMarker(null)
     }
 
@@ -695,7 +708,7 @@ export function VideoEditor() {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [draggingMarker, pixelsPerSecond, inPoint, outPoint, sourceIn, sourceOut, totalDuration, setInPoint, setOutPoint])
+  }, [draggingMarker, pixelsPerSecond, totalDuration, setInPoint, setOutPoint])
 
   // Dynamic minimum zoom: at min zoom the whole timeline fits in view
   // Falls back to 0.05 if container isn't mounted yet
@@ -1918,7 +1931,7 @@ export function VideoEditor() {
             outPoint={outPoint}
             setInPoint={setInPoint}
             setOutPoint={setOutPoint}
-            setDraggingMarker={setDraggingMarker}
+            setDraggingMarker={(v) => { markerDragOriginRef.current = 'scrubbar'; setDraggingMarker(v) }}
             playingInOut={playingInOut}
             setPlayingInOut={setPlayingInOut}
             shuttleSpeed={shuttleSpeed}
@@ -2430,7 +2443,7 @@ export function VideoEditor() {
                     <div
                       className="absolute top-0 bottom-0 z-[15] cursor-ew-resize"
                       style={{ left: `${inPoint * pixelsPerSecond - 6}px`, width: 12 }}
-                      onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setDraggingMarker('timelineIn') }}
+                      onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); markerDragOriginRef.current = 'timeline'; setDraggingMarker('timelineIn') }}
                     >
                       {/* Bracket shape */}
                       <div className="absolute top-0 bottom-0 left-[5px] w-1.5 bg-blue-400 rounded-l-sm flex flex-col justify-between pointer-events-none">
@@ -2445,7 +2458,7 @@ export function VideoEditor() {
                     <div
                       className="absolute top-0 bottom-0 z-[15] cursor-ew-resize"
                       style={{ left: `${outPoint * pixelsPerSecond - 6}px`, width: 12 }}
-                      onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setDraggingMarker('timelineOut') }}
+                      onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); markerDragOriginRef.current = 'timeline'; setDraggingMarker('timelineOut') }}
                     >
                       {/* Bracket shape */}
                       <div className="absolute top-0 bottom-0 left-[5px] w-1.5 bg-blue-400 rounded-r-sm flex flex-col justify-between pointer-events-none">
