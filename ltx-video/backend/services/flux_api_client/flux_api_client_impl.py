@@ -16,6 +16,7 @@ BFL_API_BASE_URL = "https://api.bfl.ai"
 BFL_MODEL_ENDPOINT = "/v1/flux-2-klein-9b"
 BFL_RESULT_ENDPOINT = "/v1/get_result"
 SAFETY_TOLERANCE = 5
+GUIDANCE = 1.5
 
 # TODO(press-release): replace temporary hardcoded key and remove this constant.
 BFL_API_KEY = "bfl_JlyfiMNWBCElr9HViyWTND3gHywZKrXv"
@@ -56,6 +57,7 @@ class FluxAPIClientImpl:
             "seed": seed,
             "output_format": "png",
             "safety_tolerance": SAFETY_TOLERANCE,
+            "guidance": GUIDANCE,
         }
         return self._submit_and_wait(payload=payload)
 
@@ -76,6 +78,7 @@ class FluxAPIClientImpl:
             "seed": seed,
             "output_format": "png",
             "safety_tolerance": SAFETY_TOLERANCE,
+            "guidance": GUIDANCE,
         }
 
         for idx, image_bytes in enumerate(input_images, start=1):
