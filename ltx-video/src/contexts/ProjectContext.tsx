@@ -52,7 +52,7 @@ interface ProjectContextType {
 
 const ProjectContext = createContext<ProjectContextType | null>(null)
 
-const STORAGE_KEY = 'ltx-studio-projects'
+const STORAGE_KEY = 'ltx-projects'
 
 // Migrate old projects that don't have timelines
 function migrateProject(project: Project): Project {
