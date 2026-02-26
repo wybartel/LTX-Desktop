@@ -176,10 +176,20 @@ rm -rf "$OUTPUT_PATH/lib/python"*/site-packages/setuptools-*.dist-info 2>/dev/nu
 find "$OUTPUT_PATH/lib" -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
 find "$OUTPUT_PATH/lib" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
 
-# Remove C/C++ headers (~10k files in torch/include alone). These are only
-# needed for building native extensions, not at runtime. Without this,
-# electron-builder hits the macOS 10240 open-files-per-process hard limit.
+# Remove files only needed for building native extensions, not at runtime.
+# This cuts ~14k files and speeds up macOS codesigning dramatically.
+# NOTE: Windows needs .h files for sageattention/triton — this script is macOS only.
+rm -rf "$OUTPUT_PATH/include" "$OUTPUT_PATH/share" 2>/dev/null || true
 find "$OUTPUT_PATH/lib" -type d -name "include" -exec rm -rf {} + 2>/dev/null || true
+find "$OUTPUT_PATH" -name "*.pyi" -delete 2>/dev/null || true
+find "$OUTPUT_PATH" -name "*.pxd" -delete 2>/dev/null || true
+find "$OUTPUT_PATH" -name "*.pyx" -delete 2>/dev/null || true
+find "$OUTPUT_PATH" -name "*.hpp" -delete 2>/dev/null || true
+find "$OUTPUT_PATH" -name "*.cpp" -delete 2>/dev/null || true
+find "$OUTPUT_PATH" -name "*.h" -delete 2>/dev/null || true
+find "$OUTPUT_PATH" -name "*.cuh" -delete 2>/dev/null || true
+find "$OUTPUT_PATH" -name "*.cu" -delete 2>/dev/null || true
+find "$OUTPUT_PATH" -name "*.cmake" -delete 2>/dev/null || true
 
 # Remove temp directory and generated requirements file
 rm -rf "$TEMP_DIR"
