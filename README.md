@@ -72,7 +72,7 @@ ltx-desktop/
 ├── electron/           # Electron main process
 │   ├── main.ts         # Application entry point
 │   └── preload.ts      # Secure IPC bridge
-├── src/                # React frontend
+├── frontend/           # React frontend
 │   ├── components/     # UI components
 │   ├── hooks/          # React hooks
 │   └── App.tsx         # Main application
