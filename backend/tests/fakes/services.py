@@ -702,6 +702,41 @@ class FakeIcLoraPipeline:
         output_path.write_bytes(b"fake-ic-lora-video")
 
 
+class FakeA2VPipeline:
+    _singleton: ClassVar["FakeA2VPipeline | None"] = None
+
+    @classmethod
+    def bind_singleton(cls, pipeline: "FakeA2VPipeline") -> None:
+        cls._singleton = pipeline
+
+    @staticmethod
+    def create(
+        checkpoint_path: str,
+        gemma_root: str | None,
+        upsampler_path: str,
+        distilled_lora_path: str,
+        device: str | object,
+    ) -> "FakeA2VPipeline":
+        del checkpoint_path, gemma_root, upsampler_path, distilled_lora_path, device
+        pipeline = FakeA2VPipeline._singleton
+        if pipeline is None:
+            raise RuntimeError("FakeA2VPipeline singleton is not bound")
+        return pipeline
+
+    def __init__(self) -> None:
+        self.generate_calls: list[dict[str, Any]] = []
+        self.raise_on_generate: Exception | None = None
+
+    def generate(self, **kwargs: Any) -> None:
+        self.generate_calls.append(kwargs)
+        if self.raise_on_generate is not None:
+            raise self.raise_on_generate
+
+        output_path = Path(kwargs["output_path"])
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"fake-a2v-video")
+
+
 class FakeIcLoraModelDownloader:
     _MODEL_FILES = {
         "canny": "ltx-2-19b-ic-lora-canny-control.safetensors",
@@ -799,6 +834,7 @@ class FakeServices:
     pro_native_video_pipeline: FakeProNativeVideoPipeline = field(default_factory=FakeProNativeVideoPipeline)
     image_generation_pipeline: FakeImageGenerationPipeline = field(default_factory=FakeImageGenerationPipeline)
     ic_lora_pipeline: FakeIcLoraPipeline = field(default_factory=FakeIcLoraPipeline)
+    a2v_pipeline: FakeA2VPipeline = field(default_factory=FakeA2VPipeline)
     ic_lora_model_downloader: FakeIcLoraModelDownloader = field(default_factory=FakeIcLoraModelDownloader)
 
     def __post_init__(self) -> None:
@@ -808,3 +844,4 @@ class FakeServices:
         FakeProNativeVideoPipeline.bind_singleton(self.pro_native_video_pipeline)
         FakeImageGenerationPipeline.bind_singleton(self.image_generation_pipeline)
         FakeIcLoraPipeline.bind_singleton(self.ic_lora_pipeline)
+        FakeA2VPipeline.bind_singleton(self.a2v_pipeline)

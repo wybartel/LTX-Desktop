@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 if TYPE_CHECKING:
     from state.app_settings import AppSettings
     from services.interfaces import (
+        A2VPipeline,
         FastNativeVideoPipeline,
         FastVideoPipeline,
         ImageGenerationPipeline,
@@ -113,6 +114,11 @@ class ICLoraState:
     lora_path: str
 
 
+@dataclass
+class A2VPipelineState:
+    pipeline: A2VPipeline
+
+
 # ============================================================
 # Generation state
 # ============================================================
@@ -159,7 +165,7 @@ GenerationState = GenerationRunning | GenerationComplete | GenerationError | Gen
 
 @dataclass
 class GpuSlot:
-    active_pipeline: VideoPipelineState | ICLoraState | ImageGenerationPipeline
+    active_pipeline: VideoPipelineState | ICLoraState | A2VPipelineState | ImageGenerationPipeline
     generation: GenerationState | None
 
 

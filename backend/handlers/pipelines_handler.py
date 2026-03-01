@@ -12,6 +12,7 @@ import torch
 from handlers.base import StateHandlerBase
 from handlers.text_handler import TextHandler
 from services.interfaces import (
+    A2VPipeline,
     FastNativeVideoPipeline,
     FastVideoPipeline,
     ImageGenerationPipeline,
@@ -24,6 +25,7 @@ from services.interfaces import (
 )
 from services.services_utils import get_device_type
 from state.app_state_types import (
+    A2VPipelineState,
     AppState,
     CpuSlot,
     GenerationRunning,
@@ -53,6 +55,7 @@ class PipelinesHandler(StateHandlerBase):
         pro_native_video_pipeline_class: type[ProNativeVideoPipeline],
         image_generation_pipeline_class: type[ImageGenerationPipeline],
         ic_lora_pipeline_class: type[IcLoraPipeline],
+        a2v_pipeline_class: type[A2VPipeline],
         config: RuntimeConfig,
         outputs_dir: Path,
         device: torch.device,
@@ -67,6 +70,7 @@ class PipelinesHandler(StateHandlerBase):
         self._pro_native_video_pipeline_class = pro_native_video_pipeline_class
         self._image_generation_pipeline_class = image_generation_pipeline_class
         self._ic_lora_pipeline_class = ic_lora_pipeline_class
+        self._a2v_pipeline_class = a2v_pipeline_class
         self._config = config
         self._outputs_dir = outputs_dir
         self._device = device
@@ -89,7 +93,7 @@ class PipelinesHandler(StateHandlerBase):
     def _assert_invariants(self) -> None:
         gpu_is_flux = False
         match self.state.gpu_slot:
-            case GpuSlot(active_pipeline=VideoPipelineState() | ICLoraState()):
+            case GpuSlot(active_pipeline=VideoPipelineState() | ICLoraState() | A2VPipelineState()):
                 gpu_is_flux = False
             case GpuSlot():
                 gpu_is_flux = True
@@ -181,7 +185,7 @@ class PipelinesHandler(StateHandlerBase):
                 return
 
             active = self.state.gpu_slot.active_pipeline
-            if isinstance(active, (VideoPipelineState, ICLoraState)):
+            if isinstance(active, (VideoPipelineState, ICLoraState, A2VPipelineState)):
                 return
 
             generation = self.state.gpu_slot.generation
@@ -203,7 +207,7 @@ class PipelinesHandler(StateHandlerBase):
         with self._lock:
             if self.state.gpu_slot is not None:
                 active = self.state.gpu_slot.active_pipeline
-                if not isinstance(active, (VideoPipelineState, ICLoraState)):
+                if not isinstance(active, (VideoPipelineState, ICLoraState, A2VPipelineState)):
                     return active
                 self._ensure_no_running_generation()
 
@@ -273,7 +277,7 @@ class PipelinesHandler(StateHandlerBase):
                 return
 
             active = self.state.gpu_slot.active_pipeline
-            if isinstance(active, (VideoPipelineState, ICLoraState)):
+            if isinstance(active, (VideoPipelineState, ICLoraState, A2VPipelineState)):
                 self.state.gpu_slot = None
                 self._assert_invariants()
                 should_cleanup = True
@@ -335,6 +339,32 @@ class PipelinesHandler(StateHandlerBase):
             self._device,
         )
         state = ICLoraState(pipeline=pipeline, lora_path=lora_path)
+
+        with self._lock:
+            self.state.gpu_slot = GpuSlot(active_pipeline=state, generation=None)
+            self._assert_invariants()
+        return state
+
+    def load_a2v_pipeline(self) -> A2VPipelineState:
+        self._install_text_patches_if_needed()
+
+        with self._lock:
+            match self.state.gpu_slot:
+                case GpuSlot(active_pipeline=A2VPipelineState() as state):
+                    return state
+                case _:
+                    pass
+
+        self._evict_gpu_pipeline_for_swap()
+
+        pipeline = self._a2v_pipeline_class.create(
+            str(self._config.model_path("checkpoint")),
+            self._text_handler.resolve_gemma_root(),
+            str(self._config.model_path("upsampler")),
+            str(self._config.model_path("distilled_lora")),
+            self._device,
+        )
+        state = A2VPipelineState(pipeline=pipeline)
 
         with self._lock:
             self.state.gpu_slot = GpuSlot(active_pipeline=state, generation=None)

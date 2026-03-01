@@ -84,6 +84,7 @@ def test_state(tmp_path: Path, fake_services: FakeServices):
         pro_native_video_pipeline_class=type(fake_services.pro_native_video_pipeline),
         image_generation_pipeline_class=type(fake_services.image_generation_pipeline),
         ic_lora_pipeline_class=type(fake_services.ic_lora_pipeline),
+        a2v_pipeline_class=type(fake_services.a2v_pipeline),
         ic_lora_model_downloader=fake_services.ic_lora_model_downloader,
     )
 

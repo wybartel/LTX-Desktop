@@ -22,6 +22,7 @@ from handlers import (
 )
 from runtime_config.runtime_config import RuntimeConfig
 from services.interfaces import (
+    A2VPipeline,
     FastNativeVideoPipeline,
     FastVideoPipeline,
     FluxAPIClient,
@@ -64,6 +65,7 @@ class AppHandler:
         pro_native_video_pipeline_class: type[ProNativeVideoPipeline],
         image_generation_pipeline_class: type[ImageGenerationPipeline],
         ic_lora_pipeline_class: type[IcLoraPipeline],
+        a2v_pipeline_class: type[A2VPipeline],
         ic_lora_model_downloader: IcLoraModelDownloader,
     ) -> None:
         self.config = config
@@ -83,6 +85,7 @@ class AppHandler:
         self.pro_native_video_pipeline_class = pro_native_video_pipeline_class
         self.image_generation_pipeline_class = image_generation_pipeline_class
         self.ic_lora_pipeline_class = ic_lora_pipeline_class
+        self.a2v_pipeline_class = a2v_pipeline_class
         self.ic_lora_model_downloader = ic_lora_model_downloader
 
         self._lock = threading.RLock()
@@ -148,6 +151,7 @@ class AppHandler:
             pro_native_video_pipeline_class=pro_native_video_pipeline_class,
             image_generation_pipeline_class=image_generation_pipeline_class,
             ic_lora_pipeline_class=ic_lora_pipeline_class,
+            a2v_pipeline_class=a2v_pipeline_class,
             config=config,
             outputs_dir=config.outputs_dir,
             device=config.device,
@@ -233,6 +237,7 @@ class ServiceBundle:
     pro_native_video_pipeline_class: type[ProNativeVideoPipeline]
     image_generation_pipeline_class: type[ImageGenerationPipeline]
     ic_lora_pipeline_class: type[IcLoraPipeline]
+    a2v_pipeline_class: type[A2VPipeline]
     ic_lora_model_downloader: IcLoraModelDownloader
 
 
@@ -245,6 +250,7 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
     from services.gpu_info.gpu_info_impl import GpuInfoImpl
     from services.http_client.http_client_impl import HTTPClientImpl
     from services.ic_lora_model_downloader.ic_lora_model_downloader_impl import IcLoraModelDownloaderImpl
+    from services.a2v_pipeline.ltx_a2v_pipeline import LTXa2vPipeline
     from services.ic_lora_pipeline.ltx_ic_lora_pipeline import LTXIcLoraPipeline
     from services.image_generation_pipeline.flux_image_generation_pipeline import FluxImageGenerationPipeline
     from services.ltx_api_client.ltx_api_client_impl import LTXAPIClientImpl
@@ -277,6 +283,7 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
         pro_native_video_pipeline_class=LTXProNativeVideoPipeline,
         image_generation_pipeline_class=FluxImageGenerationPipeline,
         ic_lora_pipeline_class=LTXIcLoraPipeline,
+        a2v_pipeline_class=LTXa2vPipeline,
         ic_lora_model_downloader=IcLoraModelDownloaderImpl(),
     )
 
@@ -306,5 +313,6 @@ def build_initial_state(
         pro_native_video_pipeline_class=bundle.pro_native_video_pipeline_class,
         image_generation_pipeline_class=bundle.image_generation_pipeline_class,
         ic_lora_pipeline_class=bundle.ic_lora_pipeline_class,
+        a2v_pipeline_class=bundle.a2v_pipeline_class,
         ic_lora_model_downloader=bundle.ic_lora_model_downloader,
     )

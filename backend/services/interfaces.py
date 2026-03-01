@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from services.a2v_pipeline.a2v_pipeline import A2VPipeline
 from services.fast_native_video_pipeline.fast_native_video_pipeline import FastNativeVideoPipeline
 from services.fast_video_pipeline.fast_video_pipeline import FastVideoPipeline
 from services.flux_api_client.flux_api_client import FluxAPIClient
@@ -29,6 +30,7 @@ from services.video_processor.video_processor import VideoInfoPayload, VideoProc
 VideoPipelineModelType = Literal["fast", "fast-native", "pro", "pro-native"]
 
 __all__ = [
+    "A2VPipeline",
     "JSONScalar",
     "JSONValue",
     "GpuTelemetryPayload",
