@@ -251,6 +251,7 @@ class GenerateVideoRequest(BaseModel):
     fps: str = "24"
     audio: str = "false"
     imagePath: str | None = None
+    audioPath: str | None = None
 
 
 class GenerateImageRequest(BaseModel):

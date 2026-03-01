@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, cast
 
 from PIL import Image
 
+from ltx_pipelines.utils.args import ImageConditioningInput
+
 from api_types import GenerateVideoRequest, GenerateVideoResponse, VideoCameraMotion
 from _routes._errors import HTTPError
 from handlers.base import StateHandlerBase
@@ -46,6 +48,11 @@ FORCED_API_RESOLUTION_MAP: dict[str, str] = {
 }
 FORCED_API_ALLOWED_DURATIONS = {6, 8, 10}
 FORCED_API_ALLOWED_FPS = {25, 50}
+RESOLUTION_MAP: dict[str, tuple[int, int]] = {
+    "540p": (960, 544),
+    "720p": (1280, 704),
+    "1080p": (960, 544),
+}
 
 
 class VideoGenerationHandler(StateHandlerBase):
@@ -99,12 +106,7 @@ class VideoGenerationHandler(StateHandlerBase):
         else:
             logger.info("Resolution %s - using 2-stage pipeline with upsampler", resolution)
 
-        resolution_map = {
-            "540p": (960, 544),
-            "720p": (1280, 704),
-            "1080p": (960, 544),
-        }
-        width, height = resolution_map.get(resolution, (960, 544))
+        width, height = RESOLUTION_MAP.get(resolution, (960, 544))
 
         num_frames = self._compute_num_frames(duration, fps)
 
@@ -171,12 +173,12 @@ class VideoGenerationHandler(StateHandlerBase):
 
         enhanced_prompt = prompt + self._camera_motion_prompts.get(camera_motion, "")
 
-        images: list[tuple[str, int, float]] = []
+        images: list[ImageConditioningInput] = []
         temp_image_path: str | None = None
         if image is not None:
             temp_image_path = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
             image.save(temp_image_path)
-            images = [(temp_image_path, 0, 1.0)]
+            images = [ImageConditioningInput(path=temp_image_path, frame_idx=0, strength=1.0)]
 
         output_path = self._make_output_path()
 
@@ -240,8 +242,7 @@ class VideoGenerationHandler(StateHandlerBase):
         if not os.path.isfile(audio_path):
             raise HTTPError(400, f"Audio file not found: {audio_path}")
 
-        # A2V is always two-stage, hardcode base resolution
-        width, height = 960, 544
+        width, height = RESOLUTION_MAP.get(req.resolution, (960, 544))
 
         num_frames = self._compute_num_frames(duration, fps)
 
@@ -261,11 +262,11 @@ class VideoGenerationHandler(StateHandlerBase):
             enhanced_prompt = req.prompt + self._camera_motion_prompts.get(req.cameraMotion, "")
             neg = req.negativePrompt if req.negativePrompt else self._default_negative_prompt
 
-            images: list[tuple[str, int, float]] = []
+            images: list[ImageConditioningInput] = []
             if image is not None:
                 temp_image_path = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
                 image.save(temp_image_path)
-                images = [(temp_image_path, 0, 1.0)]
+                images = [ImageConditioningInput(path=temp_image_path, frame_idx=0, strength=1.0)]
 
             output_path = self._make_output_path()
 
@@ -275,7 +276,6 @@ class VideoGenerationHandler(StateHandlerBase):
             self._generation.update_progress("loading_model", 5, 0, total_steps)
             self._generation.update_progress("encoding_text", 10, 0, total_steps)
             self._text.prepare_text_encoding(enhanced_prompt)
-
             self._generation.update_progress("inference", 15, 0, total_steps)
 
             a2v_state.pipeline.generate(

@@ -199,29 +199,34 @@ class TestA2VGenerate:
         assert r.status_code == 400
         assert r.json()["error"] == "A2V is not supported via API generation"
 
-    def test_a2v_hardcodes_960x544_resolution(self, client, test_state, fake_services, create_fake_model_files, tmp_path):
+    def test_a2v_uses_resolution_map(self, client, test_state, fake_services, create_fake_model_files, tmp_path):
         create_fake_model_files()
         _enable_local_text_encoding(test_state)
         audio_file = tmp_path / "test_audio.wav"
         audio_file.write_bytes(b"\x00" * 512)
 
-        r = client.post(
-            "/api/generate",
-            json={
-                "prompt": "A music video",
-                "resolution": "720p",
-                "model": "pro",
-                "duration": "2",
-                "fps": "24",
-                "audioPath": str(audio_file),
-            },
-        )
+        for resolution, expected_w, expected_h in [
+            ("540p", 960, 544),
+            ("720p", 1280, 704),
+            ("1080p", 960, 544),
+        ]:
+            fake_services.a2v_pipeline.generate_calls.clear()
+            r = client.post(
+                "/api/generate",
+                json={
+                    "prompt": "A music video",
+                    "resolution": resolution,
+                    "model": "pro",
+                    "duration": "2",
+                    "fps": "24",
+                    "audioPath": str(audio_file),
+                },
+            )
 
-        assert r.status_code == 200
-        pipeline = fake_services.a2v_pipeline
-        call = pipeline.generate_calls[0]
-        assert call["width"] == 960
-        assert call["height"] == 544
+            assert r.status_code == 200
+            call = fake_services.a2v_pipeline.generate_calls[0]
+            assert call["width"] == expected_w, f"{resolution}: expected width {expected_w}, got {call['width']}"
+            assert call["height"] == expected_h, f"{resolution}: expected height {expected_h}, got {call['height']}"
 
 
 class TestForcedApiGenerate:

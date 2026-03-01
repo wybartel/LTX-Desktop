@@ -127,6 +127,7 @@ class LTXTextEncoder:
                 "ltx_pipelines.ti2vid_one_stage",
                 "ltx_pipelines.ti2vid_two_stages",
                 "ltx_pipelines.ic_lora",
+                "ltx_pipelines.a2vid_two_stage",
             ):
                 try:
                     module = __import__(module_name, fromlist=["encode_text"])
