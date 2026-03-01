@@ -85,6 +85,9 @@ class VideoGenerationHandler(StateHandlerBase):
         duration = int(float(req.duration))
         fps = int(float(req.fps))
 
+        if req.audioPath:
+            return self._generate_a2v(req, duration, fps)
+
         use_upsampler = resolution == "1080p"
         if not use_upsampler:
             if model_type == "fast":
@@ -103,41 +106,15 @@ class VideoGenerationHandler(StateHandlerBase):
         }
         width, height = resolution_map.get(resolution, (960, 544))
 
-        num_frames = ((duration * fps) // 8) * 8 + 1
-        if num_frames < 9:
-            num_frames = 9
+        num_frames = self._compute_num_frames(duration, fps)
 
         image = None
         if req.imagePath:
-            if not os.path.isfile(req.imagePath):
-                raise HTTPError(400, f"Image file not found: {req.imagePath}")
+            image = self._prepare_image(req.imagePath, width, height)
+            logger.info("Image: %s -> %sx%s", req.imagePath, width, height)
 
-            img = Image.open(req.imagePath).convert("RGB")
-            img_w, img_h = img.size
-            target_ratio = width / height
-            img_ratio = img_w / img_h
-
-            if img_ratio > target_ratio:
-                new_h = height
-                new_w = int(img_w * (height / img_h))
-            else:
-                new_w = width
-                new_h = int(img_h * (width / img_w))
-
-            resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            left = (new_w - width) // 2
-            top = (new_h - height) // 2
-            image = resized.crop((left, top, left + width, top + height))
-            logger.info("Image: %s %sx%s -> %sx%s", req.imagePath, img_w, img_h, width, height)
-
-        generation_id = uuid.uuid4().hex[:8]
-
-        settings = self.state.app_settings.model_copy(deep=True)
-        if settings.seed_locked:
-            seed = settings.locked_seed
-            logger.info("Using locked seed: %s", seed)
-        else:
-            seed = int(time.time()) % 2147483647
+        generation_id = self._make_generation_id()
+        seed = self._resolve_seed()
 
         try:
             self._pipelines.load_gpu_pipeline(cast(VideoPipelineModelType, model_type), should_warm=False)
@@ -201,8 +178,7 @@ class VideoGenerationHandler(StateHandlerBase):
             image.save(temp_image_path)
             images = [(temp_image_path, 0, 1.0)]
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = self._outputs_dir / f"ltx2_video_{timestamp}_{uuid.uuid4().hex[:8]}.mp4"
+        output_path = self._make_output_path()
 
         try:
             self._text.prepare_text_encoding(enhanced_prompt)
@@ -255,11 +231,135 @@ class VideoGenerationHandler(StateHandlerBase):
             if temp_image_path and os.path.exists(temp_image_path):
                 os.unlink(temp_image_path)
 
+    def _generate_a2v(
+        self, req: GenerateVideoRequest, duration: int, fps: int
+    ) -> GenerateVideoResponse:
+        audio_path = req.audioPath
+        assert audio_path is not None
+
+        if not os.path.isfile(audio_path):
+            raise HTTPError(400, f"Audio file not found: {audio_path}")
+
+        # A2V is always two-stage, hardcode base resolution
+        width, height = 960, 544
+
+        num_frames = self._compute_num_frames(duration, fps)
+
+        image = None
+        temp_image_path: str | None = None
+        if req.imagePath:
+            image = self._prepare_image(req.imagePath, width, height)
+
+        seed = self._resolve_seed()
+
+        generation_id = self._make_generation_id()
+
+        try:
+            a2v_state = self._pipelines.load_a2v_pipeline()
+            self._generation.start_generation(generation_id)
+
+            enhanced_prompt = req.prompt + self._camera_motion_prompts.get(req.cameraMotion, "")
+            neg = req.negativePrompt if req.negativePrompt else self._default_negative_prompt
+
+            images: list[tuple[str, int, float]] = []
+            if image is not None:
+                temp_image_path = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
+                image.save(temp_image_path)
+                images = [(temp_image_path, 0, 1.0)]
+
+            output_path = self._make_output_path()
+
+            pro_steps = self.state.app_settings.pro_model.steps
+            total_steps = pro_steps
+
+            self._generation.update_progress("loading_model", 5, 0, total_steps)
+            self._generation.update_progress("encoding_text", 10, 0, total_steps)
+            self._text.prepare_text_encoding(enhanced_prompt)
+
+            self._generation.update_progress("inference", 15, 0, total_steps)
+
+            a2v_state.pipeline.generate(
+                prompt=enhanced_prompt,
+                negative_prompt=neg,
+                seed=seed,
+                height=height,
+                width=width,
+                num_frames=num_frames,
+                frame_rate=fps,
+                num_inference_steps=pro_steps,
+                images=images,
+                audio_path=audio_path,
+                audio_start_time=0.0,
+                audio_max_duration=None,
+                output_path=str(output_path),
+            )
+
+            if self._generation.is_generation_cancelled():
+                if output_path.exists():
+                    output_path.unlink()
+                raise RuntimeError("Generation was cancelled")
+
+            self._generation.update_progress("complete", 100, total_steps, total_steps)
+            self._generation.complete_generation(str(output_path))
+            return GenerateVideoResponse(status="complete", video_path=str(output_path))
+
+        except Exception as e:
+            self._generation.fail_generation(str(e))
+            if "cancelled" in str(e).lower():
+                logger.info("Generation cancelled by user")
+                return GenerateVideoResponse(status="cancelled")
+            raise HTTPError(500, str(e)) from e
+        finally:
+            self._text.clear_api_embeddings()
+            if temp_image_path and os.path.exists(temp_image_path):
+                os.unlink(temp_image_path)
+
+    def _prepare_image(self, image_path: str, width: int, height: int) -> Image.Image:
+        if not os.path.isfile(image_path):
+            raise HTTPError(400, f"Image file not found: {image_path}")
+        img = Image.open(image_path).convert("RGB")
+        img_w, img_h = img.size
+        target_ratio = width / height
+        img_ratio = img_w / img_h
+        if img_ratio > target_ratio:
+            new_h = height
+            new_w = int(img_w * (height / img_h))
+        else:
+            new_w = width
+            new_h = int(img_h * (width / img_w))
+        resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        left = (new_w - width) // 2
+        top = (new_h - height) // 2
+        return resized.crop((left, top, left + width, top + height))
+
+    @staticmethod
+    def _make_generation_id() -> str:
+        return uuid.uuid4().hex[:8]
+
+    @staticmethod
+    def _compute_num_frames(duration: int, fps: int) -> int:
+        n = ((duration * fps) // 8) * 8 + 1
+        return max(n, 9)
+
+    def _resolve_seed(self) -> int:
+        settings = self.state.app_settings
+        if settings.seed_locked:
+            logger.info("Using locked seed: %s", settings.locked_seed)
+            return settings.locked_seed
+        return int(time.time()) % 2147483647
+
+    def _make_output_path(self) -> Path:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return self._outputs_dir / f"ltx2_video_{timestamp}_{self._make_generation_id()}.mp4"
+
     def _generate_forced_api(self, req: GenerateVideoRequest) -> GenerateVideoResponse:
+        if req.audioPath:
+            raise HTTPError(400, "A2V is not supported via API generation")
+
         if self._generation.is_generation_running():
             raise HTTPError(409, "Generation already in progress")
 
-        generation_id = uuid.uuid4().hex[:8]
+        generation_id = self._make_generation_id()
         self._generation.start_api_generation(generation_id)
 
         has_input_image = bool(req.imagePath)
@@ -353,8 +453,7 @@ class VideoGenerationHandler(StateHandlerBase):
             raise HTTPError(500, str(e)) from e
 
     def _write_forced_api_video(self, video_bytes: bytes) -> Path:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = self._outputs_dir / f"ltx2_video_{timestamp}_{uuid.uuid4().hex[:8]}.mp4"
+        output_path = self._make_output_path()
         output_path.write_bytes(video_bytes)
         return output_path
 
