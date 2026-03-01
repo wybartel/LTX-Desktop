@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import io
 import logging
+import pickle
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
@@ -176,7 +176,7 @@ class LTXTextEncoder:
                 logger.warning("LTX API error %s: %s", response.status_code, response.text)
                 return None
 
-            conditioning = torch.load(io.BytesIO(response.content), weights_only=True)
+            conditioning = pickle.loads(response.content)  # noqa: S301
             if not conditioning or len(conditioning) == 0:
                 logger.warning("LTX API returned unexpected conditioning format")
                 return None
