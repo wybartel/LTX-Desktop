@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -172,6 +173,37 @@ class DownloadHandler(StateHandlerBase):
                 json.dump(index_data, f, indent=2)
             index_file.unlink()
 
+    def _move_to_final(self, file_type: ModelFileType) -> None:
+        """Move downloaded file/folder from downloading dir to final location."""
+        spec = self._config.spec_for(file_type)
+
+        if spec.is_folder and spec.snapshot_allow_patterns:
+            for pattern in spec.snapshot_allow_patterns:
+                dirname = pattern.split("/")[0]
+                src = self._config.downloading_dir / dirname
+                dst = self._config.models_dir / dirname
+                if dst.exists():
+                    shutil.rmtree(dst)
+                src.rename(dst)
+        elif spec.is_folder:
+            src = self._config.downloading_dir / spec.relative_path
+            dst = self._config.model_path(file_type)
+            if dst.exists():
+                shutil.rmtree(dst)
+            src.rename(dst)
+        else:
+            src = self._config.downloading_dir / spec.relative_path
+            dst = self._config.model_path(file_type)
+            if dst.exists():
+                dst.unlink()
+            src.rename(dst)
+
+    def cleanup_downloading_dir(self) -> None:
+        """Remove stale .downloading/ dir (leftover from crashed downloads)."""
+        downloading = self._config.downloading_dir
+        if downloading.exists():
+            shutil.rmtree(downloading)
+
     def _download_models_worker(self, skip_text_encoder: bool) -> None:
         files_to_download: dict[ModelFileType, tuple[str, int]] = {}
 
@@ -206,23 +238,31 @@ class DownloadHandler(StateHandlerBase):
             logger.info("Downloading %s from %s", target_name, spec.repo_id)
             progress_cb = self._make_progress_callback(file_type)
 
-            if spec.is_folder:
-                allow_patterns = list(spec.snapshot_allow_patterns) if spec.snapshot_allow_patterns is not None else None
-                self._model_downloader.download_snapshot(
-                    repo_id=spec.repo_id,
-                    local_dir=str(self._config.download_local_dir(file_type)),
-                    allow_patterns=allow_patterns,
-                    on_progress=progress_cb,
-                )
-                if file_type == "text_encoder":
-                    self._rename_text_encoder_files(self._config.model_path("text_encoder"))
-            else:
-                self._model_downloader.download_file(
-                    repo_id=spec.repo_id,
-                    filename=spec.name,
-                    local_dir=str(self._config.download_local_dir(file_type)),
-                    on_progress=progress_cb,
-                )
+            try:
+                self._config.downloading_dir.mkdir(parents=True, exist_ok=True)
+
+                if spec.is_folder:
+                    allow_patterns = list(spec.snapshot_allow_patterns) if spec.snapshot_allow_patterns is not None else None
+                    self._model_downloader.download_snapshot(
+                        repo_id=spec.repo_id,
+                        local_dir=str(self._config.downloading_path(file_type)),
+                        allow_patterns=allow_patterns,
+                        on_progress=progress_cb,
+                    )
+                    if file_type == "text_encoder":
+                        self._rename_text_encoder_files(self._config.downloading_dir / "text_encoder")
+                else:
+                    self._model_downloader.download_file(
+                        repo_id=spec.repo_id,
+                        filename=spec.name,
+                        local_dir=str(self._config.downloading_path(file_type)),
+                        on_progress=progress_cb,
+                    )
+
+                self._move_to_final(file_type)
+            except Exception:
+                self.cleanup_downloading_dir()
+                raise
 
             self.update_file_progress(file_type, expected_size, expected_size, 0)
             self.complete_file(file_type)
@@ -251,13 +291,19 @@ class DownloadHandler(StateHandlerBase):
             text_spec = self._config.spec_for("text_encoder")
             self.start_download({"text_encoder": (text_spec.name, text_spec.expected_size_bytes)})
             progress_cb = self._make_progress_callback("text_encoder")
-            self._model_downloader.download_snapshot(
-                repo_id=text_spec.repo_id,
-                local_dir=str(self._config.download_local_dir("text_encoder")),
-                allow_patterns=list(text_spec.snapshot_allow_patterns) if text_spec.snapshot_allow_patterns is not None else None,
-                on_progress=progress_cb,
-            )
-            self._rename_text_encoder_files(self._config.model_path("text_encoder"))
+            try:
+                self._config.downloading_dir.mkdir(parents=True, exist_ok=True)
+                self._model_downloader.download_snapshot(
+                    repo_id=text_spec.repo_id,
+                    local_dir=str(self._config.downloading_path("text_encoder")),
+                    allow_patterns=list(text_spec.snapshot_allow_patterns) if text_spec.snapshot_allow_patterns is not None else None,
+                    on_progress=progress_cb,
+                )
+                self._rename_text_encoder_files(self._config.downloading_dir / "text_encoder")
+                self._move_to_final("text_encoder")
+            except Exception:
+                self.cleanup_downloading_dir()
+                raise
             self.update_file_progress(
                 "text_encoder",
                 text_spec.expected_size_bytes,

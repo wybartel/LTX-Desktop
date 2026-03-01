@@ -33,10 +33,15 @@ class RuntimeConfig:
     def model_path(self, model_type: ModelFileType) -> Path:
         return self.models_dir / self.spec_for(model_type).relative_path
 
-    def download_local_dir(self, model_type: ModelFileType) -> Path:
+    @property
+    def downloading_dir(self) -> Path:
+        return self.models_dir / ".downloading"
+
+    def downloading_path(self, model_type: ModelFileType) -> Path:
+        """Return the staging path under downloading_dir for a model type."""
         spec = self.spec_for(model_type)
         if not spec.is_folder:
-            return self.model_path(model_type).parent
+            return self.downloading_dir
         if spec.snapshot_allow_patterns is None:
-            return self.model_path(model_type)
-        return self.models_dir
+            return self.downloading_dir / spec.relative_path
+        return self.downloading_dir

@@ -18,7 +18,6 @@ from services.interfaces import (
     ImageGenerationPipeline,
     GpuCleaner,
     IcLoraPipeline,
-    ModelDownloader,
     ProNativeVideoPipeline,
     ProVideoPipeline,
     VideoPipelineModelType,
@@ -48,7 +47,6 @@ class PipelinesHandler(StateHandlerBase):
         lock: RLock,
         text_handler: TextHandler,
         gpu_cleaner: GpuCleaner,
-        model_downloader: ModelDownloader,
         fast_video_pipeline_class: type[FastVideoPipeline],
         fast_native_video_pipeline_class: type[FastNativeVideoPipeline],
         pro_video_pipeline_class: type[ProVideoPipeline],
@@ -63,7 +61,6 @@ class PipelinesHandler(StateHandlerBase):
         super().__init__(state, lock)
         self._text_handler = text_handler
         self._gpu_cleaner = gpu_cleaner
-        self._model_downloader = model_downloader
         self._fast_video_pipeline_class = fast_video_pipeline_class
         self._fast_native_video_pipeline_class = fast_native_video_pipeline_class
         self._pro_video_pipeline_class = pro_video_pipeline_class
@@ -223,13 +220,8 @@ class PipelinesHandler(StateHandlerBase):
 
         if flux_service is None:
             flux_path = self._config.model_path("flux")
-            flux_spec = self._config.spec_for("flux")
             if not (flux_path.exists() and any(flux_path.iterdir())):
-                self._model_downloader.download_snapshot(
-                    repo_id=flux_spec.repo_id,
-                    local_dir=str(self._config.download_local_dir("flux")),
-                    allow_patterns=list(flux_spec.snapshot_allow_patterns) if flux_spec.snapshot_allow_patterns is not None else None,
-                )
+                raise RuntimeError("Flux model not downloaded. Please download the AI models first using the Model Status menu.")
             flux_service = self._image_generation_pipeline_class.create(str(flux_path), self._runtime_device)
         else:
             flux_service.to(self._runtime_device)
@@ -251,13 +243,8 @@ class PipelinesHandler(StateHandlerBase):
                     pass
 
         flux_path = self._config.model_path("flux")
-        flux_spec = self._config.spec_for("flux")
         if not (flux_path.exists() and any(flux_path.iterdir())):
-            self._model_downloader.download_snapshot(
-                repo_id=flux_spec.repo_id,
-                local_dir=str(self._config.download_local_dir("flux")),
-                allow_patterns=list(flux_spec.snapshot_allow_patterns) if flux_spec.snapshot_allow_patterns is not None else None,
-            )
+            raise RuntimeError("Flux model not downloaded. Please download the AI models first using the Model Status menu.")
 
         flux_service = self._image_generation_pipeline_class.create(str(flux_path), None)
         with self._lock:

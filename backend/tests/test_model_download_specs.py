@@ -44,12 +44,12 @@ def test_model_path_resolves_from_relative_path(tmp_path):
     assert config.model_path("text_encoder") == config.models_dir / spec.relative_path
 
 
-def test_download_local_dir_is_derived_from_specs(tmp_path):
+def test_downloading_path_is_derived_from_specs(tmp_path):
     config = _build_config(tmp_path)
 
-    assert config.download_local_dir("checkpoint") == config.models_dir
-    assert config.download_local_dir("flux") == config.model_path("flux")
-    assert config.download_local_dir("text_encoder") == config.models_dir
+    assert config.downloading_path("checkpoint") == config.downloading_dir
+    assert config.downloading_path("flux") == config.downloading_dir / "FLUX.2-klein-4B"
+    assert config.downloading_path("text_encoder") == config.downloading_dir
 
 
 def test_required_model_types_remain_dynamic_for_text_encoder():

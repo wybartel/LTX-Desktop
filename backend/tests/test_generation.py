@@ -132,6 +132,98 @@ class TestGenerate:
         assert r.json()["status"] == "cancelled"
 
 
+class TestA2VGenerate:
+    def test_a2v_generation_happy_path(self, client, test_state, fake_services, create_fake_model_files, tmp_path):
+        create_fake_model_files()
+        _enable_local_text_encoding(test_state)
+        audio_file = tmp_path / "test_audio.wav"
+        audio_file.write_bytes(b"\x00" * 512)
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video",
+                "resolution": "540p",
+                "model": "fast",
+                "duration": "2",
+                "fps": "24",
+                "audioPath": str(audio_file),
+            },
+        )
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data["status"] == "complete"
+        assert data["video_path"] is not None
+        assert Path(data["video_path"]).exists()
+
+        pipeline = fake_services.a2v_pipeline
+        assert len(pipeline.generate_calls) == 1
+        call = pipeline.generate_calls[0]
+        assert call["audio_path"] == str(audio_file)
+        assert call["audio_start_time"] == 0.0
+        assert call["audio_max_duration"] is None
+
+    def test_a2v_rejects_missing_audio_file(self, client, test_state, create_fake_model_files):
+        create_fake_model_files()
+        _enable_local_text_encoding(test_state)
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video",
+                "duration": "2",
+                "fps": "24",
+                "audioPath": "/no/such/audio.wav",
+            },
+        )
+        assert r.status_code == 400
+
+    def test_a2v_forced_api_rejected(self, client, test_state, tmp_path):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+        audio_file = tmp_path / "test_audio.wav"
+        audio_file.write_bytes(b"\x00" * 512)
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "50",
+                "audioPath": str(audio_file),
+            },
+        )
+        assert r.status_code == 400
+        assert r.json()["error"] == "A2V is not supported via API generation"
+
+    def test_a2v_hardcodes_960x544_resolution(self, client, test_state, fake_services, create_fake_model_files, tmp_path):
+        create_fake_model_files()
+        _enable_local_text_encoding(test_state)
+        audio_file = tmp_path / "test_audio.wav"
+        audio_file.write_bytes(b"\x00" * 512)
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video",
+                "resolution": "720p",
+                "model": "pro",
+                "duration": "2",
+                "fps": "24",
+                "audioPath": str(audio_file),
+            },
+        )
+
+        assert r.status_code == 200
+        pipeline = fake_services.a2v_pipeline
+        call = pipeline.generate_calls[0]
+        assert call["width"] == 960
+        assert call["height"] == 544
+
+
 class TestForcedApiGenerate:
     def test_t2v_routes_to_ltx_api(self, client, test_state, fake_services):
         test_state.config.force_api_generations = True
@@ -450,7 +542,8 @@ class TestGenerationProgress:
 
 
 class TestGenerateImage:
-    def test_happy_path(self, client):
+    def test_happy_path(self, client, create_fake_model_files):
+        create_fake_model_files(include_flux=True)
         r = client.post(
             "/api/generate-image",
             json={"prompt": "A cat", "width": 1024, "height": 1024, "numSteps": 4},
@@ -462,7 +555,8 @@ class TestGenerateImage:
         assert len(data["image_paths"]) == 1
         assert Path(data["image_paths"][0]).exists()
 
-    def test_dimension_clamping(self, client, fake_services):
+    def test_dimension_clamping(self, client, fake_services, create_fake_model_files):
+        create_fake_model_files(include_flux=True)
         r = client.post(
             "/api/generate-image",
             json={"prompt": "test", "width": 1023, "height": 1023},
@@ -473,7 +567,8 @@ class TestGenerateImage:
         assert call["width"] == 1008
         assert call["height"] == 1008
 
-    def test_num_images_clamped(self, client, fake_services):
+    def test_num_images_clamped(self, client, fake_services, create_fake_model_files):
+        create_fake_model_files(include_flux=True)
         r = client.post(
             "/api/generate-image",
             json={"prompt": "test", "numImages": 20},
@@ -482,13 +577,15 @@ class TestGenerateImage:
 
         assert len(fake_services.image_generation_pipeline.generate_calls) == 12
 
-    def test_error(self, client, fake_services):
+    def test_error(self, client, fake_services, create_fake_model_files):
+        create_fake_model_files(include_flux=True)
         fake_services.image_generation_pipeline.raise_on_generate = RuntimeError("GPU OOM")
 
         r = client.post("/api/generate-image", json={"prompt": "test"})
         assert r.status_code == 500
 
-    def test_cancelled(self, client, fake_services):
+    def test_cancelled(self, client, fake_services, create_fake_model_files):
+        create_fake_model_files(include_flux=True)
         fake_services.image_generation_pipeline.raise_on_generate = RuntimeError("cancelled")
 
         r = client.post("/api/generate-image", json={"prompt": "test"})

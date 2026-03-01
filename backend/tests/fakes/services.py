@@ -299,6 +299,9 @@ class FakeModelDownloader:
             text_encoder = root / "text_encoder"
             text_encoder.mkdir(parents=True, exist_ok=True)
             (text_encoder / "diffusion_pytorch_model.safetensors").write_bytes(b"\x00" * 1024)
+            tokenizer = root / "tokenizer"
+            tokenizer.mkdir(parents=True, exist_ok=True)
+            (tokenizer / "tokenizer.model").write_bytes(b"\x00" * 1024)
         else:
             (root / "model.safetensors").write_bytes(b"\x00" * 1024)
 

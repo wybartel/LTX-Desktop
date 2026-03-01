@@ -186,6 +186,73 @@ class TestDownloadProgressCallbacks:
         assert r.downloadedBytes == 5_000
 
 
+class TestAtomicDownloads:
+    """Verify downloads use .downloading/ staging dir and atomic moves."""
+
+    def test_partial_file_in_downloading_dir_not_detected(self, test_state):
+        """Files in .downloading/ must NOT be reported as downloaded."""
+        downloading = test_state.config.downloading_dir
+        downloading.mkdir(parents=True, exist_ok=True)
+        (downloading / "ltx-2-19b-distilled-fp8.safetensors").write_bytes(b"\x00" * 1024)
+
+        test_state.models.refresh_available_files()
+        assert test_state.state.available_files["checkpoint"] is None
+
+    def test_cleanup_downloading_dir_on_startup(self, test_state):
+        """cleanup_downloading_dir() removes stale .downloading/ dir."""
+        downloading = test_state.config.downloading_dir
+        downloading.mkdir(parents=True, exist_ok=True)
+        (downloading / "partial-file.safetensors").write_bytes(b"\x00" * 1024)
+
+        test_state.downloads.cleanup_downloading_dir()
+        assert not downloading.exists()
+
+    def test_cleanup_downloading_dir_noop_when_absent(self, test_state):
+        """cleanup_downloading_dir() is safe when dir doesn't exist."""
+        test_state.downloads.cleanup_downloading_dir()
+        assert not test_state.config.downloading_dir.exists()
+
+    def test_download_moves_files_to_final_location(self, client, test_state):
+        """After download, files exist at final location, not in .downloading/."""
+        r = client.post("/api/models/download", json={})
+        assert r.status_code == 200
+
+        # Files should be at their final locations
+        assert test_state.config.model_path("checkpoint").exists()
+        assert test_state.config.model_path("upsampler").exists()
+        assert test_state.config.model_path("distilled_lora").exists()
+
+        # .downloading/ should be gone (or empty)
+        downloading = test_state.config.downloading_dir
+        assert not downloading.exists() or not any(downloading.iterdir())
+
+    def test_text_encoder_download_moves_to_final(self, client, test_state):
+        """Text encoder download uses .downloading/ and moves to final."""
+        r = client.post("/api/text-encoder/download")
+        assert r.status_code == 200
+
+        te_path = test_state.config.model_path("text_encoder")
+        assert te_path.exists()
+
+        tokenizer_path = test_state.config.models_dir / "tokenizer"
+        assert tokenizer_path.exists()
+
+        downloading = test_state.config.downloading_dir
+        assert not downloading.exists() or not any(downloading.iterdir())
+
+    def test_failed_download_cleans_up_downloading_dir(self, test_state):
+        """On download failure, .downloading/ is cleaned up."""
+        test_state.model_downloader.fail_next = RuntimeError("network error")
+
+        test_state.downloads.start_model_download()
+
+        # The error handler should have been called
+        assert len(test_state.task_runner.errors) == 1
+
+        downloading = test_state.config.downloading_dir
+        assert not downloading.exists()
+
+
 class TestHuggingFaceInternals:
     """Guard tests for huggingface_hub internals we rely on.
 

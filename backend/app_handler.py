@@ -144,7 +144,6 @@ class AppHandler:
             lock=self._lock,
             text_handler=self.text,
             gpu_cleaner=gpu_cleaner,
-            model_downloader=model_downloader,
             fast_video_pipeline_class=fast_video_pipeline_class,
             fast_native_video_pipeline_class=fast_native_video_pipeline_class,
             pro_video_pipeline_class=pro_video_pipeline_class,
@@ -217,6 +216,7 @@ class AppHandler:
             outputs_dir=config.outputs_dir,
         )
 
+        self.downloads.cleanup_downloading_dir()
         self.models.refresh_available_files()
 
 
