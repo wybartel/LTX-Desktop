@@ -22,7 +22,7 @@ interface GenerationProgress {
 }
 
 interface UseGenerationReturn extends GenerationState {
-  generate: (prompt: string, imagePath: string | null, settings: GenerationSettings) => Promise<void>
+  generate: (prompt: string, imagePath: string | null, settings: GenerationSettings, audioPath?: string | null) => Promise<void>
   generateImage: (prompt: string, settings: GenerationSettings) => Promise<void>
   editImage: (prompt: string, imagePaths: string[], settings: GenerationSettings) => Promise<void>
   cancel: () => void
@@ -102,7 +102,8 @@ export function useGeneration(): UseGenerationReturn {
   const generate = useCallback(async (
     prompt: string,
     imagePath: string | null,
-    settings: GenerationSettings
+    settings: GenerationSettings,
+    audioPath?: string | null,
   ) => {
     // Reset state - show different message if using Pro model (may need to load)
     setState({
@@ -125,7 +126,7 @@ export function useGeneration(): UseGenerationReturn {
       const backendUrl = await window.electronAPI.getBackendUrl()
 
       // Step 1: Enhance prompt (if enabled — backend checks per-mode setting)
-      const enhanceMode = imagePath ? 'i2v' : 't2v'
+      const enhanceMode = audioPath ? 'a2v' : imagePath ? 'i2v' : 't2v'
       let finalPrompt = prompt
       try {
         const enhanceResponse = await fetch(`${backendUrl}/api/enhance-prompt`, {
@@ -175,6 +176,9 @@ export function useGeneration(): UseGenerationReturn {
       }
       if (imagePath) {
         body.imagePath = imagePath
+      }
+      if (audioPath) {
+        body.audioPath = audioPath
       }
 
       // Poll for real progress from backend with time-based interpolation

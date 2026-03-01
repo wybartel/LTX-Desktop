@@ -78,7 +78,7 @@ export function VideoEditor() {
     addTakeToAsset, deleteTakeFromAsset, setAssetActiveTake,
     addTimeline, deleteTimeline, renameTimeline, duplicateTimeline,
     setActiveTimeline, updateTimeline, getActiveTimeline,
-    setCurrentTab, setGenSpaceEditImageUrl, setGenSpaceEditMode,
+    setCurrentTab, setGenSpaceEditImageUrl, setGenSpaceEditMode, setGenSpaceAudioUrl,
   } = useProjects()
 
   const { activeLayout: kbLayout, isEditorOpen: isKbEditorOpen, setEditorOpen: setKbEditorOpen } = useKeyboardShortcuts()
@@ -1509,6 +1509,14 @@ export function VideoEditor() {
     setGenSpaceEditImageUrl(dataUrl)
     setCurrentTab('gen-space')
   }, [extractCurrentFrame, setGenSpaceEditImageUrl, setGenSpaceEditMode, setCurrentTab])
+
+  // Navigate to Gen Space with audio pre-populated for A2V
+  const handleCreateVideoFromAudio = useCallback((clip: TimelineClip) => {
+    const asset = clip.assetId ? assets.find(a => a.id === clip.assetId) : null
+    if (!asset?.url) return
+    setGenSpaceAudioUrl(asset.url)
+    setCurrentTab('gen-space')
+  }, [assets, setGenSpaceAudioUrl, setCurrentTab])
 
   // Populate fullscreen ref for keyboard handler
   toggleFullscreenRef.current = toggleFullscreen
@@ -4046,6 +4054,7 @@ export function VideoEditor() {
             setShowICLoraPanel={_setShowICLoraPanel}
             onCaptureFrameForEdit={handleCaptureFrameForEdit}
             onCaptureFrameForVideo={handleCaptureFrameForVideo}
+            onCreateVideoFromAudio={handleCreateVideoFromAudio}
           />
         )
       })()}

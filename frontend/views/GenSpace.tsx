@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Plus, Trash2, Download, Image, Video, X,
   Heart, Film, Volume2, VolumeX, Sparkles,
-  Clock, Monitor, ChevronUp, Scissors, AudioLines,
+  Clock, Monitor, ChevronUp, Scissors, AudioLines, Music,
   Paintbrush, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useProjects } from '../contexts/ProjectContext'
@@ -303,6 +303,8 @@ function PromptBar({
   isGenerating,
   inputImage,
   onInputImageChange,
+  inputAudio,
+  onInputAudioChange,
   settings,
   onSettingsChange,
   forceApiGenerations,
@@ -315,6 +317,8 @@ function PromptBar({
   isGenerating: boolean
   inputImage: string | null
   onInputImageChange: (url: string | null) => void
+  inputAudio: string | null
+  onInputAudioChange: (url: string | null) => void
   settings: {
     model: string
     duration: number
@@ -329,7 +333,9 @@ function PromptBar({
   forceApiGenerations: boolean
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [isAudioDragOver, setIsAudioDragOver] = useState(false)
   const videoDurationOptions = forceApiGenerations ? [...FORCED_API_VIDEO_DURATIONS] : [5, 6, 8, 10, 20]
   const videoResolutionOptions = forceApiGenerations ? [...FORCED_API_VIDEO_RESOLUTIONS] : ['540p', '720p', '1080p']
   const videoFpsOptions = forceApiGenerations ? [...FORCED_API_VIDEO_FPS] : [24, 25, 50]
@@ -337,12 +343,51 @@ function PromptBar({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(false)
-    
+
     const assetData = e.dataTransfer.getData('asset')
     if (assetData) {
       const asset = JSON.parse(assetData) as Asset
       if (asset.type === 'image') {
         onInputImageChange(asset.url)
+      }
+    }
+  }
+
+  const handleAudioDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsAudioDragOver(false)
+
+    const assetData = e.dataTransfer.getData('asset')
+    if (assetData) {
+      const asset = JSON.parse(assetData) as Asset
+      if (asset.type === 'audio') {
+        onInputAudioChange(asset.url)
+      }
+    }
+
+    // Handle file drops
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      const ext = file.name.split('.').pop()?.toLowerCase()
+      if (['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'].includes(ext || '')) {
+        const filePath = (file as any).path as string | undefined
+        if (filePath) {
+          const normalized = filePath.replace(/\\/g, '/')
+          const fileUrl = normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`
+          onInputAudioChange(fileUrl)
+        }
+      }
+    }
+  }
+
+  const handleAudioFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const filePath = (file as any).path as string | undefined
+      if (filePath) {
+        const normalized = filePath.replace(/\\/g, '/')
+        const fileUrl = normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`
+        onInputAudioChange(fileUrl)
       }
     }
   }
@@ -395,7 +440,7 @@ function PromptBar({
               </button>
             </>
           ) : (
-            <Plus className="h-4 w-4 text-zinc-500" />
+            <Image className="h-4 w-4 text-zinc-500" />
           )}
           <input
             ref={inputRef}
@@ -405,6 +450,41 @@ function PromptBar({
             className="hidden"
           />
         </div>
+
+        {/* Audio drop zone — only in video mode */}
+        {mode === 'video' && (
+          <div
+            className={`relative w-10 h-10 mt-2 rounded-lg border-2 border-dashed transition-colors flex items-center justify-center flex-shrink-0 cursor-pointer ${
+              isAudioDragOver ? 'border-emerald-500 bg-emerald-500/10' : inputAudio ? 'border-emerald-600' : 'border-zinc-700 hover:border-zinc-500'
+            }`}
+            onDragOver={(e) => { e.preventDefault(); setIsAudioDragOver(true) }}
+            onDragLeave={() => setIsAudioDragOver(false)}
+            onDrop={handleAudioDrop}
+            onClick={() => audioInputRef.current?.click()}
+            title={inputAudio ? 'Audio attached — click to change' : 'Attach audio for A2V'}
+          >
+            {inputAudio ? (
+              <>
+                <Music className="h-4 w-4 text-emerald-400" />
+                <button
+                  onClick={(e) => { e.stopPropagation(); onInputAudioChange(null) }}
+                  className="absolute -top-1 -right-1 p-0.5 rounded-full bg-zinc-800 text-zinc-400 hover:text-white z-10"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </>
+            ) : (
+              <Music className="h-4 w-4 text-zinc-500" />
+            )}
+            <input
+              ref={audioInputRef}
+              type="file"
+              accept=".mp3,.wav,.ogg,.aac,.flac,.m4a"
+              onChange={handleAudioFileSelect}
+              className="hidden"
+            />
+          </div>
+        )}
 
         {/* Prompt input - fills remaining width */}
         <div className="flex-1 min-w-0 py-1">
@@ -432,7 +512,6 @@ function PromptBar({
           options={[
             { value: 'image', label: 'Generate Images', icon: <Image className="h-4 w-4" /> },
             { value: 'video', label: 'Generate Videos', icon: <Video className="h-4 w-4" /> },
-            { value: 'audio-to-video', label: 'Audio to Video', icon: <AudioLines className="h-4 w-4" />, disabled: true, tooltip: 'Coming soon' },
             { value: 'retake', label: 'Retake', icon: <Scissors className="h-4 w-4" />, disabled: true, tooltip: 'Coming soon' },
           ]}
           trigger={
@@ -671,11 +750,12 @@ const DEFAULT_VIDEO_SETTINGS = {
 }
 
 export function GenSpace() {
-  const { currentProject, currentProjectId, addAsset, deleteAsset, toggleFavorite, genSpaceEditImageUrl, setGenSpaceEditImageUrl, genSpaceEditMode, setGenSpaceEditMode } = useProjects()
+  const { currentProject, currentProjectId, addAsset, deleteAsset, toggleFavorite, genSpaceEditImageUrl, setGenSpaceEditImageUrl, genSpaceEditMode, setGenSpaceEditMode, genSpaceAudioUrl, setGenSpaceAudioUrl } = useProjects()
   const { forceApiGenerations } = useAppSettings()
   const [mode, setMode] = useState<'image' | 'video'>('video')
   const [prompt, setPrompt] = useState('')
   const [inputImage, setInputImage] = useState<string | null>(null)
+  const [inputAudio, setInputAudio] = useState<string | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [showFavorites, setShowFavorites] = useState(false)
@@ -718,6 +798,16 @@ export function GenSpace() {
     }
   }, [genSpaceEditImageUrl, setGenSpaceEditImageUrl, genSpaceEditMode, setGenSpaceEditMode])
 
+  // Handle incoming audio from the Video Editor for A2V
+  useEffect(() => {
+    if (genSpaceAudioUrl) {
+      setMode('video')
+      setInputAudio(genSpaceAudioUrl)
+      setPrompt('')
+      setGenSpaceAudioUrl(null)
+    }
+  }, [genSpaceAudioUrl, setGenSpaceAudioUrl])
+
   useEffect(() => {
     if (!forceApiGenerations) return
     setSettings((prev) => applyForcedVideoSettings({ ...prev, model: 'fast' }))
@@ -737,7 +827,9 @@ export function GenSpace() {
     if (persistedVideoKeyRef.current === generationKey) return
     persistedVideoKeyRef.current = generationKey
 
-    const genMode = inputImage ? 'image-to-video' : 'text-to-video'
+    const genMode = inputAudio
+      ? 'audio-to-video'
+      : inputImage ? 'image-to-video' : 'text-to-video'
     const savedVideoSettings = applyForcedVideoSettings(settings)
 
     ;(async () => {
@@ -751,7 +843,7 @@ export function GenSpace() {
           resolution: savedVideoSettings.videoResolution,
           duration: savedVideoSettings.duration,
           generationParams: {
-            mode: genMode as 'text-to-video' | 'image-to-video',
+            mode: genMode as 'text-to-video' | 'image-to-video' | 'audio-to-video',
             prompt: lastPrompt,
             model: savedVideoSettings.model,
             duration: savedVideoSettings.duration,
@@ -762,6 +854,7 @@ export function GenSpace() {
             imageAspectRatio: savedVideoSettings.aspectRatio,
             imageSteps: 4,
             inputImageUrl: inputImage || undefined,
+            inputAudioUrl: inputAudio || undefined,
           },
           takes: [{
             url: finalUrl,
@@ -776,7 +869,7 @@ export function GenSpace() {
         logger.error(`Failed to persist generated video asset: ${err}`)
       }
     })()
-  }, [videoUrl, videoPath, currentProjectId, isGenerating, applyForcedVideoSettings, settings, inputImage, assetSavePath, lastPrompt, addAsset, reset])
+  }, [videoUrl, videoPath, currentProjectId, isGenerating, applyForcedVideoSettings, settings, inputImage, inputAudio, assetSavePath, lastPrompt, addAsset, reset])
   
   // When image generation/editing completes, add all images to project assets
   useEffect(() => {
@@ -866,9 +959,10 @@ export function GenSpace() {
         )
       }
     } else {
-      // Generate video (t2v if no image, i2v if image is provided)
+      // Generate video (t2v if no image/audio, i2v if image, a2v if audio)
       // Extract filesystem path from the file:// URL for the backend
       const imagePath = inputImage ? fileUrlToPath(inputImage) : null
+      const audioPath = inputAudio ? fileUrlToPath(inputAudio) : null
       const videoSettings = applyForcedVideoSettings(settings)
 
       generate(
@@ -884,7 +978,8 @@ export function GenSpace() {
           imageResolution: videoSettings.imageResolution,
           imageAspectRatio: videoSettings.aspectRatio,
           imageSteps: 4,
-        }
+        },
+        audioPath,
       )
     }
   }
@@ -1100,6 +1195,8 @@ export function GenSpace() {
           isGenerating={isGenerating}
           inputImage={inputImage}
           onInputImageChange={setInputImage}
+          inputAudio={inputAudio}
+          onInputAudioChange={setInputAudio}
           settings={settings}
           onSettingsChange={(nextSettings) => setSettings(applyForcedVideoSettings(nextSettings))}
           forceApiGenerations={forceApiGenerations}

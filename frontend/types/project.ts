@@ -2,7 +2,7 @@
 
 // Parameters needed to regenerate a shot
 export interface GenerationParams {
-  mode: 'text-to-video' | 'image-to-video' | 'text-to-image'
+  mode: 'text-to-video' | 'image-to-video' | 'audio-to-video' | 'text-to-image'
   prompt: string
   model: string
   duration: number
@@ -13,6 +13,7 @@ export interface GenerationParams {
   imageAspectRatio?: string
   imageSteps?: number
   inputImageUrl?: string // For I2V: the input image used
+  inputAudioUrl?: string // For A2V: the input audio used
 }
 
 // A single "take" (version) of a generated asset

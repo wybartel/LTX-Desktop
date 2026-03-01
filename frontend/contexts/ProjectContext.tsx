@@ -48,6 +48,8 @@ interface ProjectContextType {
   setGenSpaceEditImageUrl: (url: string | null) => void
   genSpaceEditMode: 'image' | 'video' | null
   setGenSpaceEditMode: (mode: 'image' | 'video' | null) => void
+  genSpaceAudioUrl: string | null
+  setGenSpaceAudioUrl: (url: string | null) => void
 }
 
 const ProjectContext = createContext<ProjectContextType | null>(null)
@@ -135,6 +137,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [currentTab, setCurrentTab] = useState<ProjectTab>('gen-space')
   const [genSpaceEditImageUrl, setGenSpaceEditImageUrl] = useState<string | null>(null)
   const [genSpaceEditMode, setGenSpaceEditMode] = useState<'image' | 'video' | null>(null)
+  const [genSpaceAudioUrl, setGenSpaceAudioUrl] = useState<string | null>(null)
   // Initialize with data from localStorage
   const [projects, setProjects] = useState<Project[]>(() => loadProjectsFromStorage())
   const isInitializedRef = useRef(false)
@@ -493,6 +496,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       setGenSpaceEditImageUrl,
       genSpaceEditMode,
       setGenSpaceEditMode,
+      genSpaceAudioUrl,
+      setGenSpaceAudioUrl,
     }}>
       {children}
     </ProjectContext.Provider>

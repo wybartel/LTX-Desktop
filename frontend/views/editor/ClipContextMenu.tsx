@@ -55,6 +55,7 @@ export interface ClipContextMenuProps {
   setShowICLoraPanel: (v: boolean) => void
   onCaptureFrameForEdit: (clip: TimelineClip) => void
   onCaptureFrameForVideo: (clip: TimelineClip) => void
+  onCreateVideoFromAudio: (clip: TimelineClip) => void
 }
 
 // Reusable menu item component
@@ -135,6 +136,7 @@ export function ClipContextMenu({
   setShowICLoraPanel, // IC-LORA HIDDEN: still passed to SingleClipMenu
   onCaptureFrameForEdit,
   onCaptureFrameForVideo,
+  onCreateVideoFromAudio,
 }: ClipContextMenuProps) {
   const close = () => setClipContextMenu(null)
   const isBackground = !contextClip
@@ -252,6 +254,7 @@ export function ClipContextMenu({
           setShowICLoraPanel={setShowICLoraPanel}
           onCaptureFrameForEdit={onCaptureFrameForEdit}
           onCaptureFrameForVideo={onCaptureFrameForVideo}
+          onCreateVideoFromAudio={onCreateVideoFromAudio}
           close={close}
         />
       ) : null}
@@ -283,6 +286,7 @@ function SingleClipMenu({
   setAssetFilter, setSelectedBin, setTakesViewAssetId, setSelectedAssetIds,
   setI2vClipId, setI2vPrompt, setRetakeClipId,   setIcLoraSourceClipId: _setIcLoraSourceClipId, setShowICLoraPanel: _setShowICLoraPanel, // IC-LORA HIDDEN
   onCaptureFrameForEdit, onCaptureFrameForVideo,
+  onCreateVideoFromAudio,
   close,
 }: {
   contextClip: TimelineClip
@@ -316,6 +320,7 @@ function SingleClipMenu({
   setShowICLoraPanel: (v: boolean) => void
   onCaptureFrameForEdit: (clip: TimelineClip) => void
   onCaptureFrameForVideo: (clip: TimelineClip) => void
+  onCreateVideoFromAudio: (clip: TimelineClip) => void
   close: () => void
 }) {
   const liveAsset = getLiveAsset(contextClip)
@@ -529,6 +534,14 @@ function SingleClipMenu({
                 onClick={() => { setIcLoraSourceClipId(contextClip.id); setShowICLoraPanel(true); close() }} />
               */}
             </>
+          )}
+          {contextClip.type === 'audio' && !contextClip.linkedClipIds?.length && (
+            <MenuItem
+              icon={Film}
+              iconClass="text-emerald-400"
+              label="Create Video (A2V)"
+              onClick={() => { onCreateVideoFromAudio(contextClip); close() }}
+            />
           )}
           {(isVideo || isImage) && (
             <div className="relative group/capture">
