@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import torch
 
-from services.services_utils import TensorOrNone, TilingConfigType, device_supports_fp8, sync_device
+from services.services_utils import AudioOrNone, TilingConfigType, device_supports_fp8, sync_device
 
 if TYPE_CHECKING:
     from ltx_core.components.guiders import MultiModalGuiderParams
@@ -34,19 +34,17 @@ def video_chunks_number(num_frames: int, tiling_config: TilingConfigType | None)
 
 def encode_video_output(
     video: torch.Tensor | Iterator[torch.Tensor],
-    audio: TensorOrNone,
+    audio: AudioOrNone,
     fps: int,
     output_path: str,
     video_chunks_number_value: int,
 ) -> None:
-    from ltx_pipelines.utils.constants import AUDIO_SAMPLE_RATE
     from ltx_pipelines.utils.media_io import encode_video
 
     encode_video(
         video=video,
         fps=fps,
         audio=audio,
-        audio_sample_rate=AUDIO_SAMPLE_RATE,
         output_path=output_path,
         video_chunks_number=video_chunks_number_value,
     )
@@ -95,7 +93,7 @@ class DistilledNativePipeline:
         frame_rate: float,
         images: list[tuple[str, int, float]],
         tiling_config: TilingConfigType | None = None,
-    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], TensorOrNone]:
+    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
         from ltx_core.components.diffusion_steps import EulerDiffusionStep
         from ltx_core.components.noisers import GaussianNoiser
         from ltx_core.model.audio_vae import decode_audio as vae_decode_audio
@@ -106,10 +104,10 @@ class DistilledNativePipeline:
         from ltx_pipelines.utils.helpers import (
             cleanup_memory,
             denoise_audio_video,
-            euler_denoising_loop,
             image_conditionings_by_replacing_latent,
             simple_denoising_func,
         )
+        from ltx_pipelines.utils.samplers import euler_denoising_loop
 
         generator = torch.Generator(device=self.device).manual_seed(seed)
         noiser = GaussianNoiser(generator=generator)

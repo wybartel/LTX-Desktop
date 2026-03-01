@@ -14,7 +14,7 @@ from services.ltx_pipeline_common import (
     encode_video_output,
     video_chunks_number,
 )
-from services.services_utils import TensorOrNone, TilingConfigType, device_supports_fp8
+from services.services_utils import AudioOrNone, TilingConfigType, device_supports_fp8
 
 
 class LTXProVideoPipeline:
@@ -73,7 +73,7 @@ class LTXProVideoPipeline:
         num_inference_steps: int,
         images: list[tuple[str, int, float]],
         tiling_config: TilingConfigType,
-    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], TensorOrNone]:
+    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
         video_guider_params, audio_guider_params = default_guiders()
         return self.pipeline(
             prompt=prompt,

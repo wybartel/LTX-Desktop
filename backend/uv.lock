@@ -491,8 +491,8 @@ wheels = [
 
 [[package]]
 name = "ltx-core"
-version = "1.0.0"
-source = { git = "https://github.com/Lightricks/LTX-2.git?subdirectory=packages%2Fltx-core&rev=28c3c73fe557666c3de176e1e50a5220152ccfca#28c3c73fe557666c3de176e1e50a5220152ccfca" }
+version = "0.1.0"
+source = { git = "https://github.com/LightricksResearch/ltx-2-internal.git?subdirectory=packages%2Fltx-core&rev=fcfe3d58d5894ac08b09093ff129baae85964a6d#fcfe3d58d5894ac08b09093ff129baae85964a6d" }
 dependencies = [
     { name = "accelerate" },
     { name = "einops" },
@@ -556,8 +556,8 @@ requires-dist = [
     { name = "huggingface-hub", specifier = ">=0.23.0" },
     { name = "imageio", specifier = ">=2.37.2" },
     { name = "imageio-ffmpeg", specifier = ">=0.6.0" },
-    { name = "ltx-core", git = "https://github.com/Lightricks/LTX-2.git?subdirectory=packages%2Fltx-core&rev=28c3c73fe557666c3de176e1e50a5220152ccfca" },
-    { name = "ltx-pipelines", git = "https://github.com/Lightricks/LTX-2.git?subdirectory=packages%2Fltx-pipelines&rev=28c3c73fe557666c3de176e1e50a5220152ccfca" },
+    { name = "ltx-core", git = "https://github.com/LightricksResearch/ltx-2-internal.git?subdirectory=packages%2Fltx-core&rev=fcfe3d58d5894ac08b09093ff129baae85964a6d" },
+    { name = "ltx-pipelines", git = "https://github.com/LightricksResearch/ltx-2-internal.git?subdirectory=packages%2Fltx-pipelines&rev=fcfe3d58d5894ac08b09093ff129baae85964a6d" },
     { name = "opencv-python-headless", specifier = ">=4.8.0" },
     { name = "peft", specifier = ">=0.13.2" },
     { name = "pillow", specifier = ">=10.3.0" },
@@ -581,8 +581,8 @@ provides-extras = ["test", "dev"]
 
 [[package]]
 name = "ltx-pipelines"
-version = "1.0.0"
-source = { git = "https://github.com/Lightricks/LTX-2.git?subdirectory=packages%2Fltx-pipelines&rev=28c3c73fe557666c3de176e1e50a5220152ccfca#28c3c73fe557666c3de176e1e50a5220152ccfca" }
+version = "0.1.0"
+source = { git = "https://github.com/LightricksResearch/ltx-2-internal.git?subdirectory=packages%2Fltx-pipelines&rev=fcfe3d58d5894ac08b09093ff129baae85964a6d#fcfe3d58d5894ac08b09093ff129baae85964a6d" }
 dependencies = [
     { name = "av" },
     { name = "ltx-core" },

@@ -9,7 +9,7 @@ from typing import Final, cast
 import torch
 
 from services.ltx_pipeline_common import default_tiling_config, encode_video_output, video_chunks_number
-from services.services_utils import TensorOrNone, TilingConfigType, device_supports_fp8
+from services.services_utils import AudioOrNone, TilingConfigType, device_supports_fp8
 
 
 class LTXFastVideoPipeline:
@@ -34,7 +34,7 @@ class LTXFastVideoPipeline:
         from ltx_pipelines.distilled import DistilledPipeline
 
         self.pipeline = DistilledPipeline(
-            checkpoint_path=checkpoint_path,
+            distilled_checkpoint_path=checkpoint_path,
             gemma_root=cast(str, gemma_root),
             spatial_upsampler_path=upsampler_path,
             loras=[],
@@ -52,7 +52,7 @@ class LTXFastVideoPipeline:
         frame_rate: float,
         images: list[tuple[str, int, float]],
         tiling_config: TilingConfigType,
-    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], TensorOrNone]:
+    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
         return self.pipeline(
             prompt=prompt,
             seed=seed,

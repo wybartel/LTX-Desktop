@@ -14,7 +14,7 @@ from services.ltx_pipeline_common import (
     encode_video_output,
     video_chunks_number,
 )
-from services.services_utils import TensorOrNone, TilingConfigType, device_supports_fp8
+from services.services_utils import AudioOrNone, TilingConfigType, device_supports_fp8
 
 
 class LTXFastNativeVideoPipeline:
@@ -50,7 +50,7 @@ class LTXFastNativeVideoPipeline:
         frame_rate: float,
         images: list[tuple[str, int, float]],
         tiling_config: TilingConfigType,
-    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], TensorOrNone]:
+    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
         return self.pipeline(
             prompt=prompt,
             seed=seed,

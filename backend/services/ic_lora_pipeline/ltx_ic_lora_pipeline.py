@@ -8,7 +8,7 @@ from typing import cast
 import torch
 
 from services.ltx_pipeline_common import default_tiling_config, encode_video_output, video_chunks_number
-from services.services_utils import TensorOrNone, TilingConfigType, device_supports_fp8
+from services.services_utils import AudioOrNone, TilingConfigType, device_supports_fp8
 
 
 class LTXIcLoraPipeline:
@@ -43,7 +43,7 @@ class LTXIcLoraPipeline:
 
         lora_entry = LoraPathStrengthAndSDOps(path=lora_path, strength=1.0, sd_ops=LTXV_LORA_COMFY_RENAMING_MAP)
         self.pipeline = ICLoraPipeline(
-            checkpoint_path=checkpoint_path,
+            distilled_checkpoint_path=checkpoint_path,
             spatial_upsampler_path=upsampler_path,
             gemma_root=cast(str, gemma_root),
             loras=[lora_entry],
@@ -62,7 +62,7 @@ class LTXIcLoraPipeline:
         images: list[tuple[str, int, float]],
         video_conditioning: list[tuple[str, float]],
         tiling_config: TilingConfigType,
-    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], TensorOrNone]:
+    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
         return self.pipeline(
             prompt=prompt,
             seed=seed,

@@ -9,7 +9,7 @@ from typing import Final, cast
 import torch
 
 from services.ltx_pipeline_common import default_guiders, encode_video_output, video_chunks_number
-from services.services_utils import TensorOrNone, device_supports_fp8
+from services.services_utils import AudioOrNone, device_supports_fp8
 
 
 class LTXProNativeVideoPipeline:
@@ -50,7 +50,7 @@ class LTXProNativeVideoPipeline:
         frame_rate: float,
         num_inference_steps: int,
         images: list[tuple[str, int, float]],
-    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], TensorOrNone]:
+    ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
         video_guider_params, audio_guider_params = default_guiders()
         return self.pipeline(
             prompt=prompt,

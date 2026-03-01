@@ -26,13 +26,17 @@ TensorType: TypeAlias = torch.Tensor
 PILImageType: TypeAlias = PILImage
 
 if TYPE_CHECKING:
+    from ltx_core.types import Audio as AudioType
+
     FrameArray: TypeAlias = NDArray[np.uint8]
     TilingConfigType: TypeAlias = TilingConfig
 else:
     FrameArray: TypeAlias = object
     TilingConfigType: TypeAlias = object
+    AudioType: TypeAlias = object
 
 TensorOrNone: TypeAlias = TensorType | None
+AudioOrNone: TypeAlias = AudioType | None
 
 logger = logging.getLogger(__name__)
 
