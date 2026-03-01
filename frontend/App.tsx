@@ -21,7 +21,7 @@ type SetupState = 'loading' | { needsSetup: boolean; needsLicense: boolean }
 function AppContent() {
   const { currentView } = useProjects()
   const { status, processStatus, isLoading: backendLoading, error: backendError } = useBackend()
-  const { settings, updateSettings, hasLtxApiKey, forceApiGenerations, isLoaded } = useAppSettings()
+  const { settings, saveLtxApiKey, forceApiGenerations, isLoaded } = useAppSettings()
 
   const [pythonReady, setPythonReady] = useState<boolean | null>(null)
   const [backendStarted, setBackendStarted] = useState(false)
@@ -144,28 +144,17 @@ function AppContent() {
         throw new Error('Please enter a valid LTX API key.')
       }
 
-      const backendUrl = await window.electronAPI.getBackendUrl()
-      const response = await fetch(`${backendUrl}/api/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ltxApiKey: trimmed }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to save API key.')
-      }
-
+      await saveLtxApiKey(trimmed)
       setFirstRunFinalizeError(null)
-      updateSettings({ ltxApiKey: trimmed })
     },
-    [updateSettings],
+    [saveLtxApiKey],
   )
 
   const isForcedFirstRun =
     setupState !== 'loading' && setupState.needsSetup && !setupState.needsLicense && forceApiGenerations
 
   const shouldAutoFinalizeForcedFirstRun =
-    isForcedFirstRun && isLoaded && hasLtxApiKey && !isFinalizingFirstRun && !firstRunFinalizeError
+    isForcedFirstRun && isLoaded && settings.hasLtxApiKey && !isFinalizingFirstRun && !firstRunFinalizeError
 
   useEffect(() => {
     if (!shouldAutoFinalizeForcedFirstRun) return
@@ -273,8 +262,8 @@ function AppContent() {
 
   const showGlobalControls = currentView !== 'home' && status.connected && !setupState.needsSetup
   const shouldBlockUntilSettingsLoaded = forceApiGenerations && !isLoaded
-  const shouldShowForcedFirstRunUpsell = isForcedFirstRun && isLoaded && !hasLtxApiKey
-  const shouldShowGlobalForcedUpsell = forceApiGenerations && !setupState.needsSetup && isLoaded && !hasLtxApiKey
+  const shouldShowForcedFirstRunUpsell = isForcedFirstRun && isLoaded && !settings.hasLtxApiKey
+  const shouldShowGlobalForcedUpsell = forceApiGenerations && !setupState.needsSetup && isLoaded && !settings.hasLtxApiKey
   const shouldBlockForApiKey = shouldShowForcedFirstRunUpsell || shouldShowGlobalForcedUpsell
 
   const renderView = () => {
@@ -333,9 +322,8 @@ function AppContent() {
             await saveApiKeyForFirstRun(apiKey)
             return
           }
-          updateSettings({ ltxApiKey: apiKey })
+          await saveLtxApiKey(apiKey)
         }}
-        initialApiKey={settings.ltxApiKey}
         copy={forcedApiUpsellCopy}
       />
 
@@ -348,7 +336,7 @@ function AppContent() {
         </div>
       )}
 
-      {isForcedFirstRun && isLoaded && hasLtxApiKey && isFinalizingFirstRun && (
+      {isForcedFirstRun && isLoaded && settings.hasLtxApiKey && isFinalizingFirstRun && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="flex items-center gap-2 text-sm text-zinc-200">
             <Loader2 className="h-4 w-4 animate-spin" />

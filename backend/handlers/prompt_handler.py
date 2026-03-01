@@ -91,10 +91,7 @@ class PromptHandler(StateHandlerBase):
             raise HTTPError(400, "GEMINI_API_KEY_MISSING")
 
         system_prompt = settings.i2v_system_prompt if mode == "i2v" else settings.t2v_system_prompt
-        gemini_url = (
-            "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
-        )
+        gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
         contents: list[JSONValue] = [{"role": "user", "parts": [{"text": prompt}]}]
         system_instruction: dict[str, JSONValue] = {"parts": [{"text": system_prompt}]}
         generation_config: dict[str, JSONValue] = {"temperature": 0.7, "maxOutputTokens": 1024}
@@ -107,7 +104,7 @@ class PromptHandler(StateHandlerBase):
         try:
             response = self._http.post(
                 gemini_url,
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", "x-goog-api-key": settings.gemini_api_key},
                 json_payload=gemini_payload,
                 timeout=30,
             )
@@ -207,10 +204,7 @@ class PromptHandler(StateHandlerBase):
             user_parts.append({"text": "First frame of the shot AFTER the gap:"})
             user_parts.append({"inlineData": {"mimeType": "image/jpeg", "data": after_frame}})
 
-        gemini_url = (
-            "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-2.0-flash:generateContent?key={gemini_api_key}"
-        )
+        gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
         contents: list[JSONValue] = [{"role": "user", "parts": user_parts}]
         system_instruction: dict[str, JSONValue] = {"parts": [{"text": system_text}]}
         generation_config: dict[str, JSONValue] = {"temperature": 0.7, "maxOutputTokens": 512}
@@ -223,7 +217,7 @@ class PromptHandler(StateHandlerBase):
         try:
             response = self._http.post(
                 gemini_url,
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", "x-goog-api-key": gemini_api_key},
                 json_payload=gemini_payload,
                 timeout=30,
             )

@@ -389,8 +389,7 @@ export function ExportModal({ open, onClose, clips, tracks, timeline, projectNam
                   className="border-zinc-700 text-zinc-300"
                   onClick={() => {
                     if (exportPath) {
-                      const dir = exportPath.replace(/[/\\][^/\\]*$/, '')
-                      window.electronAPI?.openFolder(dir)
+                      window.electronAPI?.openParentFolderOfFile(exportPath)
                     }
                   }}
                 >

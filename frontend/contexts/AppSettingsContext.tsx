@@ -12,14 +12,14 @@ export interface FastModelSettings {
 export interface AppSettings {
   useTorchCompile: boolean
   loadOnStartup: boolean
-  ltxApiKey: string
+  hasLtxApiKey: boolean
   useLocalTextEncoder: boolean
   fastModel: FastModelSettings
   proModel: InferenceSettings
   promptCacheSize: number
   promptEnhancerEnabledT2V: boolean
   promptEnhancerEnabledI2V: boolean
-  geminiApiKey: string
+  hasGeminiApiKey: boolean
   t2vSystemPrompt: string
   i2vSystemPrompt: string
   seedLocked: boolean
@@ -29,14 +29,14 @@ export interface AppSettings {
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   useTorchCompile: false,
   loadOnStartup: true,
-  ltxApiKey: '',
+  hasLtxApiKey: false,
   useLocalTextEncoder: false,
   fastModel: { useUpscaler: true },
   proModel: { steps: 20, useUpscaler: true },
   promptCacheSize: 1,
   promptEnhancerEnabledT2V: false,
   promptEnhancerEnabledI2V: false,
-  geminiApiKey: '',
+  hasGeminiApiKey: false,
   t2vSystemPrompt: '',
   i2vSystemPrompt: '',
   seedLocked: false,
@@ -50,7 +50,8 @@ interface AppSettingsContextValue {
   isLoaded: boolean
   updateSettings: (patch: Partial<AppSettings> | ((prev: AppSettings) => AppSettings)) => void
   refreshSettings: () => Promise<void>
-  hasLtxApiKey: boolean
+  saveLtxApiKey: (value: string) => Promise<void>
+  saveGeminiApiKey: (value: string) => Promise<void>
   forceApiGenerations: boolean
 }
 
@@ -72,14 +73,14 @@ function normalizeAppSettings(data: Partial<AppSettings>): AppSettings {
   return {
     useTorchCompile: data.useTorchCompile ?? DEFAULT_APP_SETTINGS.useTorchCompile,
     loadOnStartup: data.loadOnStartup ?? DEFAULT_APP_SETTINGS.loadOnStartup,
-    ltxApiKey: data.ltxApiKey ?? DEFAULT_APP_SETTINGS.ltxApiKey,
+    hasLtxApiKey: data.hasLtxApiKey ?? DEFAULT_APP_SETTINGS.hasLtxApiKey,
     useLocalTextEncoder: data.useLocalTextEncoder ?? DEFAULT_APP_SETTINGS.useLocalTextEncoder,
     fastModel: data.fastModel ?? DEFAULT_APP_SETTINGS.fastModel,
     proModel: data.proModel ?? DEFAULT_APP_SETTINGS.proModel,
     promptCacheSize: data.promptCacheSize ?? DEFAULT_APP_SETTINGS.promptCacheSize,
     promptEnhancerEnabledT2V: data.promptEnhancerEnabledT2V ?? DEFAULT_APP_SETTINGS.promptEnhancerEnabledT2V,
     promptEnhancerEnabledI2V: data.promptEnhancerEnabledI2V ?? DEFAULT_APP_SETTINGS.promptEnhancerEnabledI2V,
-    geminiApiKey: data.geminiApiKey ?? DEFAULT_APP_SETTINGS.geminiApiKey,
+    hasGeminiApiKey: data.hasGeminiApiKey ?? DEFAULT_APP_SETTINGS.hasGeminiApiKey,
     t2vSystemPrompt: data.t2vSystemPrompt ?? DEFAULT_APP_SETTINGS.t2vSystemPrompt,
     i2vSystemPrompt: data.i2vSystemPrompt ?? DEFAULT_APP_SETTINGS.i2vSystemPrompt,
     seedLocked: data.seedLocked ?? DEFAULT_APP_SETTINGS.seedLocked,
@@ -171,10 +172,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     if (!backendUrl || !isLoaded || backendProcessStatus !== 'alive') return
     const syncTimer = setTimeout(async () => {
       try {
+        const { hasLtxApiKey: _a, hasGeminiApiKey: _b, ...syncPayload } = settings
         await fetch(`${backendUrl}/api/settings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(settings),
+          body: JSON.stringify(syncPayload),
         })
       } catch {
         // Best-effort settings sync.
@@ -191,20 +193,40 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setSettings((prev) => ({ ...prev, ...patch }))
   }, [])
 
-  const hasLtxApiKey = useMemo(() => settings.ltxApiKey.trim().length > 0, [settings.ltxApiKey])
-  const value = useMemo<AppSettingsContextValue>(
+  const saveLtxApiKey = useCallback(async (value: string) => {
+    if (!backendUrl) return
+    await fetch(`${backendUrl}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ltxApiKey: value }),
+    })
+    await refreshSettings()
+  }, [backendUrl, refreshSettings])
+
+  const saveGeminiApiKey = useCallback(async (value: string) => {
+    if (!backendUrl) return
+    await fetch(`${backendUrl}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ geminiApiKey: value }),
+    })
+    await refreshSettings()
+  }, [backendUrl, refreshSettings])
+
+  const contextValue = useMemo<AppSettingsContextValue>(
     () => ({
       settings,
       isLoaded,
       updateSettings,
       refreshSettings,
-      hasLtxApiKey,
+      saveLtxApiKey,
+      saveGeminiApiKey,
       forceApiGenerations,
     }),
-    [forceApiGenerations, hasLtxApiKey, isLoaded, refreshSettings, settings, updateSettings],
+    [forceApiGenerations, isLoaded, refreshSettings, saveLtxApiKey, saveGeminiApiKey, settings, updateSettings],
   )
 
-  return <AppSettingsContext.Provider value={value}>{children}</AppSettingsContext.Provider>
+  return <AppSettingsContext.Provider value={contextValue}>{children}</AppSettingsContext.Provider>
 }
 
 export function useAppSettings() {

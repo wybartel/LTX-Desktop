@@ -24,8 +24,8 @@ interface Window {
     completeSetup: () => Promise<boolean>
     fetchLicenseText: () => Promise<string>
     getNoticesText: () => Promise<string>
-    openExternalUrl: (url: string) => Promise<boolean>
-    openFolder: (folderPath: string) => Promise<void>
+    openLtxApiKeyPage: () => Promise<boolean>
+    openParentFolderOfFile: (filePath: string) => Promise<void>
     showItemInFolder: (filePath: string) => Promise<void>
     getLogs: () => Promise<LogsResponse>
     getLogPath: () => Promise<{ logPath: string; logDir: string }>
@@ -38,8 +38,6 @@ interface Window {
     saveBinaryFile: (filePath: string, data: ArrayBuffer) => Promise<{ success: boolean; path?: string; error?: string }>
     showOpenDirectoryDialog: (options: { title?: string }) => Promise<string | null>
     copyFile: (src: string, dest: string) => Promise<{ success: boolean; error?: string }>
-    importFileToStorage: (sourcePath: string, originalName: string) => Promise<{ success: boolean; path?: string; url?: string; error?: string }>
-    checkFileExists: (filePath: string) => Promise<boolean>
     checkFilesExist: (filePaths: string[]) => Promise<Record<string, boolean>>
     showOpenFileDialog: (options: { title?: string; filters?: { name: string; extensions: string[] }[]; properties?: string[] }) => Promise<string[] | null>
     searchDirectoryForFiles: (directory: string, filenames: string[]) => Promise<Record<string, string | null>>

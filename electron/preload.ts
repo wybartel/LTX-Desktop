@@ -29,9 +29,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchLicenseText: (): Promise<string> => ipcRenderer.invoke('fetch-license-text'),
   getNoticesText: (): Promise<string> => ipcRenderer.invoke('get-notices-text'),
   
-  // Open folder in file explorer
-  openExternalUrl: (url: string): Promise<boolean> => ipcRenderer.invoke('open-external-url', url),
-  openFolder: (folderPath: string): Promise<void> => ipcRenderer.invoke('open-folder', folderPath),
+  // Open specific app pages / folders
+  openLtxApiKeyPage: (): Promise<boolean> => ipcRenderer.invoke('open-ltx-api-key-page'),
+  openParentFolderOfFile: (filePath: string): Promise<void> => ipcRenderer.invoke('open-parent-folder-of-file', filePath),
   
   // Reveal a specific file in the OS file manager (Explorer/Finder)
   showItemInFolder: (filePath: string): Promise<void> => ipcRenderer.invoke('show-item-in-folder', filePath),
@@ -62,14 +62,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('search-directory-for-files', dir, filenames),
   copyFile: (src: string, dest: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('copy-file', src, dest),
-  
-  // Import a file to persistent storage (copies to outputs dir)
-  importFileToStorage: (sourcePath: string, originalName: string): Promise<{ success: boolean; path?: string; url?: string; error?: string }> =>
-    ipcRenderer.invoke('import-file-to-storage', sourcePath, originalName),
-  
-  // Check if a file exists on disk
-  checkFileExists: (filePath: string): Promise<boolean> =>
-    ipcRenderer.invoke('check-file-exists', filePath),
   
   // Check multiple files at once
   checkFilesExist: (filePaths: string[]): Promise<Record<string, boolean>> =>
@@ -147,8 +139,8 @@ declare global {
       completeSetup: () => Promise<boolean>
       fetchLicenseText: () => Promise<string>
       getNoticesText: () => Promise<string>
-      openExternalUrl: (url: string) => Promise<boolean>
-      openFolder: (folderPath: string) => Promise<void>
+      openLtxApiKeyPage: () => Promise<boolean>
+      openParentFolderOfFile: (filePath: string) => Promise<void>
       showItemInFolder: (filePath: string) => Promise<void>
       getLogs: () => Promise<LogsResponse>
       getLogPath: () => Promise<{ logPath: string; logDir: string }>
@@ -162,8 +154,6 @@ declare global {
       showOpenDirectoryDialog: (options: { title?: string }) => Promise<string | null>
       searchDirectoryForFiles: (dir: string, filenames: string[]) => Promise<Record<string, string>>
       copyFile: (src: string, dest: string) => Promise<{ success: boolean; error?: string }>
-      importFileToStorage: (sourcePath: string, originalName: string) => Promise<{ success: boolean; path?: string; url?: string; error?: string }>
-      checkFileExists: (filePath: string) => Promise<boolean>
       checkFilesExist: (filePaths: string[]) => Promise<Record<string, boolean>>
       showOpenFileDialog: (options: { title?: string; filters?: { name: string; extensions: string[] }[]; properties?: string[] }) => Promise<string[] | null>
       exportNative: (data: {

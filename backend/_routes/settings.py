@@ -6,7 +6,7 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from state.app_settings import SettingsResponse, UpdateSettingsRequest
+from state.app_settings import SettingsResponse, UpdateSettingsRequest, to_settings_response
 from api_types import StatusResponse
 from state import get_state_service
 from app_handler import AppHandler
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api", tags=["settings"])
 
 @router.get("/settings", response_model=SettingsResponse)
 def route_get_settings(handler: AppHandler = Depends(get_state_service)) -> SettingsResponse:
-    return handler.settings.get_settings_snapshot()
+    return to_settings_response(handler.settings.get_settings_snapshot())
 
 
 @router.post("/settings", response_model=StatusResponse)

@@ -14,12 +14,7 @@ export interface ApiUpsellModalProps {
   onSaveApiKey: (apiKey: string) => Promise<void> | void
   copy: ApiUpsellCopy
   blocking?: boolean
-  initialApiKey?: string
-  getApiKeyUrl?: string
-  getApiKeyLabel?: string
 }
-
-const DEFAULT_API_KEY_URL = 'https://console.ltx.video/api-keys/'
 
 export function buildProApiUpsellCopy(): ApiUpsellCopy {
   return {
@@ -37,20 +32,17 @@ export function ApiUpsellModal({
   onSaveApiKey,
   copy,
   blocking = false,
-  initialApiKey = '',
-  getApiKeyUrl = DEFAULT_API_KEY_URL,
-  getApiKeyLabel = 'Get API key',
 }: ApiUpsellModalProps) {
-  const [apiKey, setApiKey] = useState(initialApiKey)
+  const [apiKey, setApiKey] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isOpen) return
-    setApiKey(initialApiKey)
+    setApiKey('')
     setError(null)
     setIsSaving(false)
-  }, [isOpen, initialApiKey])
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return
@@ -65,14 +57,8 @@ export function ApiUpsellModal({
 
   const canSubmit = useMemo(() => apiKey.trim().length > 0 && !isSaving, [apiKey, isSaving])
 
-  const handleOpenApiKeyUrl = async () => {
-    try {
-      await window.electronAPI.openExternalUrl(getApiKeyUrl)
-      return
-    } catch {
-      // Fallback in case IPC is unavailable.
-    }
-    window.open(getApiKeyUrl, '_blank', 'noopener,noreferrer')
+  const handleOpenApiKeyUrl = () => {
+    window.electronAPI.openLtxApiKeyPage()
   }
 
   const handleSave = async () => {
@@ -148,7 +134,7 @@ export function ApiUpsellModal({
                 onClick={handleOpenApiKeyUrl}
                 className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
               >
-                {getApiKeyLabel}
+                Get API key
                 <ExternalLink className="h-3 w-3" />
               </button>
             </div>

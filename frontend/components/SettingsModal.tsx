@@ -68,9 +68,11 @@ interface SettingsModalProps {
 type TabId = 'general' | 'inference' | 'promptEnhancer' | 'about'
 
 export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProps) {
-  const { settings, updateSettings } = useAppSettings()
+  const { settings, updateSettings, saveLtxApiKey, saveGeminiApiKey } = useAppSettings()
   const onSettingsChange = (next: AppSettings) => updateSettings(next)
   const [activeTab, setActiveTab] = useState<TabId>('general')
+  const [ltxApiKeyInput, setLtxApiKeyInput] = useState('')
+  const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('')
   const [textEncoderStatus, setTextEncoderStatus] = useState<TextEncoderStatus | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -175,13 +177,6 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
     })
   }
 
-  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onSettingsChange({
-      ...settings,
-      ltxApiKey: e.target.value,
-    })
-  }
-
   const handleToggleLocalEncoder = () => {
     onSettingsChange({
       ...settings,
@@ -228,13 +223,6 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
     }
   }
   const anyEnhancerEnabled = settings.promptEnhancerEnabledT2V || settings.promptEnhancerEnabledI2V
-
-  const handleGeminiApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onSettingsChange({
-      ...settings,
-      geminiApiKey: e.target.value,
-    })
-  }
 
   const handleT2vSystemPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onSettingsChange({
@@ -414,24 +402,39 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                   {/* API Key Input - show when this option is selected */}
                   {!settings.useLocalTextEncoder && (
                     <div className="mt-3 pt-3 border-t border-zinc-700/50">
-                      <input
-                        type="password"
-                        value={settings.ltxApiKey || ''}
-                        onChange={handleApiKeyChange}
-                        onClick={(e) => e.stopPropagation()}
-                        placeholder="Enter your LTX API key..."
-                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={ltxApiKeyInput}
+                          onChange={(e) => setLtxApiKeyInput(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder={settings.hasLtxApiKey ? 'Enter new key to replace...' : 'Enter your LTX API key...'}
+                          className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const trimmed = ltxApiKeyInput.trim()
+                            if (!trimmed) return
+                            void saveLtxApiKey(trimmed)
+                            setLtxApiKeyInput('')
+                          }}
+                          disabled={!ltxApiKeyInput.trim()}
+                          className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                        >
+                          Save Key
+                        </button>
+                      </div>
                       <div className="flex items-center justify-between mt-2">
                         <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
-                          settings.ltxApiKey
+                          settings.hasLtxApiKey
                             ? 'bg-green-500/10 text-green-400'
                             : 'bg-amber-500/10 text-amber-400'
                         }`}>
-                          {settings.ltxApiKey ? (
+                          {settings.hasLtxApiKey ? (
                             <>
                               <Check className="h-3 w-3" />
-                              Ready to generate
+                              Key configured
                             </>
                           ) : (
                             <>
@@ -452,7 +455,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                       </div>
 
                       {/* Prompt Cache Size */}
-                      {settings.ltxApiKey && (
+                      {settings.hasLtxApiKey && (
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-700/50">
                           <div>
                             <label className="text-xs text-white">Prompt Cache</label>
@@ -887,24 +890,38 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                     <label className="text-sm font-medium text-white">Gemini API Key</label>
                   </div>
 
-                  <input
-                    type="password"
-                    value={settings.geminiApiKey || ''}
-                    onChange={handleGeminiApiKeyChange}
-                    placeholder="Enter your Gemini API key..."
-                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={geminiApiKeyInput}
+                      onChange={(e) => setGeminiApiKeyInput(e.target.value)}
+                      placeholder={settings.hasGeminiApiKey ? 'Enter new key to replace...' : 'Enter your Gemini API key...'}
+                      className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={() => {
+                        const trimmed = geminiApiKeyInput.trim()
+                        if (!trimmed) return
+                        void saveGeminiApiKey(trimmed)
+                        setGeminiApiKeyInput('')
+                      }}
+                      disabled={!geminiApiKeyInput.trim()}
+                      className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    >
+                      Save Key
+                    </button>
+                  </div>
 
                   <div className="flex items-center justify-between">
                     <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
-                      settings.geminiApiKey
+                      settings.hasGeminiApiKey
                         ? 'bg-green-500/10 text-green-400'
                         : 'bg-amber-500/10 text-amber-400'
                     }`}>
-                      {settings.geminiApiKey ? (
+                      {settings.hasGeminiApiKey ? (
                         <>
                           <Check className="h-3 w-3" />
-                          API key configured
+                          Key configured
                         </>
                       ) : (
                         <>

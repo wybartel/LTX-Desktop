@@ -17,28 +17,32 @@ class TestGetSettings:
         data = r.json()
         assert data["useTorchCompile"] is False
         assert data["loadOnStartup"] is False
-        assert data["ltxApiKey"] == ""
+        assert data["hasLtxApiKey"] is False
         assert data["useLocalTextEncoder"] is False
         assert data["fastModel"] == {"useUpscaler": True}
         assert data["proModel"] == {"steps": 20, "useUpscaler": True}
         assert data["promptCacheSize"] == 100
         assert data["promptEnhancerEnabledT2V"] is True
         assert data["promptEnhancerEnabledI2V"] is False
-        assert data["geminiApiKey"] == ""
+        assert data["hasGeminiApiKey"] is False
         assert data["seedLocked"] is False
         assert data["lockedSeed"] == 42
         assert data["t2vSystemPrompt"] == default_app_settings.t2v_system_prompt
         assert data["i2vSystemPrompt"] == default_app_settings.i2v_system_prompt
+        assert "ltxApiKey" not in data
+        assert "geminiApiKey" not in data
 
     def test_reflects_changed_settings(self, client, test_state):
         test_state.state.app_settings.use_torch_compile = True
         r = client.get("/api/settings")
         assert r.json()["useTorchCompile"] is True
 
-    def test_returns_api_key_when_set(self, client, test_state):
+    def test_has_api_key_true_when_set(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "test-key-123"
         r = client.get("/api/settings")
-        assert r.json()["ltxApiKey"] == "test-key-123"
+        data = r.json()
+        assert data["hasLtxApiKey"] is True
+        assert "ltxApiKey" not in data
 
 
 class TestPostSettings:
@@ -110,6 +114,18 @@ class TestPostSettings:
         assert r.status_code == 200
         assert test_state.state.app_settings.t2v_system_prompt == "Custom T2V prompt"
         assert test_state.state.app_settings.i2v_system_prompt == "Custom I2V prompt"
+
+    def test_empty_string_does_not_erase_key(self, client, test_state):
+        test_state.state.app_settings.ltx_api_key = "real-key"
+        r = client.post("/api/settings", json={"ltxApiKey": ""})
+        assert r.status_code == 200
+        assert test_state.state.app_settings.ltx_api_key == "real-key"
+
+    def test_omitted_key_does_not_erase_key(self, client, test_state):
+        test_state.state.app_settings.ltx_api_key = "real-key"
+        r = client.post("/api/settings", json={"useTorchCompile": True})
+        assert r.status_code == 200
+        assert test_state.state.app_settings.ltx_api_key == "real-key"
 
     def test_unknown_field_rejected(self, client):
         r = client.post("/api/settings", json={"unknownSetting": True})

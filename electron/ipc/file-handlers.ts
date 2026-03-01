@@ -1,7 +1,7 @@
 import { ipcMain, dialog } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import { getCurrentDir, getAllowedRoots } from '../config'
+import { getAllowedRoots } from '../config'
 import { logger } from '../logger'
 import { getMainWindow } from '../window'
 import { validatePath, approvePath } from '../path-validation'
@@ -62,36 +62,22 @@ function searchDirectoryForFiles(dir: string, filenames: string[]): Record<strin
   return results
 }
 
-function importFileToStorage(sourcePath: string, originalName: string): { path: string; url: string } {
-  // Use the backend outputs directory so imported assets live alongside generated ones
-  const backendDir = path.join(getCurrentDir(), 'backend', 'outputs')
-  if (!fs.existsSync(backendDir)) fs.mkdirSync(backendDir, { recursive: true })
-
-  const ext = path.extname(originalName) || path.extname(sourcePath) || ''
-  const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15)
-  const uniqueId = Math.random().toString(36).slice(2, 10)
-  const destName = `imported_${timestamp}_${uniqueId}${ext}`
-  const destPath = path.join(backendDir, destName)
-
-  fs.copyFileSync(sourcePath, destPath)
-
-  // Build a file:// URL
-  const normalized = destPath.replace(/\\/g, '/')
-  const fileUrl = normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`
-
-  return { path: destPath, url: fileUrl }
-}
 
 export function registerFileHandlers(): void {
-  ipcMain.handle('open-external-url', async (_event, url: string) => {
+  ipcMain.handle('open-ltx-api-key-page', async () => {
     const { shell } = await import('electron')
-    await shell.openExternal(url)
+    await shell.openExternal('https://console.ltx.video/api-keys/')
     return true
   })
 
-  ipcMain.handle('open-folder', async (_event, folderPath: string) => {
+  ipcMain.handle('open-parent-folder-of-file', async (_event, filePath: string) => {
     const { shell } = await import('electron')
-    shell.openPath(folderPath)
+    const normalizedPath = validatePath(filePath, getAllowedRoots())
+    const parentDir = path.dirname(normalizedPath)
+    if (!fs.existsSync(parentDir) || !fs.statSync(parentDir).isDirectory()) {
+      throw new Error(`Parent directory not found: ${parentDir}`)
+    }
+    shell.openPath(parentDir)
   })
 
   ipcMain.handle('show-item-in-folder', async (_event, filePath: string) => {
@@ -183,23 +169,6 @@ export function registerFileHandlers(): void {
       return { success: true }
     } catch (error) {
       return { success: false, error: String(error) }
-    }
-  })
-
-  ipcMain.handle('import-file-to-storage', async (_event, sourcePath: string, originalName: string) => {
-    try {
-      const result = importFileToStorage(sourcePath, originalName)
-      return { success: true, path: result.path, url: result.url }
-    } catch (error) {
-      return { success: false, error: String(error) }
-    }
-  })
-
-  ipcMain.handle('check-file-exists', async (_event, filePath: string) => {
-    try {
-      return fs.existsSync(filePath)
-    } catch {
-      return false
     }
   })
 
