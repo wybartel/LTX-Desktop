@@ -12,6 +12,11 @@ used by LTX Desktop.
   License: LTX-2 Community License
   https://github.com/Lightricks/LTX-2/blob/main/LICENSE
 
+- **Gemma 3**
+  Copyright (c) Google LLC.
+  License: Gemma Terms of Use
+  https://ai.google.dev/gemma/terms
+
 - **FLUX.2-klein-4B**
   Copyright (c) Black Forest Labs.
   License: Apache License 2.0
@@ -42,6 +47,7 @@ used by LTX Desktop.
 - **fastapi** — Copyright (c) Sebastian Ramirez — MIT License
 - **uvicorn** — Copyright (c) Encode OSS Ltd. — BSD 3-Clause License
 - **python-multipart** — Copyright (c) Andrew Dunham — Apache License 2.0
+- **triton-windows** — Copyright (c) OpenAI — MIT License (Windows only)
 
 ---
 
