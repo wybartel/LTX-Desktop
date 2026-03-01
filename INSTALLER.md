@@ -37,13 +37,11 @@ Before building, ensure you have:
 
 ### macOS
 ```bash
-cd ltx-video
 npm run build:mac
 ```
 
 ### Windows
 ```powershell
-cd ltx-video
 npm run build:win
 ```
 
@@ -159,7 +157,6 @@ For developers working on the codebase:
 
 ### macOS
 ```bash
-cd ltx-video
 npm run setup:dev:mac   # Create venv + install Python deps
 npm install             # Install Node deps
 npm run dev             # Start in dev mode
@@ -167,7 +164,6 @@ npm run dev             # Start in dev mode
 
 ### Windows
 ```powershell
-cd ltx-video
 npm run setup:dev       # Create venv + install Python deps
 npm install             # Install Node deps
 npm run dev             # Start in dev mode

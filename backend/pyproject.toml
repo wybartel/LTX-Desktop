@@ -1,5 +1,5 @@
 [project]
-name = "ltx-video-backend"
+name = "ltx-desktop-backend"
 version = "1.0.0"
 description = "LTX-2 Video Generation Backend"
 requires-python = ">=3.12"

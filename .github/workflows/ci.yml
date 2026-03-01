@@ -14,9 +14,6 @@ jobs:
   typecheck:
     name: Type Checking
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ltx-video
     steps:
       - uses: actions/checkout@v4
 
@@ -24,7 +21,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: ltx-video/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - run: npm ci
 
@@ -35,18 +32,18 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
-          cache-dependency-glob: "ltx-video/backend/uv.lock"
+          cache-dependency-glob: "backend/uv.lock"
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install Python dev dependencies
-        working-directory: ltx-video/backend
+        working-directory: backend
         run: uv sync --frozen --extra dev
 
       - name: Pyright type check
-        working-directory: ltx-video/backend
+        working-directory: backend
         run: uv run pyright
 
   test-python:
@@ -62,7 +59,7 @@ jobs:
             runner: windows-latest
     defaults:
       run:
-        working-directory: ltx-video/backend
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
@@ -70,7 +67,7 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
-          cache-dependency-glob: "ltx-video/backend/uv.lock"
+          cache-dependency-glob: "backend/uv.lock"
 
       - uses: actions/setup-python@v5
         with:
@@ -85,9 +82,6 @@ jobs:
   build-check:
     name: Frontend Build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ltx-video
     steps:
       - uses: actions/checkout@v4
 
@@ -95,7 +89,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: ltx-video/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - run: npm ci
 

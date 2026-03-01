@@ -2,11 +2,7 @@
 
 A standalone desktop application for generating AI videos using the LTX-2 model, running entirely on your local GPU.
 
-## Features 
-
-
-
-
+## Features
 
 - **Local GPU Inference**: All video generation happens on your machine - no cloud required
 - **Text-to-Video**: Generate videos from text descriptions
@@ -31,7 +27,7 @@ A standalone desktop application for generating AI videos using the LTX-2 model,
 ## Installation
 
 ### For Users
-1. Download the latest installer from [Releases](https://github.com/Lightricks/ltx-video/releases)
+1. Download the latest installer from [Releases](https://github.com/Lightricks/ltx-desktop/releases)
 2. Run the installer
 3. Launch LTX Video
 4. On first run, the app will download required AI models (~15GB)
@@ -40,16 +36,22 @@ A standalone desktop application for generating AI videos using the LTX-2 model,
 
 #### Prerequisites
 - Node.js 20+
-- Python 3.11+
+- Python 3.12+
 - NVIDIA GPU with CUDA 12.1+
 - uv (Python package manager)
+- [Microsoft Visual C++ Redistributable 2015+](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) (required by native Python packages)
+
+> **Windows note:** If you see script execution errors when running `uv sync` or `npm` commands, you may need to allow PowerShell script execution. Run PowerShell as Administrator and execute:
+> ```powershell
+> Set-ExecutionPolicy RemoteSigned
+> ```
 
 #### Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/Lightricks/ltx-video.git
-cd ltx-video
+git clone https://github.com/Lightricks/ltx-desktop.git
+cd ltx-desktop
 
 # Install frontend dependencies
 npm install
@@ -66,7 +68,7 @@ npm run electron:dev
 ## Project Structure
 
 ```
-ltx-video/
+ltx-desktop/
 ├── electron/           # Electron main process
 │   ├── main.ts         # Application entry point
 │   └── preload.ts      # Secure IPC bridge

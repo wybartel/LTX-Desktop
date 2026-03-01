@@ -16,7 +16,7 @@ echo.
 echo DISTUTILS_USE_SDK=%DISTUTILS_USE_SDK%
 echo.
 echo Installing SageAttention 2.2.0 from GitHub...
-cd /d "C:\CursorProjects\LTX-2-app\ltx-video\backend"
+cd /d "%~dp0"
 ".venv\Scripts\pip.exe" uninstall sageattention -y 2>nul
 ".venv\Scripts\pip.exe" install git+https://github.com/thu-ml/SageAttention.git --no-build-isolation
 

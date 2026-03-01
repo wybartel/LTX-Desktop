@@ -506,18 +506,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ltx-pipelines"
-version = "1.0.0"
-source = { git = "https://github.com/Lightricks/LTX-2.git?subdirectory=packages%2Fltx-pipelines&rev=28c3c73fe557666c3de176e1e50a5220152ccfca#28c3c73fe557666c3de176e1e50a5220152ccfca" }
-dependencies = [
-    { name = "av" },
-    { name = "ltx-core" },
-    { name = "pillow" },
-    { name = "tqdm" },
-]
-
-[[package]]
-name = "ltx-video-backend"
+name = "ltx-desktop-backend"
 version = "1.0.0"
 source = { virtual = "." }
 dependencies = [
@@ -589,6 +578,17 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
 ]
 provides-extras = ["test", "dev"]
+
+[[package]]
+name = "ltx-pipelines"
+version = "1.0.0"
+source = { git = "https://github.com/Lightricks/LTX-2.git?subdirectory=packages%2Fltx-pipelines&rev=28c3c73fe557666c3de176e1e50a5220152ccfca#28c3c73fe557666c3de176e1e50a5220152ccfca" }
+dependencies = [
+    { name = "av" },
+    { name = "ltx-core" },
+    { name = "pillow" },
+    { name = "tqdm" },
+]
 
 [[package]]
 name = "markupsafe"

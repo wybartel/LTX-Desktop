@@ -7,15 +7,13 @@
 
 ## How to create a release
 
-Use `npm version` from the `ltx-video/` directory to bump the version in `package.json` and create a git tag in one step:
+Use `npm version` to bump the version in `package.json` and create a git tag in one step:
 
 ```bash
-cd ltx-video
 npm version 1.0.1        # explicit version
 # or: npm version patch   # 1.0.0 → 1.0.1
 # or: npm version minor   # 1.0.0 → 1.1.0
 # or: npm version major   # 1.0.0 → 2.0.0
-cd ..
 git push --follow-tags    # pushes the version bump commit + v1.0.1 tag
 ```
 
@@ -26,9 +24,7 @@ This keeps `package.json` and the tag in sync by design.
 Use semver prerelease identifiers:
 
 ```bash
-cd ltx-video
 npm version 1.1.0-beta.1
-cd ..
 git push --follow-tags
 ```
 
@@ -67,9 +63,7 @@ The draft release stays on GitHub. To retry:
 2. Delete the tag: `git push origin :refs/tags/v1.0.1`
 3. Fix the issue and re-tag:
    ```bash
-   cd ltx-video
    npm version 1.0.1
-   cd ..
    git push --follow-tags
    ```
 
