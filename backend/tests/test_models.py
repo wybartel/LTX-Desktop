@@ -1,6 +1,10 @@
 """Integration-style tests for model-related endpoints."""
 
-from state.app_state_types import FileDownloadRunning
+import inspect
+
+from huggingface_hub import file_download
+
+from state.app_state_types import FileDownloadCompleted, FileDownloadRunning
 
 
 class TestModelsList:
@@ -138,3 +142,69 @@ class TestTextEncoderDownload:
         test_state.downloads.start_download({"checkpoint": ("checkpoint", 100)})
         r = client.post("/api/text-encoder/download")
         assert r.status_code == 409
+
+
+class TestDownloadProgressCallbacks:
+    def test_download_passes_progress_callback(self, client, test_state):
+        r = client.post("/api/models/download", json={})
+        assert r.status_code == 200
+
+        calls = test_state.model_downloader.calls
+        assert len(calls) > 0
+        for call in calls:
+            assert call["on_progress"] is not None, f"on_progress missing for {call['kind']} call"
+
+    def test_text_encoder_download_passes_progress_callback(self, client, test_state):
+        r = client.post("/api/text-encoder/download")
+        assert r.status_code == 200
+
+        calls = test_state.model_downloader.calls
+        assert len(calls) > 0
+        for call in calls:
+            assert call["on_progress"] is not None
+
+    def test_progress_callback_updates_state(self, client, test_state):
+        r = client.post("/api/models/download", json={})
+        assert r.status_code == 200
+
+        # The fake downloader invokes on_progress(512, 1024) then on_progress(1024, 1024).
+        # After download completes, each file is marked completed.
+        # Verify that the download session was populated (files are now completed).
+        r = client.get("/api/models/download/progress")
+        data = r.json()
+        assert data["status"] == "complete"
+        assert data["filesCompleted"] > 0
+
+    def test_progress_callback_updates_running_state(self, test_state):
+        """Directly invoke callback to verify it updates FileDownloadRunning state."""
+        test_state.downloads.start_download({"checkpoint": ("checkpoint", 10_000)})
+        cb = test_state.downloads._make_progress_callback("checkpoint")
+        cb(5_000, 10_000)
+
+        r = test_state.downloads.get_download_progress()
+        assert r.currentFileProgress == 50
+        assert r.downloadedBytes == 5_000
+
+
+class TestHuggingFaceInternals:
+    """Guard tests for huggingface_hub internals we rely on.
+
+    We monkey-patch ``file_download.http_get`` to inject a custom tqdm bar
+    for progress tracking during ``hf_hub_download`` (which has no public
+    ``tqdm_class`` parameter, unlike ``snapshot_download``).
+
+    If these tests break after a huggingface_hub upgrade, the internal API
+    has changed.  Find an alternative approach and raise to a developer.
+    """
+
+    def test_http_get_exists_and_is_callable(self):
+        assert hasattr(file_download, "http_get"), (
+            "file_download.http_get no longer exists — progress patch for hf_hub_download is broken"
+        )
+        assert callable(file_download.http_get)
+
+    def test_http_get_accepts_tqdm_bar(self):
+        sig = inspect.signature(file_download.http_get)
+        assert "_tqdm_bar" in sig.parameters, (
+            "file_download.http_get no longer accepts _tqdm_bar — progress patch for hf_hub_download is broken"
+        )

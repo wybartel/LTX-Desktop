@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from collections.abc import Callable
 from pathlib import Path
 from threading import RLock
 from typing import TYPE_CHECKING
@@ -44,23 +46,23 @@ class DownloadHandler(StateHandlerBase):
     @with_state_lock
     def start_download(self, files: dict[ModelFileType, tuple[str, int]]) -> None:
         self.state.downloading_session = {
-            file_key: FileDownloadRunning(
+            file_type: FileDownloadRunning(
                 target_path=target,
                 progress=0.0,
                 downloaded_bytes=0,
                 total_bytes=size,
                 speed_mbps=0.0,
             )
-            for file_key, (target, size) in files.items()
+            for file_type, (target, size) in files.items()
         }
 
     @with_state_lock
-    def update_file_progress(self, file_key: str, downloaded: int, total: int, speed_mbps: float) -> None:
+    def update_file_progress(self, file_type: ModelFileType, downloaded: int, total: int, speed_mbps: float) -> None:
         match self.state.downloading_session:
             case dict() as files:
-                if file_key not in files:
+                if file_type not in files:
                     return
-                match files[file_key]:
+                match files[file_type]:
                     case FileDownloadRunning() as running:
                         running.downloaded_bytes = downloaded
                         running.total_bytes = total
@@ -72,10 +74,10 @@ class DownloadHandler(StateHandlerBase):
                 return
 
     @with_state_lock
-    def complete_file(self, file_key: ModelFileType) -> None:
+    def complete_file(self, file_type: ModelFileType) -> None:
         match self.state.downloading_session:
             case dict() as files:
-                files[file_key] = FileDownloadCompleted()
+                files[file_type] = FileDownloadCompleted()
             case _:
                 return
 
@@ -83,6 +85,16 @@ class DownloadHandler(StateHandlerBase):
     def fail_download(self, error: str) -> None:
         logger.error("Model download failed: %s", error)
         self.state.downloading_session = DownloadError(error=error)
+
+    def _make_progress_callback(self, file_type: ModelFileType) -> Callable[[int, int], None]:
+        start_time = time.monotonic()
+
+        def on_progress(downloaded: int, total: int) -> None:
+            elapsed = time.monotonic() - start_time
+            speed_mbps = (downloaded / elapsed / (1024 * 1024)) if elapsed > 0 else 0.0
+            self.update_file_progress(file_type, downloaded, total, speed_mbps)
+
+        return on_progress
 
     def _on_background_download_error(self, exc: Exception) -> None:
         self.fail_download(str(exc))
@@ -106,15 +118,15 @@ class DownloadHandler(StateHandlerBase):
             case dict() as files:
                 status = "downloading" if self.state.is_downloading else "complete"
                 total_files = len(files)
-                for file_key, file_state in files.items():
-                    size = self._config.spec_for(file_key).expected_size_bytes
+                for file_type, file_state in files.items():
+                    size = self._config.spec_for(file_type).expected_size_bytes
                     total_bytes += size
                     match file_state:
                         case FileDownloadCompleted():
                             files_completed += 1
                             downloaded_bytes += size
                         case FileDownloadRunning() as running:
-                            current_file = file_key
+                            current_file = file_type
                             current_file_progress = int(running.progress * 100)
                             speed_mbps = int(running.speed_mbps)
                             downloaded_bytes += running.downloaded_bytes
@@ -189,28 +201,31 @@ class DownloadHandler(StateHandlerBase):
 
         self.start_download(files_to_download)
 
-        for file_key, (target_name, expected_size) in files_to_download.items():
-            spec = self._config.spec_for(file_key)
+        for file_type, (target_name, expected_size) in files_to_download.items():
+            spec = self._config.spec_for(file_type)
             logger.info("Downloading %s from %s", target_name, spec.repo_id)
+            progress_cb = self._make_progress_callback(file_type)
 
             if spec.is_folder:
                 allow_patterns = list(spec.snapshot_allow_patterns) if spec.snapshot_allow_patterns is not None else None
                 self._model_downloader.download_snapshot(
                     repo_id=spec.repo_id,
-                    local_dir=str(self._config.download_local_dir(file_key)),
+                    local_dir=str(self._config.download_local_dir(file_type)),
                     allow_patterns=allow_patterns,
+                    on_progress=progress_cb,
                 )
-                if file_key == "text_encoder":
+                if file_type == "text_encoder":
                     self._rename_text_encoder_files(self._config.model_path("text_encoder"))
             else:
                 self._model_downloader.download_file(
                     repo_id=spec.repo_id,
                     filename=spec.name,
-                    local_dir=str(self._config.download_local_dir(file_key)),
+                    local_dir=str(self._config.download_local_dir(file_type)),
+                    on_progress=progress_cb,
                 )
 
-            self.update_file_progress(file_key, expected_size, expected_size, 0)
-            self.complete_file(file_key)
+            self.update_file_progress(file_type, expected_size, expected_size, 0)
+            self.complete_file(file_type)
 
         self._models_handler.refresh_available_files()
 
@@ -235,10 +250,12 @@ class DownloadHandler(StateHandlerBase):
         def worker() -> None:
             text_spec = self._config.spec_for("text_encoder")
             self.start_download({"text_encoder": (text_spec.name, text_spec.expected_size_bytes)})
+            progress_cb = self._make_progress_callback("text_encoder")
             self._model_downloader.download_snapshot(
                 repo_id=text_spec.repo_id,
                 local_dir=str(self._config.download_local_dir("text_encoder")),
                 allow_patterns=list(text_spec.snapshot_allow_patterns) if text_spec.snapshot_allow_patterns is not None else None,
+                on_progress=progress_cb,
             )
             self._rename_text_encoder_files(self._config.model_path("text_encoder"))
             self.update_file_progress(
