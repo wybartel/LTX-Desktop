@@ -63,11 +63,11 @@ DEFAULT_MODEL_DOWNLOAD_SPECS: dict[ModelFileType, ModelFileDownloadSpec] = {
         snapshot_allow_patterns=("text_encoder/*", "tokenizer/*"),
     ),
     "flux": ModelFileDownloadSpec(
-        relative_path=Path("FLUX.2-klein-4B"),
-        expected_size_bytes=15_000_000_000,
+        relative_path=Path("FLUX.2-klein-9B"),
+        expected_size_bytes=53_000_000_000,
         is_folder=True,
-        repo_id="black-forest-labs/FLUX.2-klein-4B",
-        description="Flux model for text-to-image",
+        repo_id="black-forest-labs/FLUX.2-klein-9B",
+        description="Flux 9B model for text-to-image",
     ),
 }
 
