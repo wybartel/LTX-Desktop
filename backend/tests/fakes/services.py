@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar
@@ -250,16 +251,32 @@ class FakeModelDownloader:
         self.fail_next = None
         raise error
 
-    def download_file(self, repo_id: str, filename: str, local_dir: str) -> Path:
+    def download_file(
+        self,
+        repo_id: str,
+        filename: str,
+        local_dir: str,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> Path:
         self._raise_if_needed()
-        self.calls.append({"kind": "file", "repo_id": repo_id, "filename": filename, "local_dir": local_dir})
+        self.calls.append({"kind": "file", "repo_id": repo_id, "filename": filename, "local_dir": local_dir, "on_progress": on_progress})
+
+        if on_progress is not None:
+            on_progress(512, 1024)
+            on_progress(1024, 1024)
 
         destination = Path(local_dir) / filename
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(b"\x00" * 1024)
         return destination
 
-    def download_snapshot(self, repo_id: str, local_dir: str, allow_patterns: list[str] | None = None) -> Path:
+    def download_snapshot(
+        self,
+        repo_id: str,
+        local_dir: str,
+        allow_patterns: list[str] | None = None,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> Path:
         self._raise_if_needed()
         self.calls.append(
             {
@@ -267,8 +284,13 @@ class FakeModelDownloader:
                 "repo_id": repo_id,
                 "local_dir": local_dir,
                 "allow_patterns": allow_patterns,
+                "on_progress": on_progress,
             }
         )
+
+        if on_progress is not None:
+            on_progress(512, 1024)
+            on_progress(1024, 1024)
 
         root = Path(local_dir)
         root.mkdir(parents=True, exist_ok=True)
