@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Button } from './ui/button'
 import { useAppSettings, type AppSettings } from '../contexts/AppSettingsContext'
 import { logger } from '../lib/logger'
+import { LtxApiKeyInput, LtxApiKeyHelperRow } from './LtxApiKeyInput'
 
 interface TextEncoderStatus {
   downloaded: boolean
@@ -279,8 +280,84 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
         <div className="px-6 py-5 space-y-6 h-[60vh] overflow-y-auto">
           {activeTab === 'general' && (
             <>
-              {/* Text Encoding Section */}
+              {/* LTX API Section */}
               <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-blue-400" />
+                  <h3 className="text-sm font-semibold text-white">LTX API</h3>
+                </div>
+
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  Your LTX API key is used for cloud text encoding, prompt enhancement, and Pro generation.
+                  Add your key below to unlock these features.
+                </p>
+
+                <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3">
+                  <div className="flex gap-2">
+                    <LtxApiKeyInput
+                      ref={ltxApiKeyInputRef}
+                      value={ltxApiKeyInput}
+                      onChange={(e) => setLtxApiKeyInput(e.target.value)}
+                      placeholder={settings.hasLtxApiKey ? 'Enter new key to replace...' : 'Enter your LTX API key...'}
+                      stopPropagation
+                      className="flex-1"
+                    />
+                    <button
+                      onClick={() => {
+                        const trimmed = ltxApiKeyInput.trim()
+                        if (!trimmed) return
+                        void saveLtxApiKey(trimmed)
+                        setLtxApiKeyInput('')
+                      }}
+                      disabled={!ltxApiKeyInput.trim()}
+                      className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    >
+                      Save Key
+                    </button>
+                  </div>
+                  <LtxApiKeyHelperRow stopPropagation />
+                  <div className="flex items-center justify-between">
+                    <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
+                      settings.hasLtxApiKey
+                        ? 'bg-green-500/10 text-green-400'
+                        : 'bg-amber-500/10 text-amber-400'
+                    }`}>
+                      {settings.hasLtxApiKey ? (
+                        <>
+                          <Check className="h-3 w-3" />
+                          Key configured
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-3 w-3" />
+                          API key required
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Prompt Cache Size */}
+                  {settings.hasLtxApiKey && (
+                    <div className="flex items-center justify-between pt-3 border-t border-zinc-700/50">
+                      <div>
+                        <label className="text-xs text-white">Prompt Cache</label>
+                        <p className="text-xs text-zinc-500">Skip repeat prompts</p>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        max="1000"
+                        value={settings.promptCacheSize ?? 100}
+                        onChange={handlePromptCacheSizeChange}
+                        className="w-16 px-2 py-1 bg-zinc-700 border border-zinc-600 rounded text-xs text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Text Encoding Section */}
+              <div className="space-y-4 pt-4 border-t border-zinc-800">
                 <div className="flex items-center gap-2">
                   <svg className="h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3" />
@@ -298,7 +375,15 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                   className={`bg-zinc-800/50 rounded-lg p-4 border-2 transition-colors cursor-pointer ${
                     !settings.useLocalTextEncoder ? 'border-blue-500' : 'border-transparent hover:border-zinc-600'
                   }`}
-                  onClick={() => settings.useLocalTextEncoder && handleToggleLocalEncoder()}
+                  onClick={() => {
+                    if (!settings.useLocalTextEncoder) return
+                    if (!settings.hasLtxApiKey) {
+                      ltxApiKeyInputRef.current?.focus()
+                      ltxApiKeyInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      return
+                    }
+                    handleToggleLocalEncoder()
+                  }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
@@ -307,6 +392,9 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                         <span className="text-sm font-medium text-white">LTX API</span>
                         <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">Recommended</span>
                       </div>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Fast cloud-based text encoding (~1 second). Requires an LTX API key configured above.
+                      </p>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                       !settings.useLocalTextEncoder ? 'border-blue-500 bg-blue-500' : 'border-zinc-600'
@@ -315,80 +403,11 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                     </div>
                   </div>
 
-                  {/* API Key Input - show when this option is selected */}
-                  {!settings.useLocalTextEncoder && (
-                    <div className="mt-3 pt-3 border-t border-zinc-700/50">
-                      <div className="flex gap-2">
-                        <input
-                          ref={ltxApiKeyInputRef}
-                          type="password"
-                          value={ltxApiKeyInput}
-                          onChange={(e) => setLtxApiKeyInput(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder={settings.hasLtxApiKey ? 'Enter new key to replace...' : 'Enter your LTX API key...'}
-                          className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const trimmed = ltxApiKeyInput.trim()
-                            if (!trimmed) return
-                            void saveLtxApiKey(trimmed)
-                            setLtxApiKeyInput('')
-                          }}
-                          disabled={!ltxApiKeyInput.trim()}
-                          className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-                        >
-                          Save Key
-                        </button>
-                      </div>
-                      <div className="flex items-center justify-between mt-2">
-                        <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
-                          settings.hasLtxApiKey
-                            ? 'bg-green-500/10 text-green-400'
-                            : 'bg-amber-500/10 text-amber-400'
-                        }`}>
-                          {settings.hasLtxApiKey ? (
-                            <>
-                              <Check className="h-3 w-3" />
-                              Key configured
-                            </>
-                          ) : (
-                            <>
-                              <AlertCircle className="h-3 w-3" />
-                              API key required
-                            </>
-                          )}
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            window.electronAPI.openLtxApiKeyPage()
-                          }}
-                          className="text-xs text-blue-400 hover:text-blue-300 underline"
-                        >
-                          Get Key
-                        </button>
-                      </div>
-
-                      {/* Prompt Cache Size */}
-                      {settings.hasLtxApiKey && (
-                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-700/50">
-                          <div>
-                            <label className="text-xs text-white">Prompt Cache</label>
-                            <p className="text-xs text-zinc-500">Skip repeat prompts</p>
-                          </div>
-                          <input
-                            type="number"
-                            min="0"
-                            max="1000"
-                            value={settings.promptCacheSize ?? 100}
-                            onChange={handlePromptCacheSizeChange}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-16 px-2 py-1 bg-zinc-700 border border-zinc-600 rounded text-xs text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      )}
+                  {/* Warning when selected but no key */}
+                  {!settings.useLocalTextEncoder && !settings.hasLtxApiKey && (
+                    <div className="mt-2 text-xs text-amber-400 flex items-center gap-1.5">
+                      <AlertCircle className="h-3 w-3" />
+                      API key required — configure it in the LTX API section above.
                     </div>
                   )}
                 </div>
@@ -767,7 +786,10 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                       <button
                         onClick={() => {
                           setActiveTab('general')
-                          setTimeout(() => ltxApiKeyInputRef.current?.focus(), 100)
+                          setTimeout(() => {
+                            ltxApiKeyInputRef.current?.focus()
+                            ltxApiKeyInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                          }, 100)
                         }}
                         className="w-full mt-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
                       >

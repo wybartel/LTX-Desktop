@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, KeyRound, Sparkles, X } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
+import { LtxApiKeyInput, LtxApiKeyHelperRow } from './LtxApiKeyInput'
 
 export interface ApiUpsellCopy {
   title: string
@@ -57,10 +58,6 @@ export function ApiUpsellModal({
 
   const canSubmit = useMemo(() => apiKey.trim().length > 0 && !isSaving, [apiKey, isSaving])
 
-  const handleOpenApiKeyUrl = () => {
-    window.electronAPI.openLtxApiKeyPage()
-  }
-
   const handleSave = async () => {
     const trimmedKey = apiKey.trim()
     if (!trimmedKey) {
@@ -115,29 +112,13 @@ export function ApiUpsellModal({
             <label htmlFor="ltx-api-key-input" className="mb-2 block text-sm font-medium text-zinc-200">
               LTX API Key
             </label>
-            <div className="relative">
-              <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-              <input
-                id="ltx-api-key-input"
-                type="password"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                placeholder="Paste your API key"
-                autoComplete="off"
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2.5 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <span className="text-xs text-zinc-500">Your key stays in your local app settings.</span>
-              <button
-                type="button"
-                onClick={handleOpenApiKeyUrl}
-                className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
-              >
-                Get API key
-                <ExternalLink className="h-3 w-3" />
-              </button>
-            </div>
+            <LtxApiKeyInput
+              id="ltx-api-key-input"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              placeholder="Paste your API key"
+            />
+            <LtxApiKeyHelperRow />
           </div>
 
           {error && (
