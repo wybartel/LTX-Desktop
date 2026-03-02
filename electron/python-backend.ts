@@ -19,17 +19,12 @@ type BackendOwnership = 'managed' | 'adopted' | null
 
 let backendOwnership: BackendOwnership = null
 
-interface BackendRuntimeFlags {
-  forceApiGenerations: boolean
-}
-
 export interface BackendHealthStatus {
   status: 'alive' | 'restarting' | 'dead'
   exitCode?: number | null
 }
 
 let latestBackendHealthStatus: BackendHealthStatus | null = null
-let lastRuntimeFlags: BackendRuntimeFlags | null = null
 
 function publishBackendHealthStatus(status: BackendHealthStatus): void {
   latestBackendHealthStatus = status
@@ -104,13 +99,6 @@ function startOwnershipTakeover(): void {
     return
   }
 
-  const restartFlags = lastRuntimeFlags
-  if (!restartFlags) {
-    backendOwnership = null
-    publishBackendHealthStatus({ status: 'dead' })
-    return
-  }
-
   takeoverInFlight = (async () => {
     try {
       const shutdownRequested = await requestAdoptedBackendShutdown()
@@ -124,7 +112,7 @@ function startOwnershipTakeover(): void {
       }
 
       backendOwnership = null
-      await startPythonBackend(restartFlags)
+      await startPythonBackend()
     } catch (error) {
       logger.error(`Failed to reclaim backend process ownership: ${error}`)
       backendOwnership = null
@@ -190,9 +178,7 @@ export function getPythonPath(): string {
   return 'python'
 }
 
-export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<void> {
-  lastRuntimeFlags = flags
-
+export async function startPythonBackend(): Promise<void> {
   if (startPromise) {
     return startPromise
   }
@@ -240,7 +226,6 @@ export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<vo
         LTX_LOG_FILE: getCurrentLogFilename(),
         LTX_APP_DATA_DIR: getAppDataDir(),
         PYTORCH_ENABLE_MPS_FALLBACK: '1',
-        FORCE_API_GENERATIONS: flags.forceApiGenerations ? '1' : '0',
         // Set PYTHONHOME for bundled Python on macOS so it finds its stdlib
         ...(!isDev && process.platform !== 'win32' ? {
           PYTHONHOME: getPythonDir(),
@@ -344,9 +329,8 @@ export async function startPythonBackend(flags: BackendRuntimeFlags): Promise<vo
 
       lastCrashTime = now
       publishBackendHealthStatus({ status: 'restarting', exitCode: code })
-      const restartFlags = lastRuntimeFlags ?? flags
       try {
-        await startPythonBackend(restartFlags)
+        await startPythonBackend()
       } catch {
         publishBackendHealthStatus({ status: 'dead', exitCode: code })
       }

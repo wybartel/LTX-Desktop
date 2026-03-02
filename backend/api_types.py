@@ -93,6 +93,10 @@ class GpuInfoResponse(BaseModel):
     gpu_info: GpuTelemetry
 
 
+class RuntimePolicyResponse(BaseModel):
+    force_api_generations: bool
+
+
 class GenerationProgressResponse(BaseModel):
     status: str
     phase: str

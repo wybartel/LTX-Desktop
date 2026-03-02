@@ -14,7 +14,6 @@ interface BackendHealthStatus {
 interface Window {
   electronAPI: {
     getBackendUrl: () => Promise<string>
-    getRuntimeFlags: () => Promise<{ forceApiGenerations: boolean }>
     getModelsPath: () => Promise<string>
     readLocalFile: (filePath: string) => Promise<{ data: string; mimeType: string }>
     checkGpu: () => Promise<{ available: boolean; name?: string; vram?: number }>

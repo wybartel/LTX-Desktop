@@ -21,7 +21,7 @@ type SetupState = 'loading' | { needsSetup: boolean; needsLicense: boolean }
 function AppContent() {
   const { currentView } = useProjects()
   const { status, processStatus, isLoading: backendLoading, error: backendError } = useBackend()
-  const { settings, saveLtxApiKey, forceApiGenerations, isLoaded } = useAppSettings()
+  const { settings, saveLtxApiKey, forceApiGenerations, isLoaded, runtimePolicyLoaded } = useAppSettings()
 
   const [pythonReady, setPythonReady] = useState<boolean | null>(null)
   const [backendStarted, setBackendStarted] = useState(false)
@@ -44,6 +44,7 @@ function AppContent() {
 
   const isBackendRestarting = processStatus === 'restarting'
   const isBackendDead = processStatus === 'dead'
+  const waitingForRuntimePolicy = processStatus === 'alive' && !runtimePolicyLoaded
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -207,7 +208,7 @@ function AppContent() {
     )
   }
 
-  if (backendLoading || setupState === 'loading') {
+  if (backendLoading || setupState === 'loading' || waitingForRuntimePolicy) {
     return (
       <div className="relative h-screen w-screen">
         <div className="h-screen bg-background flex items-center justify-center">

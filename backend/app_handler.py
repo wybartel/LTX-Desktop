@@ -16,6 +16,7 @@ from handlers import (
     PipelinesHandler,
     PromptHandler,
     RetakeHandler,
+    RuntimePolicyHandler,
     SettingsHandler,
     TextHandler,
     VideoGenerationHandler,
@@ -190,6 +191,8 @@ class AppHandler:
             config=config,
             use_sage_attention=config.use_sage_attention,
         )
+
+        self.runtime_policy = RuntimePolicyHandler(config=config)
 
         self.prompt = PromptHandler(
             state=self.state,

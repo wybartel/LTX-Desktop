@@ -5,7 +5,6 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   // Get the backend URL
   getBackendUrl: (): Promise<string> => ipcRenderer.invoke('get-backend-url'),
-  getRuntimeFlags: (): Promise<{ forceApiGenerations: boolean }> => ipcRenderer.invoke('get-runtime-flags'),
   
   // Get the path where models are stored
   getModelsPath: (): Promise<string> => ipcRenderer.invoke('get-models-path'),
@@ -129,7 +128,6 @@ declare global {
   interface Window {
     electronAPI: {
       getBackendUrl: () => Promise<string>
-      getRuntimeFlags: () => Promise<{ forceApiGenerations: boolean }>
       getModelsPath: () => Promise<string>
       readLocalFile: (filePath: string) => Promise<{ data: string; mimeType: string }>
       checkGpu: () => Promise<{ available: boolean; name?: string; vram?: number }>

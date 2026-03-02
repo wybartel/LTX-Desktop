@@ -12,8 +12,6 @@ import { stopPythonBackend } from './python-backend'
 import { initAutoUpdater } from './updater'
 import { createWindow, getMainWindow } from './window'
 
-const FORCE_API_GENERATIONS = process.platform === 'darwin'
-
 const gotLock = app.requestSingleInstanceLock()
 
 if (!gotLock) {
@@ -21,7 +19,7 @@ if (!gotLock) {
 } else {
   initSessionLog()
 
-  registerAppHandlers({ forceApiGenerations: FORCE_API_GENERATIONS })
+  registerAppHandlers()
   registerFileHandlers()
   registerLogHandlers()
   registerExportHandlers()

@@ -48,6 +48,7 @@ type BackendProcessStatus = 'alive' | 'restarting' | 'dead'
 interface AppSettingsContextValue {
   settings: AppSettings
   isLoaded: boolean
+  runtimePolicyLoaded: boolean
   updateSettings: (patch: Partial<AppSettings> | ((prev: AppSettings) => AppSettings)) => void
   refreshSettings: () => Promise<void>
   saveLtxApiKey: (value: string) => Promise<void>
@@ -91,17 +92,54 @@ function normalizeAppSettings(data: Partial<AppSettings>): AppSettings {
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [runtimePolicyLoaded, setRuntimePolicyLoaded] = useState(false)
   const [backendUrl, setBackendUrl] = useState<string | null>(null)
   const [forceApiGenerations, setForceApiGenerations] = useState(true)
   const [backendProcessStatus, setBackendProcessStatus] = useState<BackendProcessStatus | null>(null)
 
   useEffect(() => {
     window.electronAPI.getBackendUrl().then(setBackendUrl).catch(() => setBackendUrl(null))
-    window.electronAPI
-      .getRuntimeFlags()
-      .then((flags) => setForceApiGenerations(flags.forceApiGenerations))
-      .catch(() => setForceApiGenerations(true))
   }, [])
+
+  useEffect(() => {
+    if (!backendUrl || backendProcessStatus !== 'alive') return
+
+    let cancelled = false
+    setRuntimePolicyLoaded(false)
+
+    const fetchRuntimePolicy = async () => {
+      try {
+        const response = await fetch(`${backendUrl}/api/runtime-policy`)
+        if (!response.ok) {
+          throw new Error(`Runtime policy fetch failed with status ${response.status}`)
+        }
+
+        const payload = (await response.json()) as { force_api_generations?: unknown }
+        if (typeof payload.force_api_generations !== 'boolean') {
+          throw new Error('Runtime policy response missing force_api_generations boolean')
+        }
+
+        if (!cancelled) {
+          setForceApiGenerations(payload.force_api_generations)
+        }
+      } catch {
+        if (!cancelled) {
+          // Fail closed until policy can be read.
+          setForceApiGenerations(true)
+        }
+      } finally {
+        if (!cancelled) {
+          setRuntimePolicyLoaded(true)
+        }
+      }
+    }
+
+    void fetchRuntimePolicy()
+
+    return () => {
+      cancelled = true
+    }
+  }, [backendProcessStatus, backendUrl])
 
   useEffect(() => {
     let cancelled = false
@@ -217,13 +255,14 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     () => ({
       settings,
       isLoaded,
+      runtimePolicyLoaded,
       updateSettings,
       refreshSettings,
       saveLtxApiKey,
       saveGeminiApiKey,
       forceApiGenerations,
     }),
-    [forceApiGenerations, isLoaded, refreshSettings, saveLtxApiKey, saveGeminiApiKey, settings, updateSettings],
+    [forceApiGenerations, isLoaded, refreshSettings, runtimePolicyLoaded, saveLtxApiKey, saveGeminiApiKey, settings, updateSettings],
   )
 
   return <AppSettingsContext.Provider value={contextValue}>{children}</AppSettingsContext.Provider>

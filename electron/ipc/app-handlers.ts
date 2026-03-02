@@ -66,17 +66,9 @@ function markLicenseAccepted(settingsPath: string): void {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
 }
 
-interface RuntimeFlags {
-  forceApiGenerations: boolean
-}
-
-export function registerAppHandlers(runtimeFlags: RuntimeFlags): void {
+export function registerAppHandlers(): void {
   ipcMain.handle('get-backend-url', () => {
     return BACKEND_BASE_URL
-  })
-
-  ipcMain.handle('get-runtime-flags', () => {
-    return runtimeFlags
   })
 
   ipcMain.handle('get-models-path', () => {
@@ -148,7 +140,7 @@ export function registerAppHandlers(runtimeFlags: RuntimeFlags): void {
   })
 
   ipcMain.handle('start-python-backend', async () => {
-    await startPythonBackend(runtimeFlags)
+    await startPythonBackend()
   })
 
   ipcMain.handle('get-backend-health-status', () => {

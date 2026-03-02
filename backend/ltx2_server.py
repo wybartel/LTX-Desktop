@@ -170,14 +170,40 @@ DEFAULT_APP_SETTINGS = AppSettings(
 from app_factory import DEFAULT_ALLOWED_ORIGINS, create_app
 from state import RuntimeConfig, build_initial_state
 from runtime_config.model_download_specs import DEFAULT_MODEL_DOWNLOAD_SPECS, DEFAULT_REQUIRED_MODEL_TYPES
+from runtime_config.runtime_policy import decide_force_api_generations
 from state.app_state_types import ModelFileType
 from server_utils.model_layout_migration import migrate_legacy_models_layout
+from services.gpu_info.gpu_info_impl import GpuInfoImpl
 
 migrate_legacy_models_layout(APP_DATA_DIR)
 IC_LORA_DIR.mkdir(parents=True, exist_ok=True)
 
 LTX_API_BASE_URL = "https://api.ltx.video"
-FORCE_API_GENERATIONS = os.environ.get("FORCE_API_GENERATIONS", "1") == "1"
+
+
+def _resolve_force_api_generations() -> bool:
+    gpu_info = GpuInfoImpl()
+    system = platform.system()
+    cuda_available = gpu_info.get_cuda_available()
+    vram_gb = gpu_info.get_vram_total_gb()
+
+    # Server-owned source of truth for mode selection.
+    force_api_generations = decide_force_api_generations(
+        system=system,
+        cuda_available=cuda_available,
+        vram_gb=vram_gb,
+    )
+    logger.info(
+        "Runtime policy force_api_generations=%s (system=%s cuda_available=%s vram_gb=%s)",
+        force_api_generations,
+        system,
+        cuda_available,
+        vram_gb,
+    )
+    return force_api_generations
+
+
+FORCE_API_GENERATIONS = _resolve_force_api_generations()
 REQUIRED_MODEL_TYPES: frozenset[ModelFileType] = (
     frozenset() if FORCE_API_GENERATIONS else DEFAULT_REQUIRED_MODEL_TYPES
 )
@@ -238,8 +264,6 @@ def background_warmup() -> None:
 
 def log_hardware_info() -> None:
     """Log runtime hardware and environment details."""
-    from services.gpu_info.gpu_info_impl import GpuInfoImpl
-
     gpu = GpuInfoImpl()
     gpu_info = gpu.get_gpu_info()
     vram_gb = gpu_info["vram"] // 1024 if gpu_info["vram"] else 0
