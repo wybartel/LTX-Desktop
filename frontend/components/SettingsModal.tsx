@@ -335,24 +335,6 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                       )}
                     </div>
                   </div>
-
-                  {/* Prompt Cache Size */}
-                  {settings.hasLtxApiKey && (
-                    <div className="flex items-center justify-between pt-3 border-t border-zinc-700/50">
-                      <div>
-                        <label className="text-xs text-white">Prompt Cache</label>
-                        <p className="text-xs text-zinc-500">Skip repeat prompts</p>
-                      </div>
-                      <input
-                        type="number"
-                        min="0"
-                        max="1000"
-                        value={settings.promptCacheSize ?? 100}
-                        onChange={handlePromptCacheSizeChange}
-                        className="w-16 px-2 py-1 bg-zinc-700 border border-zinc-600 rounded text-xs text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -408,6 +390,25 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                     <div className="mt-2 text-xs text-amber-400 flex items-center gap-1.5">
                       <AlertCircle className="h-3 w-3" />
                       API key required — configure it in the LTX API section above.
+                    </div>
+                  )}
+
+                  {/* Prompt Cache Size — only relevant for API text encoding */}
+                  {!settings.useLocalTextEncoder && settings.hasLtxApiKey && (
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-700/50">
+                      <div>
+                        <label className="text-xs text-white">Prompt Cache</label>
+                        <p className="text-xs text-zinc-500">Skip repeat encoding calls</p>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        max="1000"
+                        value={settings.promptCacheSize ?? 100}
+                        onChange={handlePromptCacheSizeChange}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-16 px-2 py-1 bg-zinc-700 border border-zinc-600 rounded text-xs text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
                   )}
                 </div>
