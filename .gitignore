@@ -28,7 +28,9 @@ backend/**/__pycache__/
 
 # IDE
 .idea/
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
 *.swp
 *.swo
 *~

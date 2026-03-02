@@ -11,11 +11,17 @@ export default defineConfig({
       {
         entry: 'electron/main.ts',
         onstart(options) {
-          options.startup()
+          if (process.env.ELECTRON_DEBUG) {
+            // --inspect and --remote-debugging-port must come before '.' (the app path)
+            options.startup(['--inspect=9229', '--remote-debugging-port=9222', '.', '--no-sandbox'])
+          } else {
+            options.startup()
+          }
         },
         vite: {
           build: {
             outDir: 'dist-electron',
+            sourcemap: true,
             rollupOptions: {
               external: ['electron']
             }
@@ -30,6 +36,7 @@ export default defineConfig({
         vite: {
           build: {
             outDir: 'dist-electron',
+            sourcemap: true,
             rollupOptions: {
               output: {
                 format: 'cjs'  // Preload must be CommonJS

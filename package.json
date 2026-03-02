@@ -9,7 +9,6 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "dev:debug": "DEBUG=1 vite",
     "build": "vite build && electron-builder",
     "build:frontend": "vite build",
     "build:mac": "bash scripts/build-installer.sh --platform mac",
