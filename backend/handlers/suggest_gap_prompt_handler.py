@@ -1,21 +1,19 @@
-"""Prompt enhancement and gap suggestion handler."""
+"""Gap prompt suggestion handler (Gemini-powered)."""
 
 from __future__ import annotations
 
 import base64
 import logging
-from pathlib import Path
 from threading import RLock
 
 from api_types import (
-    EnhancePromptRequest,
-    EnhancePromptResponse,
     SuggestGapPromptRequest,
     SuggestGapPromptResponse,
 )
 from _routes._errors import HTTPError
 from handlers.base import StateHandlerBase
 from pydantic import BaseModel, Field, ValidationError
+from server_utils.media_validation import normalize_optional_path, validate_image_file
 from services.interfaces import HTTPClient, HttpTimeoutError, JSONValue
 from state.app_state_types import AppState
 
@@ -48,77 +46,25 @@ def _extract_gemini_text(payload: object) -> str:
 
 def _read_image_file_as_base64(file_path: str | None) -> str | None:
     """Read an image file from disk and return its contents as base64."""
-    if not file_path:
+    normalized = normalize_optional_path(file_path)
+    if not normalized:
         return None
-    p = Path(file_path)
-    if not p.is_file():
-        logger.warning("Image file not found: %s", file_path)
+    try:
+        validated_path = validate_image_file(normalized)
+    except HTTPError as exc:
+        logger.warning("Ignoring invalid image file for gap prompt: %s (%s)", normalized, exc.detail)
         return None
-    return base64.b64encode(p.read_bytes()).decode()
+    try:
+        return base64.b64encode(validated_path.read_bytes()).decode()
+    except Exception:
+        logger.warning("Failed to read image file for gap prompt: %s", normalized, exc_info=True)
+        return None
 
 
-class PromptHandler(StateHandlerBase):
+class SuggestGapPromptHandler(StateHandlerBase):
     def __init__(self, state: AppState, lock: RLock, http: HTTPClient) -> None:
         super().__init__(state, lock)
         self._http = http
-
-    def enhance(self, req: EnhancePromptRequest) -> EnhancePromptResponse:
-        prompt = req.prompt.strip()
-        mode = req.mode
-        settings = self.state.app_settings.model_copy(deep=True)
-
-        if not prompt:
-            raise HTTPError(400, "Prompt is required")
-
-        if mode == "t2i":
-            return EnhancePromptResponse(
-                status="success",
-                enhanced_prompt=prompt,
-                skipped=True,
-                reason="Prompt enhancement disabled for image generation",
-            )
-
-        enhancer_enabled = settings.prompt_enhancer_enabled_i2v if mode == "i2v" else settings.prompt_enhancer_enabled_t2v
-        if not enhancer_enabled:
-            return EnhancePromptResponse(
-                status="success",
-                enhanced_prompt=prompt,
-                skipped=True,
-                reason=f"Prompt enhancer is disabled for {mode.upper()}",
-            )
-
-        if not settings.gemini_api_key:
-            raise HTTPError(400, "GEMINI_API_KEY_MISSING")
-
-        system_prompt = settings.i2v_system_prompt if mode == "i2v" else settings.t2v_system_prompt
-        gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-        contents: list[JSONValue] = [{"role": "user", "parts": [{"text": prompt}]}]
-        system_instruction: dict[str, JSONValue] = {"parts": [{"text": system_prompt}]}
-        generation_config: dict[str, JSONValue] = {"temperature": 0.7, "maxOutputTokens": 1024}
-        gemini_payload: dict[str, JSONValue] = {
-            "contents": contents,
-            "systemInstruction": system_instruction,
-            "generationConfig": generation_config,
-        }
-
-        try:
-            response = self._http.post(
-                gemini_url,
-                headers={"Content-Type": "application/json", "x-goog-api-key": settings.gemini_api_key},
-                json_payload=gemini_payload,
-                timeout=30,
-            )
-        except HttpTimeoutError as exc:
-            raise HTTPError(504, "Gemini API request timed out") from exc
-        except Exception as exc:
-            raise HTTPError(500, str(exc)) from exc
-
-        if response.status_code != 200:
-            logger.error("Gemini API error: %s - %s", response.status_code, response.text)
-            raise HTTPError(response.status_code, f"Gemini API error: {response.text}")
-
-        enhanced_prompt = _extract_gemini_text(response.json())
-        return EnhancePromptResponse(status="success", enhanced_prompt=enhanced_prompt, original_prompt=prompt)
 
     def suggest_gap(self, req: SuggestGapPromptRequest) -> SuggestGapPromptResponse:
         before_frame = _read_image_file_as_base64(req.beforeFrame)

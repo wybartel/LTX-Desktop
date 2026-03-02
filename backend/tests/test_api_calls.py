@@ -1,4 +1,4 @@
-"""Integration-style tests for /api/enhance-prompt, /api/suggest-gap-prompt, /api/retake."""
+"""Integration-style tests for /api/suggest-gap-prompt, /api/retake."""
 
 from __future__ import annotations
 
@@ -21,60 +21,6 @@ def _gemini_error(status: int = 429, body: str = "rate limited") -> FakeResponse
 
 def _gemini_empty_candidates() -> FakeResponse:
     return FakeResponse(status_code=200, json_payload={"candidates": []})
-
-
-class TestEnhancePrompt:
-    def test_happy_path_t2v(self, client, test_state):
-        test_state.state.app_settings.gemini_api_key = "test-key"
-        test_state.http.queue("post", _gemini_ok("A beautiful cinematic sunset"))
-
-        r = client.post("/api/enhance-prompt", json={"prompt": "sunset", "mode": "t2v"})
-        assert r.status_code == 200
-        assert r.json()["enhanced_prompt"] == "A beautiful cinematic sunset"
-
-    def test_happy_path_i2v(self, client, test_state):
-        test_state.state.app_settings.gemini_api_key = "test-key"
-        test_state.state.app_settings.prompt_enhancer_enabled_i2v = True
-        test_state.http.queue("post", _gemini_ok("Animated image"))
-
-        r = client.post("/api/enhance-prompt", json={"prompt": "animate it", "mode": "i2v"})
-        assert r.status_code == 200
-        assert r.json()["enhanced_prompt"] == "Animated image"
-
-        payload = test_state.http.calls[-1].json_payload
-        assert payload["systemInstruction"]["parts"][0]["text"] == test_state.state.app_settings.i2v_system_prompt
-
-    def test_skip_t2i_mode(self, client):
-        r = client.post("/api/enhance-prompt", json={"prompt": "a cat", "mode": "t2i"})
-        assert r.status_code == 200
-        assert r.json()["skipped"] is True
-
-    def test_missing_gemini_key_400(self, client):
-        r = client.post("/api/enhance-prompt", json={"prompt": "hello", "mode": "t2v"})
-        assert r.status_code == 400
-        assert r.json()["error"] == "GEMINI_API_KEY_MISSING"
-
-    def test_gemini_api_error_forwarded(self, client, test_state):
-        test_state.state.app_settings.gemini_api_key = "key"
-        test_state.http.queue("post", _gemini_error(429, "rate limited"))
-
-        r = client.post("/api/enhance-prompt", json={"prompt": "test", "mode": "t2v"})
-        assert r.status_code == 429
-
-    def test_gemini_parse_error(self, client, test_state):
-        test_state.state.app_settings.gemini_api_key = "key"
-        test_state.http.queue("post", _gemini_empty_candidates())
-
-        r = client.post("/api/enhance-prompt", json={"prompt": "test", "mode": "t2v"})
-        assert r.status_code == 500
-        assert r.json()["error"] == "GEMINI_PARSE_ERROR"
-
-    def test_timeout_504(self, client, test_state):
-        test_state.state.app_settings.gemini_api_key = "key"
-        test_state.http.queue("post", HttpTimeoutError("timeout"))
-
-        r = client.post("/api/enhance-prompt", json={"prompt": "test", "mode": "t2v"})
-        assert r.status_code == 504
 
 
 class TestSuggestGapPrompt:

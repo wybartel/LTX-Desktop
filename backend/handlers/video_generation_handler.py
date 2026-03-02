@@ -22,6 +22,11 @@ from handlers.base import StateHandlerBase
 from handlers.generation_handler import GenerationHandler
 from handlers.pipelines_handler import PipelinesHandler
 from handlers.text_handler import TextHandler
+from server_utils.media_validation import (
+    normalize_optional_path,
+    validate_audio_file,
+    validate_image_file,
+)
 from services.interfaces import (
     FastNativeVideoPipeline,
     FastVideoPipeline,
@@ -92,8 +97,9 @@ class VideoGenerationHandler(StateHandlerBase):
         duration = int(float(req.duration))
         fps = int(float(req.fps))
 
-        if req.audioPath:
-            return self._generate_a2v(req, duration, fps)
+        audio_path = normalize_optional_path(req.audioPath)
+        if audio_path:
+            return self._generate_a2v(req, duration, fps, audio_path=audio_path)
 
         use_upsampler = resolution == "1080p"
         if not use_upsampler:
@@ -111,9 +117,10 @@ class VideoGenerationHandler(StateHandlerBase):
         num_frames = self._compute_num_frames(duration, fps)
 
         image = None
-        if req.imagePath:
-            image = self._prepare_image(req.imagePath, width, height)
-            logger.info("Image: %s -> %sx%s", req.imagePath, width, height)
+        image_path = normalize_optional_path(req.imagePath)
+        if image_path:
+            image = self._prepare_image(image_path, width, height)
+            logger.info("Image: %s -> %sx%s", image_path, width, height)
 
         generation_id = self._make_generation_id()
         seed = self._resolve_seed()
@@ -183,7 +190,13 @@ class VideoGenerationHandler(StateHandlerBase):
         output_path = self._make_output_path()
 
         try:
-            self._text.prepare_text_encoding(enhanced_prompt)
+            settings = self.state.app_settings
+            use_api_encoding = bool(settings.ltx_api_key) and not settings.use_local_text_encoder
+            if image is not None:
+                enhance = use_api_encoding and settings.prompt_enhancer_enabled_i2v
+            else:
+                enhance = use_api_encoding and settings.prompt_enhancer_enabled_t2v
+            self._text.prepare_text_encoding(enhanced_prompt, enhance_prompt=enhance)
 
             self._generation.update_progress("inference", 15, 0, total_steps)
 
@@ -234,13 +247,10 @@ class VideoGenerationHandler(StateHandlerBase):
                 os.unlink(temp_image_path)
 
     def _generate_a2v(
-        self, req: GenerateVideoRequest, duration: int, fps: int
+        self, req: GenerateVideoRequest, duration: int, fps: int, *, audio_path: str
     ) -> GenerateVideoResponse:
-        audio_path = req.audioPath
-        assert audio_path is not None
-
-        if not os.path.isfile(audio_path):
-            raise HTTPError(400, f"Audio file not found: {audio_path}")
+        validated_audio_path = validate_audio_file(audio_path)
+        audio_path_str = str(validated_audio_path)
 
         width, height = RESOLUTION_MAP.get(req.resolution, (960, 544))
 
@@ -248,8 +258,9 @@ class VideoGenerationHandler(StateHandlerBase):
 
         image = None
         temp_image_path: str | None = None
-        if req.imagePath:
-            image = self._prepare_image(req.imagePath, width, height)
+        image_path = normalize_optional_path(req.imagePath)
+        if image_path:
+            image = self._prepare_image(image_path, width, height)
 
         seed = self._resolve_seed()
 
@@ -273,9 +284,16 @@ class VideoGenerationHandler(StateHandlerBase):
             pro_steps = self.state.app_settings.pro_model.steps
             total_steps = pro_steps
 
+            a2v_settings = self.state.app_settings
+            a2v_use_api = bool(a2v_settings.ltx_api_key) and not a2v_settings.use_local_text_encoder
+            if image is not None:
+                a2v_enhance = a2v_use_api and a2v_settings.prompt_enhancer_enabled_i2v
+            else:
+                a2v_enhance = a2v_use_api and a2v_settings.prompt_enhancer_enabled_t2v
+
             self._generation.update_progress("loading_model", 5, 0, total_steps)
             self._generation.update_progress("encoding_text", 10, 0, total_steps)
-            self._text.prepare_text_encoding(enhanced_prompt)
+            self._text.prepare_text_encoding(enhanced_prompt, enhance_prompt=a2v_enhance)
             self._generation.update_progress("inference", 15, 0, total_steps)
 
             a2v_state.pipeline.generate(
@@ -288,7 +306,7 @@ class VideoGenerationHandler(StateHandlerBase):
                 frame_rate=fps,
                 num_inference_steps=pro_steps,
                 images=images,
-                audio_path=audio_path,
+                audio_path=audio_path_str,
                 audio_start_time=0.0,
                 audio_max_duration=None,
                 output_path=str(output_path),
@@ -315,9 +333,11 @@ class VideoGenerationHandler(StateHandlerBase):
                 os.unlink(temp_image_path)
 
     def _prepare_image(self, image_path: str, width: int, height: int) -> Image.Image:
-        if not os.path.isfile(image_path):
-            raise HTTPError(400, f"Image file not found: {image_path}")
-        img = Image.open(image_path).convert("RGB")
+        validated_path = validate_image_file(image_path)
+        try:
+            img = Image.open(validated_path).convert("RGB")
+        except Exception:
+            raise HTTPError(400, f"Invalid image file: {image_path}") from None
         img_w, img_h = img.size
         target_ratio = width / height
         img_ratio = img_w / img_h
@@ -359,8 +379,10 @@ class VideoGenerationHandler(StateHandlerBase):
         generation_id = self._make_generation_id()
         self._generation.start_api_generation(generation_id)
 
-        has_input_audio = bool(req.audioPath)
-        has_input_image = bool(req.imagePath)
+        audio_path = normalize_optional_path(req.audioPath)
+        image_path = normalize_optional_path(req.imagePath)
+        has_input_audio = bool(audio_path)
+        has_input_image = bool(image_path)
 
         try:
             self._generation.update_progress("validating_request", 5, None, None)
@@ -386,27 +408,24 @@ class VideoGenerationHandler(StateHandlerBase):
                 raise RuntimeError("Generation was cancelled")
 
             if has_input_audio:
-                audio_path = req.audioPath
                 if audio_path is None:
                     raise HTTPError(400, "Audio path is required for audio-to-video")
-                if not os.path.isfile(audio_path):
-                    raise HTTPError(400, f"Audio file not found: {audio_path}")
-
-                image_path = req.imagePath
-                if image_path is not None and not os.path.isfile(image_path):
-                    raise HTTPError(400, f"Image file not found: {image_path}")
+                validated_audio_path = validate_audio_file(audio_path)
+                validated_image_path: Path | None = None
+                if image_path is not None:
+                    validated_image_path = validate_image_file(image_path)
 
                 self._generation.update_progress("uploading_audio", 20, None, None)
                 audio_uri = self._ltx_api_client.upload_file(
                     api_key=api_key,
-                    file_path=audio_path,
+                    file_path=str(validated_audio_path),
                 )
                 image_uri: str | None = None
-                if image_path is not None:
+                if validated_image_path is not None:
                     self._generation.update_progress("uploading_image", 35, None, None)
                     image_uri = self._ltx_api_client.upload_file(
                         api_key=api_key,
-                        file_path=image_path,
+                        file_path=str(validated_image_path),
                     )
                 self._generation.update_progress("inference", 55, None, None)
                 video_bytes = self._ltx_api_client.generate_audio_to_video(
@@ -419,11 +438,9 @@ class VideoGenerationHandler(StateHandlerBase):
                 )
                 self._generation.update_progress("downloading_output", 85, None, None)
             elif has_input_image:
-                image_path = req.imagePath
                 if image_path is None:
                     raise HTTPError(400, "Image path is required for image-to-video")
-                if not os.path.isfile(image_path):
-                    raise HTTPError(400, f"Image file not found: {image_path}")
+                validated_image_path = validate_image_file(image_path)
 
                 duration = self._parse_forced_numeric_field(req.duration, "INVALID_FORCED_API_DURATION")
                 if duration not in FORCED_API_ALLOWED_DURATIONS:
@@ -437,7 +454,7 @@ class VideoGenerationHandler(StateHandlerBase):
                 self._generation.update_progress("uploading_image", 20, None, None)
                 image_uri = self._ltx_api_client.upload_file(
                     api_key=api_key,
-                    file_path=image_path,
+                    file_path=str(validated_image_path),
                 )
                 self._generation.update_progress("inference", 55, None, None)
                 video_bytes = self._ltx_api_client.generate_image_to_video(

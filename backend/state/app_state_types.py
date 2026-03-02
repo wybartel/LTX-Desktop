@@ -78,14 +78,14 @@ class CachedTextEncoder(Protocol):
         ...
 
 
-def _new_prompt_cache() -> dict[str, TextEncodingResult]:
+def _new_prompt_cache() -> dict[tuple[str, bool], TextEncodingResult]:
     return {}
 
 
 @dataclass
 class TextEncoderState:
     service: TextEncoder
-    prompt_cache: dict[str, TextEncodingResult] = field(default_factory=_new_prompt_cache)
+    prompt_cache: dict[tuple[str, bool], TextEncodingResult] = field(default_factory=_new_prompt_cache)
     api_embeddings: TextEncodingResult | None = None
     cached_encoder: CachedTextEncoder | None = None
 

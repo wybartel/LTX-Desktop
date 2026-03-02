@@ -27,8 +27,6 @@ class TestGetSettings:
         assert data["hasGeminiApiKey"] is False
         assert data["seedLocked"] is False
         assert data["lockedSeed"] == 42
-        assert data["t2vSystemPrompt"] == default_app_settings.t2v_system_prompt
-        assert data["i2vSystemPrompt"] == default_app_settings.i2v_system_prompt
         assert "ltxApiKey" not in data
         assert "geminiApiKey" not in data
 
@@ -94,7 +92,7 @@ class TestPostSettings:
         te = test_state.state.text_encoder
         assert te is not None
         for i in range(5):
-            te.prompt_cache[f"key_{i}"] = f"value_{i}"  # type: ignore[assignment]
+            te.prompt_cache[(f"key_{i}", False)] = f"value_{i}"  # type: ignore[assignment]
 
         r = client.post("/api/settings", json={"promptCacheSize": 2})
         assert r.status_code == 200
@@ -105,15 +103,6 @@ class TestPostSettings:
         assert r.status_code == 200
         assert test_state.state.app_settings.ltx_api_key == "ltx-key-abc"
         assert test_state.state.app_settings.gemini_api_key == "gemini-key-xyz"
-
-    def test_update_system_prompts(self, client, test_state):
-        r = client.post(
-            "/api/settings",
-            json={"t2vSystemPrompt": "Custom T2V prompt", "i2vSystemPrompt": "Custom I2V prompt"},
-        )
-        assert r.status_code == 200
-        assert test_state.state.app_settings.t2v_system_prompt == "Custom T2V prompt"
-        assert test_state.state.app_settings.i2v_system_prompt == "Custom I2V prompt"
 
     def test_empty_string_does_not_erase_key(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "real-key"

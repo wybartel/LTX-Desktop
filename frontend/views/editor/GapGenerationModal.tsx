@@ -435,15 +435,52 @@ export function GapGenerationModal({
                   )}
                 </div>
                 {gapSuggestionNoApiKey && (
-                  <p className="text-[10px] text-zinc-500 mt-1.5">
-                    Gemini API key required for AI prompt suggestions.{' '}
-                    <button
-                      onClick={() => { setGapGenerateMode(null); regenReset(); window.dispatchEvent(new CustomEvent('open-settings')) }}
-                      className="text-blue-400/80 hover:text-blue-300 transition-colors underline underline-offset-2"
-                    >
-                      Add in Settings
-                    </button>
-                  </p>
+                  <div className="mt-1.5 space-y-1">
+                    <p className="text-[10px] text-zinc-500">
+                      Gemini API key required for AI prompt suggestions.
+                    </p>
+                    <div className="flex gap-1.5 items-center">
+                      <input
+                        type="password"
+                        placeholder="Enter Gemini API key..."
+                        className="flex-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter') {
+                            const val = (e.target as HTMLInputElement).value.trim()
+                            if (!val) return
+                            try {
+                              const backendUrl = await window.electronAPI.getBackendUrl()
+                              await fetch(`${backendUrl}/api/settings`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ geminiApiKey: val }),
+                              });
+                              (e.target as HTMLInputElement).value = ''
+                            } catch {}
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={async (e) => {
+                          const input = (e.currentTarget.previousElementSibling as HTMLInputElement)
+                          const val = input?.value?.trim()
+                          if (!val) return
+                          try {
+                            const backendUrl = await window.electronAPI.getBackendUrl()
+                            await fetch(`${backendUrl}/api/settings`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ geminiApiKey: val }),
+                            })
+                            input.value = ''
+                          } catch {}
+                        }}
+                        className="px-2 py-1 bg-blue-600 text-white text-[10px] rounded hover:bg-blue-500 transition-colors whitespace-nowrap"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {gapSuggestionError && !gapSuggesting && !gapSuggestion && (
                   <p className="text-[10px] text-zinc-500 mt-1.5">Could not suggest a prompt. Type your own or try again.</p>

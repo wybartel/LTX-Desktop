@@ -18,14 +18,14 @@ class TextHandler(StateHandlerBase):
         self._config = config
 
     @with_state_lock
-    def _get_cached_prompt(self, prompt: str) -> TextEncodingResult | None:
+    def _get_cached_prompt(self, prompt: str, enhance_prompt: bool) -> TextEncodingResult | None:
         te = self.state.text_encoder
         if te is None:
             return None
-        return te.prompt_cache.get(prompt.strip())
+        return te.prompt_cache.get((prompt.strip(), enhance_prompt))
 
     @with_state_lock
-    def _cache_prompt(self, prompt: str, result: TextEncodingResult) -> None:
+    def _cache_prompt(self, prompt: str, enhance_prompt: bool, result: TextEncodingResult) -> None:
         te = self.state.text_encoder
         if te is None:
             return
@@ -34,7 +34,7 @@ class TextHandler(StateHandlerBase):
         if max_size <= 0:
             return
 
-        key = prompt.strip()
+        key = (prompt.strip(), enhance_prompt)
         if key in te.prompt_cache:
             del te.prompt_cache[key]
         elif len(te.prompt_cache) >= max_size:
@@ -50,7 +50,7 @@ class TextHandler(StateHandlerBase):
     def clear_api_embeddings(self) -> None:
         self._set_api_embeddings(None)
 
-    def prepare_text_encoding(self, prompt: str) -> None:
+    def prepare_text_encoding(self, prompt: str, enhance_prompt: bool) -> None:
         """Validate settings and prepare text embeddings for a generation run.
 
         Raises RuntimeError with a prefixed message if text encoding is
@@ -74,7 +74,7 @@ class TextHandler(StateHandlerBase):
                 )
 
         gemma_root = self.resolve_gemma_root()
-        embeddings = self._prepare_api_embeddings(prompt)
+        embeddings = self._prepare_api_embeddings(prompt, enhance_prompt)
 
         if settings.ltx_api_key and not settings.use_local_text_encoder and embeddings is None and gemma_root is None:
             raise RuntimeError(
@@ -91,13 +91,13 @@ class TextHandler(StateHandlerBase):
             return str(self._config.models_dir)
         return None
 
-    def _prepare_api_embeddings(self, prompt: str) -> TextEncodingResult | None:
+    def _prepare_api_embeddings(self, prompt: str, enhance_prompt: bool) -> TextEncodingResult | None:
         settings = self.state.app_settings.model_copy(deep=True)
         if not settings.ltx_api_key or settings.use_local_text_encoder:
             self.clear_api_embeddings()
             return None
 
-        cached = self._get_cached_prompt(prompt)
+        cached = self._get_cached_prompt(prompt, enhance_prompt)
         if cached is not None:
             self._set_api_embeddings(cached)
             return cached
@@ -110,8 +110,9 @@ class TextHandler(StateHandlerBase):
             prompt=prompt,
             api_key=settings.ltx_api_key,
             checkpoint_path=str(self._config.model_path("checkpoint")),
+            enhance_prompt=enhance_prompt,
         )
         if encoded is not None:
-            self._cache_prompt(prompt, encoded)
+            self._cache_prompt(prompt, enhance_prompt, encoded)
             self._set_api_embeddings(encoded)
         return encoded

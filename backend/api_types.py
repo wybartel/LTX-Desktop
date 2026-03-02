@@ -167,14 +167,6 @@ class IcLoraListResponse(BaseModel):
     directory: str
 
 
-class EnhancePromptResponse(BaseModel):
-    status: str = "success"
-    enhanced_prompt: str
-    original_prompt: str | None = None
-    skipped: bool | None = None
-    reason: str | None = None
-
-
 class SuggestGapPromptResponse(BaseModel):
     status: str = "success"
     suggested_prompt: str
@@ -276,11 +268,6 @@ class EditImageRequest(BaseModel):
 
 class ModelDownloadRequest(BaseModel):
     skipTextEncoder: bool = False
-
-
-class EnhancePromptRequest(BaseModel):
-    prompt: str
-    mode: str = "t2v"
 
 
 class SuggestGapPromptRequest(BaseModel):

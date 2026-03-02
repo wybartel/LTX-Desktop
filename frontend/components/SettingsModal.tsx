@@ -1,57 +1,8 @@
-import { AlertCircle, Check, Download, Info, RotateCcw, Settings, Sliders, Sparkles, X, Zap } from 'lucide-react'
-import React, { useEffect, useState } from 'react'
+import { AlertCircle, Check, Download, Info, Settings, Sliders, Sparkles, X, Zap } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Button } from './ui/button'
 import { useAppSettings, type AppSettings } from '../contexts/AppSettingsContext'
 import { logger } from '../lib/logger'
-
-const DEFAULT_T2V_SYSTEM_PROMPT = `You are a prompt enhancer for a text-to-video model. Your task is to take user input and expand it into a fully realized, visually and acoustically specific scene.
-
-CRITICAL INSTRUCTIONS:
-Strictly follow all aspects of the user's input: include every element the user requests, such as style, visual details, motions, actions, camera movement, and audio.
-
-The user's input may be vague. To prevent the video model from generating generic or "default" outputs (e.g., shirtless characters, textureless objects), you MUST invent reasonable, concrete details to fill in the visual gaps:
-1. Visual Detail: Add fine-grained visual information about lighting, color palettes, textures, reflections, and atmospheric elements.
-2. Subject Appearance: Define gender, clothing, hair, age and expressions if not specified, describe subjects interaction with the environment. Avoid mentioning charachter names unless specified, they are irrelevant and non visual.
-3. Multiple Characters: When describing more than one person, introduce each with a clear subject (e.g., "A tall man... beside him, a shorter woman...") to avoid attribute confusion.
-4. Object Texture & Environment: Define materials for objects and environments - Is the ground wet asphalt or dry sand? Is the light harsh neon or soft sun? For human skin and faces, keep descriptions natural and avoid "texture" language that could cause exaggerated features.
-5. Physics & Movement: Describe exactly *how* things move (heavy trudging vs. light gliding, rigid impact vs. elastic bounce).
-
-Guidelines for Enhancement:
-- Audio Layer (Mandatory & Concrete): Abstract descriptions like "music plays" result in silent videos. You must describe the *source* and the *texture* of the sound (e.g., "The hollow drone of wind," "The wet splash of tires," "The metallic clank of machinery"). The audio may come from implied or off-screen sources, weave audio descriptions naturally into the chronological flow of the visual description. Do not add speech or dialogue if not mentioned in the input.
-- Camera motion: DO NOT invent camera motion/movement unless requested by the user. Make sure to include camera motion if it is specified in the input.
-- Temporal Flow: Suggest how the scene evolves over a few seconds — subtle changes in light, character movements, or environmental shifts.
-- Avoid freezes: Throughout the prompt, use continuous motion verbs: "continues", "maintains", "keeps [verb]ing", "still [verb]ing" to sustain action from start to finish. NEVER use "static", "still", "frozen", "paused", "captures", "frames", "in the midst of"—even for camera descriptions—unless explicitly requested.
-- Dialogue: Only if the input specifies dialogue, quote the exact lines within the action. Describe each speaker distinctively so it is unambiguous who speaks when. If a language other than English is required, explicitly state the language for the dialogue lines.
-
-Output Format (Strict):
-- Produce a single continuous paragraph in natural language.
-- Length: Moderate (4-6 sentences). Enough to define physics, appearance and audio fully, but without fluff.
-- Do NOT include titles, headings, prefaces, or sections.
-- Do NOT include code fences or Markdown—plain prose only.`
-
-const DEFAULT_I2V_SYSTEM_PROMPT = `<OBJECTIVE_AND_PERSONA>
-You are a Creative Assistant specializing in writing detailed, chronological image-to-video prompts in a clear, factual, filmic style for a movie production company.
-</OBJECTIVE_AND_PERSONA>
-
-<CONTEXT>
-You will be provided an image that must be adapted into a short video. You may also receive user input describing desired action or camera motion.
-Your task is to write a single, self-contained 'video prompt': a dense, chronological description that precisely states the setting, subjects, actions, gestures, micro-movements, background activity, camera placement and movement, lighting, and other visual details observable in the shot.
-</CONTEXT>
-
-<INSTRUCTIONS>
-1. Adhere strictly to the user's explicit intent: include every requested motion/action, camera movement, transition, timing, subject, and on-screen text.
-2. Chronological flow: Describe subjects, actions, and camera moves in real-time order.
-3. Camera work: Always specify framing, angle, lens feel, and mention camera behavior when not static.
-4. Environment: Describe setting in concrete detail—architecture, surfaces, textures, lighting cues.
-5. Continuity: Default to a single continuous shot.
-6. Motion defaults: If no action is specified, describe subtle subject or environmental motion.
-7. Dynamic action handling: Treat the image description as the starting state and begin motion within 0.5-1.0 seconds.
-8. Sustain motion throughout: Maintain the subject's action for the full duration.
-</INSTRUCTIONS>
-
-<OUTPUT_FORMAT>
-Output must be a single paragraph in English written as a cinematic, chronological shot description.
-</OUTPUT_FORMAT>`
 
 interface TextEncoderStatus {
   downloaded: boolean
@@ -68,15 +19,14 @@ interface SettingsModalProps {
 type TabId = 'general' | 'inference' | 'promptEnhancer' | 'about'
 
 export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProps) {
-  const { settings, updateSettings, saveLtxApiKey, saveGeminiApiKey } = useAppSettings()
+  const { settings, updateSettings, saveLtxApiKey } = useAppSettings()
   const onSettingsChange = (next: AppSettings) => updateSettings(next)
   const [activeTab, setActiveTab] = useState<TabId>('general')
   const [ltxApiKeyInput, setLtxApiKeyInput] = useState('')
-  const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('')
+  const ltxApiKeyInputRef = useRef<HTMLInputElement>(null)
   const [textEncoderStatus, setTextEncoderStatus] = useState<TextEncoderStatus | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
-  const [showResetConfirm, setShowResetConfirm] = useState<'t2v' | 'i2v' | null>(null)
   const [appVersion, setAppVersion] = useState('')
   const [noticesText, setNoticesText] = useState<string | null>(null)
   const [noticesLoading, setNoticesLoading] = useState(false)
@@ -222,22 +172,6 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
       onSettingsChange({ ...settings, promptEnhancerEnabledI2V: !settings.promptEnhancerEnabledI2V })
     }
   }
-  const anyEnhancerEnabled = settings.promptEnhancerEnabledT2V || settings.promptEnhancerEnabledI2V
-
-  const handleT2vSystemPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onSettingsChange({
-      ...settings,
-      t2vSystemPrompt: e.target.value,
-    })
-  }
-
-  const handleI2vSystemPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onSettingsChange({
-      ...settings,
-      i2vSystemPrompt: e.target.value,
-    })
-  }
-
   // Seed handlers
   const handleToggleSeedLock = () => {
     onSettingsChange({
@@ -259,21 +193,6 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
       ...settings,
       lockedSeed: Math.floor(Math.random() * 2147483647),
     })
-  }
-
-  const handleResetSystemPrompt = (promptType: 't2v' | 'i2v') => {
-    if (promptType === 't2v') {
-      onSettingsChange({
-        ...settings,
-        t2vSystemPrompt: DEFAULT_T2V_SYSTEM_PROMPT,
-      })
-    } else {
-      onSettingsChange({
-        ...settings,
-        i2vSystemPrompt: DEFAULT_I2V_SYSTEM_PROMPT,
-      })
-    }
-    setShowResetConfirm(null)
   }
 
   const handleLoadModelLicense = async () => {
@@ -357,7 +276,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
         </div>
 
         {/* Content */}
-        <div className="px-6 py-5 space-y-6 max-h-[60vh] overflow-y-auto">
+        <div className="px-6 py-5 space-y-6 h-[60vh] overflow-y-auto">
           {activeTab === 'general' && (
             <>
               {/* Text Encoding Section */}
@@ -388,9 +307,6 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                         <span className="text-sm font-medium text-white">LTX API</span>
                         <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">Recommended</span>
                       </div>
-                      <p className="text-xs text-zinc-400 mt-1">
-                        Fast encoding via cloud (~1 second). Requires API key.
-                      </p>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                       !settings.useLocalTextEncoder ? 'border-blue-500 bg-blue-500' : 'border-zinc-600'
@@ -404,6 +320,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                     <div className="mt-3 pt-3 border-t border-zinc-700/50">
                       <div className="flex gap-2">
                         <input
+                          ref={ltxApiKeyInputRef}
                           type="password"
                           value={ltxApiKeyInput}
                           onChange={(e) => setLtxApiKeyInput(e.target.value)}
@@ -443,15 +360,15 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                             </>
                           )}
                         </div>
-                        <a
-                          href="https://console.ltx.video/api-keys/"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            window.electronAPI.openLtxApiKeyPage()
+                          }}
                           className="text-xs text-blue-400 hover:text-blue-300 underline"
                         >
-                          Get a free key
-                        </a>
+                          Get Key
+                        </button>
                       </div>
 
                       {/* Prompt Cache Size */}
@@ -823,7 +740,6 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
 
           {activeTab === 'promptEnhancer' && (
             <>
-              {/* Enable/Disable Toggles */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-blue-400" />
@@ -831,230 +747,84 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                 </div>
 
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  Automatically enhances your prompts with rich visual details, sound descriptions, and motion cues
-                  to help the AI generate higher quality videos. Control independently for each generation type.
+                  Automatically enhances your prompts via the LTX API with rich visual details, sound descriptions,
+                  and motion cues to help generate higher quality videos. Control independently for each generation type.
                 </p>
 
-                {/* T2V Toggle */}
-                <div
-                  className="flex items-center justify-between bg-zinc-800/50 rounded-lg px-4 py-3 border border-zinc-700/50 cursor-pointer"
-                  onClick={() => handleTogglePromptEnhancer('t2v')}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded">T2V</span>
-                    <div>
-                      <span className="text-sm text-zinc-200">Text-to-Video</span>
-                      <p className="text-[10px] text-zinc-500 mt-0.5">
-                        {settings.promptEnhancerEnabledT2V ? 'Prompts will be enhanced before T2V generation' : 'T2V prompts used as-is'}
-                      </p>
+                {!settings.hasLtxApiKey ? (
+                  <div className="space-y-4 mt-2">
+                    <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-4 space-y-3">
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                        <div className="space-y-2">
+                          <p className="text-sm text-amber-300 font-medium">LTX API key required</p>
+                          <p className="text-xs text-zinc-400 leading-relaxed">
+                            Prompt enhancement runs server-side on the LTX API. To use this feature, you need to configure
+                            an API key in the General settings tab.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setActiveTab('general')
+                          setTimeout(() => ltxApiKeyInputRef.current?.focus(), 100)
+                        }}
+                        className="w-full mt-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        Set API Key
+                      </button>
                     </div>
                   </div>
-                  <div className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                    settings.promptEnhancerEnabledT2V ? 'bg-blue-500' : 'bg-zinc-700'
-                  }`}>
-                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform pointer-events-none ${
-                      settings.promptEnhancerEnabledT2V ? 'translate-x-5' : 'translate-x-0'
-                    }`} />
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    {/* T2V Toggle */}
+                    <div
+                      className="flex items-center justify-between bg-zinc-800/50 rounded-lg px-4 py-3 border border-zinc-700/50 cursor-pointer"
+                      onClick={() => handleTogglePromptEnhancer('t2v')}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-semibold text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded">T2V</span>
+                        <div>
+                          <span className="text-sm text-zinc-200">Text-to-Video</span>
+                          <p className="text-[10px] text-zinc-500 mt-0.5">
+                            {settings.promptEnhancerEnabledT2V ? 'Prompts will be enhanced before T2V generation' : 'T2V prompts used as-is'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                        settings.promptEnhancerEnabledT2V ? 'bg-blue-500' : 'bg-zinc-700'
+                      }`}>
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform pointer-events-none ${
+                          settings.promptEnhancerEnabledT2V ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </div>
+                    </div>
 
-                {/* I2V Toggle */}
-                <div
-                  className="flex items-center justify-between bg-zinc-800/50 rounded-lg px-4 py-3 border border-zinc-700/50 cursor-pointer"
-                  onClick={() => handleTogglePromptEnhancer('i2v')}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded">I2V</span>
-                    <div>
-                      <span className="text-sm text-zinc-200">Image-to-Video</span>
-                      <p className="text-[10px] text-zinc-500 mt-0.5">
-                        {settings.promptEnhancerEnabledI2V ? 'Prompts will be enhanced before I2V generation' : 'I2V prompts used as-is'}
-                      </p>
+                    {/* I2V Toggle */}
+                    <div
+                      className="flex items-center justify-between bg-zinc-800/50 rounded-lg px-4 py-3 border border-zinc-700/50 cursor-pointer"
+                      onClick={() => handleTogglePromptEnhancer('i2v')}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded">I2V</span>
+                        <div>
+                          <span className="text-sm text-zinc-200">Image-to-Video</span>
+                          <p className="text-[10px] text-zinc-500 mt-0.5">
+                            {settings.promptEnhancerEnabledI2V ? 'Prompts will be enhanced before I2V generation' : 'I2V prompts used as-is'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                        settings.promptEnhancerEnabledI2V ? 'bg-blue-500' : 'bg-zinc-700'
+                      }`}>
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform pointer-events-none ${
+                          settings.promptEnhancerEnabledI2V ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </div>
                     </div>
-                  </div>
-                  <div className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                    settings.promptEnhancerEnabledI2V ? 'bg-blue-500' : 'bg-zinc-700'
-                  }`}>
-                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform pointer-events-none ${
-                      settings.promptEnhancerEnabledI2V ? 'translate-x-5' : 'translate-x-0'
-                    }`} />
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
-
-              {/* Gemini API Key - only show when at least one enhancer is enabled */}
-              {anyEnhancerEnabled && (
-                <div className="space-y-3 pt-4 border-t border-zinc-800">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-blue-400" />
-                    <label className="text-sm font-medium text-white">Gemini API Key</label>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={geminiApiKeyInput}
-                      onChange={(e) => setGeminiApiKeyInput(e.target.value)}
-                      placeholder={settings.hasGeminiApiKey ? 'Enter new key to replace...' : 'Enter your Gemini API key...'}
-                      className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <button
-                      onClick={() => {
-                        const trimmed = geminiApiKeyInput.trim()
-                        if (!trimmed) return
-                        void saveGeminiApiKey(trimmed)
-                        setGeminiApiKeyInput('')
-                      }}
-                      disabled={!geminiApiKeyInput.trim()}
-                      className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-                    >
-                      Save Key
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
-                      settings.hasGeminiApiKey
-                        ? 'bg-green-500/10 text-green-400'
-                        : 'bg-amber-500/10 text-amber-400'
-                    }`}>
-                      {settings.hasGeminiApiKey ? (
-                        <>
-                          <Check className="h-3 w-3" />
-                          Key configured
-                        </>
-                      ) : (
-                        <>
-                          <AlertCircle className="h-3 w-3" />
-                          Required for prompt enhancement
-                        </>
-                      )}
-                    </div>
-                    <a
-                      href="https://aistudio.google.com/app/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-400 hover:text-blue-300 underline"
-                    >
-                      Get a free key
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* T2V System Prompt */}
-              {settings.promptEnhancerEnabledT2V && (
-                <div className="space-y-3 pt-4 border-t border-zinc-800">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Settings className="h-4 w-4 text-blue-400" />
-                      <label className="text-sm font-medium text-white">Text-to-Video Prompt</label>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowResetConfirm('t2v')}
-                      className="h-7 px-2 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800"
-                    >
-                      <RotateCcw className="h-3 w-3 mr-1" />
-                      Reset
-                    </Button>
-                  </div>
-
-                  <p className="text-xs text-zinc-500">
-                    System prompt for enhancing text-to-video generations.
-                  </p>
-
-                  <textarea
-                    value={settings.t2vSystemPrompt || DEFAULT_T2V_SYSTEM_PROMPT}
-                    onChange={handleT2vSystemPromptChange}
-                    rows={8}
-                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono"
-                  />
-
-                  <p className="text-xs text-zinc-600">
-                    {(settings.t2vSystemPrompt || DEFAULT_T2V_SYSTEM_PROMPT).length} characters
-                  </p>
-                </div>
-              )}
-
-              {/* I2V System Prompt */}
-              {settings.promptEnhancerEnabledI2V && (
-                <div className="space-y-3 pt-4 border-t border-zinc-800">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Settings className="h-4 w-4 text-blue-400" />
-                      <label className="text-sm font-medium text-white">Image-to-Video Prompt</label>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowResetConfirm('i2v')}
-                      className="h-7 px-2 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800"
-                    >
-                      <RotateCcw className="h-3 w-3 mr-1" />
-                      Reset
-                    </Button>
-                  </div>
-
-                  <p className="text-xs text-zinc-500">
-                    System prompt for enhancing image-to-video generations.
-                  </p>
-
-                  <textarea
-                    value={settings.i2vSystemPrompt || DEFAULT_I2V_SYSTEM_PROMPT}
-                    onChange={handleI2vSystemPromptChange}
-                    rows={8}
-                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none font-mono"
-                  />
-
-                  <p className="text-xs text-zinc-600">
-                    {(settings.i2vSystemPrompt || DEFAULT_I2V_SYSTEM_PROMPT).length} characters
-                  </p>
-                </div>
-              )}
-
-              {/* Note about T2I */}
-              {anyEnhancerEnabled && (
-                <div className="bg-zinc-800/30 rounded-lg p-3 mt-2">
-                  <p className="text-xs text-zinc-500">
-                    <span className="text-zinc-400">Note:</span> Prompt enhancement is not applied to text-to-image generation.
-                  </p>
-                </div>
-              )}
-
-              {/* Reset Confirmation Modal */}
-              {showResetConfirm && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center">
-                  <div
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                    onClick={() => setShowResetConfirm(null)}
-                  />
-                  <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
-                    <h3 className="text-lg font-semibold text-white mb-2">
-                      Reset {showResetConfirm === 't2v' ? 'Text-to-Video' : 'Image-to-Video'} Prompt?
-                    </h3>
-                    <p className="text-sm text-zinc-400 mb-4">
-                      This will restore the default system prompt. Any changes you've made will be lost.
-                    </p>
-                    <div className="flex gap-3 justify-end">
-                      <Button
-                        variant="ghost"
-                        onClick={() => setShowResetConfirm(null)}
-                        className="text-zinc-400 hover:text-white hover:bg-zinc-800"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={() => handleResetSystemPrompt(showResetConfirm)}
-                        className="bg-red-600 hover:bg-red-500 text-white"
-                      >
-                        Reset
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </>
           )}
 

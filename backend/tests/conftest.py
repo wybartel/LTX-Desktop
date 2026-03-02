@@ -31,10 +31,7 @@ DEFAULT_NEGATIVE_PROMPT = (
     "excessive noise, grainy texture"
 )
 
-DEFAULT_APP_SETTINGS = AppSettings(
-    t2v_system_prompt="Default t2v system prompt",
-    i2v_system_prompt="Default i2v system prompt",
-)
+DEFAULT_APP_SETTINGS = AppSettings()
 
 
 @pytest.fixture

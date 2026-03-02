@@ -70,8 +70,6 @@ class AppSettings(SettingsBaseModel):
     prompt_enhancer_enabled_t2v: bool = True
     prompt_enhancer_enabled_i2v: bool = False
     gemini_api_key: str = ""
-    t2v_system_prompt: str = ""
-    i2v_system_prompt: str = ""
     seed_locked: bool = False
     locked_seed: int = 42
 
@@ -141,8 +139,6 @@ class SettingsResponse(SettingsBaseModel):
     prompt_enhancer_enabled_t2v: bool = True
     prompt_enhancer_enabled_i2v: bool = False
     has_gemini_api_key: bool = False
-    t2v_system_prompt: str = ""
-    i2v_system_prompt: str = ""
     seed_locked: bool = False
     locked_seed: int = 42
 

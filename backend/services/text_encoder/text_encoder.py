@@ -13,5 +13,5 @@ class TextEncoder(Protocol):
     def install_patches(self, state_getter: Callable[[], AppState]) -> None:
         ...
 
-    def encode_via_api(self, prompt: str, api_key: str, checkpoint_path: str) -> TextEncodingResult | None:
+    def encode_via_api(self, prompt: str, api_key: str, checkpoint_path: str, enhance_prompt: bool) -> TextEncodingResult | None:
         ...

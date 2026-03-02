@@ -19,9 +19,6 @@ export interface AppSettings {
   promptCacheSize: number
   promptEnhancerEnabledT2V: boolean
   promptEnhancerEnabledI2V: boolean
-  hasGeminiApiKey: boolean
-  t2vSystemPrompt: string
-  i2vSystemPrompt: string
   seedLocked: boolean
   lockedSeed: number
 }
@@ -36,9 +33,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   promptCacheSize: 1,
   promptEnhancerEnabledT2V: false,
   promptEnhancerEnabledI2V: false,
-  hasGeminiApiKey: false,
-  t2vSystemPrompt: '',
-  i2vSystemPrompt: '',
   seedLocked: false,
   lockedSeed: 42,
 }
@@ -52,7 +46,6 @@ interface AppSettingsContextValue {
   updateSettings: (patch: Partial<AppSettings> | ((prev: AppSettings) => AppSettings)) => void
   refreshSettings: () => Promise<void>
   saveLtxApiKey: (value: string) => Promise<void>
-  saveGeminiApiKey: (value: string) => Promise<void>
   forceApiGenerations: boolean
 }
 
@@ -81,9 +74,6 @@ function normalizeAppSettings(data: Partial<AppSettings>): AppSettings {
     promptCacheSize: data.promptCacheSize ?? DEFAULT_APP_SETTINGS.promptCacheSize,
     promptEnhancerEnabledT2V: data.promptEnhancerEnabledT2V ?? DEFAULT_APP_SETTINGS.promptEnhancerEnabledT2V,
     promptEnhancerEnabledI2V: data.promptEnhancerEnabledI2V ?? DEFAULT_APP_SETTINGS.promptEnhancerEnabledI2V,
-    hasGeminiApiKey: data.hasGeminiApiKey ?? DEFAULT_APP_SETTINGS.hasGeminiApiKey,
-    t2vSystemPrompt: data.t2vSystemPrompt ?? DEFAULT_APP_SETTINGS.t2vSystemPrompt,
-    i2vSystemPrompt: data.i2vSystemPrompt ?? DEFAULT_APP_SETTINGS.i2vSystemPrompt,
     seedLocked: data.seedLocked ?? DEFAULT_APP_SETTINGS.seedLocked,
     lockedSeed: data.lockedSeed ?? DEFAULT_APP_SETTINGS.lockedSeed,
   }
@@ -210,7 +200,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     if (!backendUrl || !isLoaded || backendProcessStatus !== 'alive') return
     const syncTimer = setTimeout(async () => {
       try {
-        const { hasLtxApiKey: _a, hasGeminiApiKey: _b, ...syncPayload } = settings
+        const { hasLtxApiKey: _a, ...syncPayload } = settings
         await fetch(`${backendUrl}/api/settings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -241,16 +231,6 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     await refreshSettings()
   }, [backendUrl, refreshSettings])
 
-  const saveGeminiApiKey = useCallback(async (value: string) => {
-    if (!backendUrl) return
-    await fetch(`${backendUrl}/api/settings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ geminiApiKey: value }),
-    })
-    await refreshSettings()
-  }, [backendUrl, refreshSettings])
-
   const contextValue = useMemo<AppSettingsContextValue>(
     () => ({
       settings,
@@ -259,10 +239,9 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       updateSettings,
       refreshSettings,
       saveLtxApiKey,
-      saveGeminiApiKey,
       forceApiGenerations,
     }),
-    [forceApiGenerations, isLoaded, refreshSettings, runtimePolicyLoaded, saveLtxApiKey, saveGeminiApiKey, settings, updateSettings],
+    [forceApiGenerations, isLoaded, refreshSettings, runtimePolicyLoaded, saveLtxApiKey, settings, updateSettings],
   )
 
   return <AppSettingsContext.Provider value={contextValue}>{children}</AppSettingsContext.Provider>

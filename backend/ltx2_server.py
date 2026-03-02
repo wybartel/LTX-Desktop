@@ -26,7 +26,6 @@ from datetime import datetime
 
 import torch
 from state.app_settings import AppSettings
-from runtime_config.prompt_texts import DEFAULT_I2V_SYSTEM_PROMPT, DEFAULT_T2V_SYSTEM_PROMPT
 
 # ============================================================
 # Logging Configuration
@@ -162,10 +161,7 @@ SETTINGS_DIR = APP_DATA_DIR
 SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 
-DEFAULT_APP_SETTINGS = AppSettings(
-    t2v_system_prompt=DEFAULT_T2V_SYSTEM_PROMPT,
-    i2v_system_prompt=DEFAULT_I2V_SYSTEM_PROMPT,
-)
+DEFAULT_APP_SETTINGS = AppSettings()
 
 from app_factory import DEFAULT_ALLOWED_ORIGINS, create_app
 from state import RuntimeConfig, build_initial_state

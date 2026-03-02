@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef } from 'react'
-import { logger } from '../lib/logger'
 import type { GenerationSettings } from '../components/SettingsPanel'
 
 interface GenerationState {
@@ -107,11 +106,14 @@ export function useGeneration(): UseGenerationReturn {
     settings: GenerationSettings,
     audioPath?: string | null,
   ) => {
-    // Reset state - show different message if using Pro model (may need to load)
+    const statusMsg = settings.model === 'pro'
+      ? 'Loading Pro model & generating...'
+      : 'Generating video...'
+
     setState({
       isGenerating: true,
       progress: 0,
-      statusMessage: 'Enhancing prompt...',
+      statusMessage: statusMsg,
       videoUrl: null,
       videoPath: null,
       imageUrl: null,
@@ -127,48 +129,9 @@ export function useGeneration(): UseGenerationReturn {
       // Get backend URL from Electron
       const backendUrl = await window.electronAPI.getBackendUrl()
 
-      // Step 1: Enhance prompt (if enabled — backend checks per-mode setting)
-      const enhanceMode = audioPath ? 'a2v' : imagePath ? 'i2v' : 't2v'
-      let finalPrompt = prompt
-      try {
-        const enhanceResponse = await fetch(`${backendUrl}/api/enhance-prompt`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt, mode: enhanceMode }),
-          signal: abortControllerRef.current.signal,
-        })
-        
-        if (enhanceResponse.ok) {
-          const enhanceResult = await enhanceResponse.json()
-          if (enhanceResult.status === 'success' && enhanceResult.enhanced_prompt) {
-            if (enhanceResult.skipped) {
-              logger.info(`Prompt enhancement skipped (${enhanceMode}): ${enhanceResult.reason}`)
-            } else {
-              finalPrompt = enhanceResult.enhanced_prompt
-              logger.info(`Prompt enhanced (${enhanceMode}): ${finalPrompt.substring(0, 100)}...`)
-            }
-          }
-        } else {
-          const errorData = await enhanceResponse.json().catch(() => ({}))
-          if (errorData.error === 'GEMINI_API_KEY_MISSING') {
-            logger.info('Prompt enhancement skipped: no Gemini API key')
-          } else {
-            logger.warn(`Prompt enhancement failed, using original: ${JSON.stringify(errorData)}`)
-          }
-        }
-      } catch (enhanceError) {
-        logger.warn(`Prompt enhancement error, using original: ${enhanceError}`)
-      }
-      
-      // Update status for video generation
-      const statusMsg = settings.model === 'pro' 
-        ? 'Loading Pro model & generating...' 
-        : 'Generating video...'
-      setState(prev => ({ ...prev, statusMessage: statusMsg }))
-
       // Prepare JSON body
       const body: Record<string, unknown> = {
-        prompt: finalPrompt,
+        prompt,
         model: settings.model,
         duration: String(settings.duration),
         resolution: settings.videoResolution,

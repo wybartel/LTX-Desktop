@@ -854,12 +854,13 @@ class FakeTextEncoder:
     def install_patches(self, state_getter) -> None:  # noqa: ARG002
         self.install_calls += 1
 
-    def encode_via_api(self, prompt: str, api_key: str, checkpoint_path: str) -> Any | None:
+    def encode_via_api(self, prompt: str, api_key: str, checkpoint_path: str, enhance_prompt: bool) -> Any | None:
         self.encode_calls.append(
             {
                 "prompt": prompt,
                 "api_key": api_key,
                 "checkpoint_path": checkpoint_path,
+                "enhance_prompt": enhance_prompt,
             }
         )
         if self.encode_responses:

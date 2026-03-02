@@ -115,7 +115,9 @@ class IcLoraHandler(StateHandlerBase):
             self._generation.start_generation(generation_id)
             self._generation.update_progress("loading_model", 5, 0, 1)
 
-            self._text.prepare_text_encoding(req.prompt)
+            s = self.state.app_settings
+            use_api = bool(s.ltx_api_key) and not s.use_local_text_encoder
+            self._text.prepare_text_encoding(req.prompt, enhance_prompt=use_api and s.prompt_enhancer_enabled_t2v)
 
             cap = self._video_processor.open_video(str(video_path))
             info = self._video_processor.get_video_info(cap)

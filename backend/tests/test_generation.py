@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from state.app_state_types import GpuSlot, VideoPipelineState, VideoPipelineWarmth
 from tests.fakes.services import FakeFastVideoPipeline
+
+
+@dataclass
+class _FakeEncodingResult:
+    """Minimal stand-in for TextEncodingResult in tests."""
+
+    video_context: object = "fake_tensor"
+    audio_context: object = None
 
 _T2V_JSON = {
     "prompt": "test",
@@ -14,6 +23,17 @@ _T2V_JSON = {
     "duration": "2",
     "fps": "24",
 }
+
+
+def _write_test_wav(path: Path, *, duration_seconds: float = 0.1, sample_rate: int = 8000) -> None:
+    import wave
+
+    frame_count = max(1, int(duration_seconds * sample_rate))
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(b"\x00\x00" * frame_count)
 
 
 def _enable_local_text_encoding(test_state) -> None:
@@ -74,6 +94,19 @@ class TestGenerate:
             json={**_T2V_JSON, "imagePath": "/no/such/file.png"},
         )
         assert r.status_code == 400
+
+    def test_i2v_rejects_invalid_image_content_400(self, client, test_state, create_fake_model_files, tmp_path):
+        create_fake_model_files()
+        _enable_local_text_encoding(test_state)
+        bad_image = tmp_path / "bad.png"
+        bad_image.write_bytes(b"not-a-real-png")
+
+        r = client.post(
+            "/api/generate",
+            json={**_T2V_JSON, "imagePath": str(bad_image)},
+        )
+        assert r.status_code == 400
+        assert "Invalid image file" in r.json()["error"]
 
     def test_resolution_mapping_540p(self, client, test_state, fake_services, create_fake_model_files):
         create_fake_model_files()
@@ -137,7 +170,7 @@ class TestA2VGenerate:
         create_fake_model_files()
         _enable_local_text_encoding(test_state)
         audio_file = tmp_path / "test_audio.wav"
-        audio_file.write_bytes(b"\x00" * 512)
+        _write_test_wav(audio_file)
 
         r = client.post(
             "/api/generate",
@@ -179,11 +212,29 @@ class TestA2VGenerate:
         )
         assert r.status_code == 400
 
+    def test_a2v_rejects_invalid_audio_content_400(self, client, test_state, create_fake_model_files, tmp_path):
+        create_fake_model_files()
+        _enable_local_text_encoding(test_state)
+        audio_file = tmp_path / "bad.wav"
+        audio_file.write_bytes(b"not-a-real-wav")
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video",
+                "duration": "2",
+                "fps": "24",
+                "audioPath": str(audio_file),
+            },
+        )
+        assert r.status_code == 400
+        assert "Invalid audio file" in r.json()["error"]
+
     def test_a2v_forced_api_routes_to_ltx_api(self, client, test_state, fake_services, tmp_path):
         test_state.config.force_api_generations = True
         test_state.state.app_settings.ltx_api_key = "api-key"
         audio_file = tmp_path / "test_audio.wav"
-        audio_file.write_bytes(b"\x00" * 512)
+        _write_test_wav(audio_file)
 
         r = client.post(
             "/api/generate",
@@ -213,7 +264,7 @@ class TestA2VGenerate:
         test_state.config.force_api_generations = True
         test_state.state.app_settings.ltx_api_key = "api-key"
         audio_file = tmp_path / "test_audio.wav"
-        audio_file.write_bytes(b"\x00" * 512)
+        _write_test_wav(audio_file)
         image_path = tmp_path / "input.png"
         image_path.write_bytes(make_test_image().getvalue())
 
@@ -246,7 +297,7 @@ class TestA2VGenerate:
         create_fake_model_files()
         _enable_local_text_encoding(test_state)
         audio_file = tmp_path / "test_audio.wav"
-        audio_file.write_bytes(b"\x00" * 512)
+        _write_test_wav(audio_file)
 
         for resolution, expected_w, expected_h in [
             ("540p", 960, 544),
@@ -294,7 +345,7 @@ class TestA2VGenerate:
         test_state.config.force_api_generations = True
         test_state.state.app_settings.ltx_api_key = ""
         audio_file = tmp_path / "test_audio.wav"
-        audio_file.write_bytes(b"\x00" * 512)
+        _write_test_wav(audio_file)
 
         r = client.post(
             "/api/generate",
@@ -316,7 +367,7 @@ class TestA2VGenerate:
         test_state.state.app_settings.ltx_api_key = "api-key"
         fake_services.ltx_api_client.raise_on_audio_to_video = RuntimeError("cancelled")
         audio_file = tmp_path / "test_audio.wav"
-        audio_file.write_bytes(b"\x00" * 512)
+        _write_test_wav(audio_file)
 
         r = client.post(
             "/api/generate",
@@ -845,3 +896,95 @@ class TestEditImage:
         call = fake_services.image_generation_pipeline.generate_edit_calls[0]
         assert isinstance(call["image"], list)
         assert len(call["image"]) == 3
+
+
+class TestEnhancePromptFlag:
+    """Verify enhance_prompt is passed correctly to the text encoder API."""
+
+    def _setup_api_encoding(self, test_state, fake_services, create_fake_model_files):
+        create_fake_model_files()
+        test_state.state.app_settings.ltx_api_key = "test-key"
+        test_state.state.app_settings.use_local_text_encoder = False
+        fake_services.text_encoder.encode_responses.append(_FakeEncodingResult())
+
+    def test_t2v_enhance_enabled(self, client, test_state, fake_services, create_fake_model_files):
+        self._setup_api_encoding(test_state, fake_services, create_fake_model_files)
+        test_state.state.app_settings.prompt_enhancer_enabled_t2v = True
+
+        r = client.post("/api/generate", json=_T2V_JSON)
+        assert r.status_code == 200
+
+        assert len(fake_services.text_encoder.encode_calls) == 1
+        assert fake_services.text_encoder.encode_calls[0]["enhance_prompt"] is True
+
+    def test_t2v_enhance_disabled(self, client, test_state, fake_services, create_fake_model_files):
+        self._setup_api_encoding(test_state, fake_services, create_fake_model_files)
+        test_state.state.app_settings.prompt_enhancer_enabled_t2v = False
+
+        r = client.post("/api/generate", json=_T2V_JSON)
+        assert r.status_code == 200
+
+        assert len(fake_services.text_encoder.encode_calls) == 1
+        assert fake_services.text_encoder.encode_calls[0]["enhance_prompt"] is False
+
+    def test_i2v_enhance_enabled(self, client, test_state, fake_services, create_fake_model_files, make_test_image, tmp_path):
+        self._setup_api_encoding(test_state, fake_services, create_fake_model_files)
+        test_state.state.app_settings.prompt_enhancer_enabled_i2v = True
+        image_path = tmp_path / "input.png"
+        image_path.write_bytes(make_test_image().getvalue())
+
+        r = client.post("/api/generate", json={**_T2V_JSON, "imagePath": str(image_path)})
+        assert r.status_code == 200
+
+        assert len(fake_services.text_encoder.encode_calls) == 1
+        assert fake_services.text_encoder.encode_calls[0]["enhance_prompt"] is True
+
+    def test_i2v_enhance_disabled(self, client, test_state, fake_services, create_fake_model_files, make_test_image, tmp_path):
+        self._setup_api_encoding(test_state, fake_services, create_fake_model_files)
+        test_state.state.app_settings.prompt_enhancer_enabled_i2v = False
+        image_path = tmp_path / "input.png"
+        image_path.write_bytes(make_test_image().getvalue())
+
+        r = client.post("/api/generate", json={**_T2V_JSON, "imagePath": str(image_path)})
+        assert r.status_code == 200
+
+        assert len(fake_services.text_encoder.encode_calls) == 1
+        assert fake_services.text_encoder.encode_calls[0]["enhance_prompt"] is False
+
+    def test_a2v_without_image_uses_t2v_setting(self, client, test_state, fake_services, create_fake_model_files, tmp_path):
+        self._setup_api_encoding(test_state, fake_services, create_fake_model_files)
+        test_state.state.app_settings.prompt_enhancer_enabled_t2v = True
+        audio_file = tmp_path / "test_audio.wav"
+        _write_test_wav(audio_file)
+
+        r = client.post("/api/generate", json={**_T2V_JSON, "audioPath": str(audio_file)})
+        assert r.status_code == 200
+
+        assert len(fake_services.text_encoder.encode_calls) == 1
+        assert fake_services.text_encoder.encode_calls[0]["enhance_prompt"] is True
+
+    def test_a2v_with_image_uses_i2v_setting(self, client, test_state, fake_services, create_fake_model_files, make_test_image, tmp_path):
+        self._setup_api_encoding(test_state, fake_services, create_fake_model_files)
+        test_state.state.app_settings.prompt_enhancer_enabled_i2v = True
+        test_state.state.app_settings.prompt_enhancer_enabled_t2v = False
+        audio_file = tmp_path / "test_audio.wav"
+        _write_test_wav(audio_file)
+        image_path = tmp_path / "input.png"
+        image_path.write_bytes(make_test_image().getvalue())
+
+        r = client.post("/api/generate", json={**_T2V_JSON, "audioPath": str(audio_file), "imagePath": str(image_path)})
+        assert r.status_code == 200
+
+        assert len(fake_services.text_encoder.encode_calls) == 1
+        assert fake_services.text_encoder.encode_calls[0]["enhance_prompt"] is True
+
+    def test_local_encoding_skips_api(self, client, test_state, fake_services, create_fake_model_files):
+        create_fake_model_files()
+        test_state.state.app_settings.ltx_api_key = "test-key"
+        test_state.state.app_settings.use_local_text_encoder = True
+        test_state.state.app_settings.prompt_enhancer_enabled_t2v = True
+
+        r = client.post("/api/generate", json=_T2V_JSON)
+        assert r.status_code == 200
+
+        assert len(fake_services.text_encoder.encode_calls) == 0

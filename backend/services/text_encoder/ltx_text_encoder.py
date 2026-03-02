@@ -152,7 +152,7 @@ class LTXTextEncoder:
             logger.warning("Could not extract model_id from checkpoint: %s", exc, exc_info=True)
         return None
 
-    def encode_via_api(self, prompt: str, api_key: str, checkpoint_path: str) -> TextEncodingResult | None:
+    def encode_via_api(self, prompt: str, api_key: str, checkpoint_path: str, enhance_prompt: bool) -> TextEncodingResult | None:
         model_id = self.get_model_id_from_checkpoint(checkpoint_path)
         if not model_id:
             return None
@@ -168,6 +168,7 @@ class LTXTextEncoder:
                 json_payload={
                     "prompt": prompt,
                     "model_id": model_id,
+                    "enhance_prompt": enhance_prompt,
                 },
                 timeout=60,
             )

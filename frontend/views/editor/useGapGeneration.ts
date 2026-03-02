@@ -81,7 +81,7 @@ export function useGapGeneration({
     imageFile: File | null; applyAudio: boolean
   } | null>(null)
 
-  // Gap context-aware prompt suggestion (via Gemini)
+  // Gap context-aware prompt suggestion
   const [gapSuggesting, setGapSuggesting] = useState(false)
   const [gapSuggestion, setGapSuggestion] = useState<string | null>(null)
   const [gapSuggestionError, setGapSuggestionError] = useState(false)
@@ -364,7 +364,7 @@ export function useGapGeneration({
     
   }, [regenVideoUrl, regenImageUrl, isRegenerating, generatingGap, regenError])
 
-  // --- Gap context-aware prompt suggestion via Gemini ---
+  // --- Gap context-aware prompt suggestion ---
   // Use refs so the async function always reads the latest values without re-creating
   const gapPromptRef = useRef(gapPrompt)
   gapPromptRef.current = gapPrompt

@@ -14,7 +14,7 @@ from handlers import (
     ImageGenerationHandler,
     ModelsHandler,
     PipelinesHandler,
-    PromptHandler,
+    SuggestGapPromptHandler,
     RetakeHandler,
     RuntimePolicyHandler,
     SettingsHandler,
@@ -194,7 +194,7 @@ class AppHandler:
 
         self.runtime_policy = RuntimePolicyHandler(config=config)
 
-        self.prompt = PromptHandler(
+        self.suggest_gap_prompt = SuggestGapPromptHandler(
             state=self.state,
             lock=self._lock,
             http=http,
