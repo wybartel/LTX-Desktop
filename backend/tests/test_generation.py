@@ -300,9 +300,9 @@ class TestA2VGenerate:
         _write_test_wav(audio_file)
 
         for resolution, expected_w, expected_h in [
-            ("540p", 960, 544),
+            ("540p", 960, 576),
             ("720p", 1280, 704),
-            ("1080p", 960, 544),
+            ("1080p", 960, 576),
         ]:
             fake_services.a2v_pipeline.generate_calls.clear()
             r = client.post(

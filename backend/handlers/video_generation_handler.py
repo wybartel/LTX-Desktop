@@ -53,11 +53,6 @@ FORCED_API_RESOLUTION_MAP: dict[str, str] = {
 }
 FORCED_API_ALLOWED_DURATIONS = {6, 8, 10}
 FORCED_API_ALLOWED_FPS = {25, 50}
-RESOLUTION_MAP: dict[str, tuple[int, int]] = {
-    "540p": (960, 544),
-    "720p": (1280, 704),
-    "1080p": (960, 544),
-}
 
 
 class VideoGenerationHandler(StateHandlerBase):
@@ -112,6 +107,11 @@ class VideoGenerationHandler(StateHandlerBase):
         else:
             logger.info("Resolution %s - using 2-stage pipeline with upsampler", resolution)
 
+        RESOLUTION_MAP: dict[str, tuple[int, int]] = {
+            "540p": (960, 544),
+            "720p": (1280, 704),
+            "1080p": (960, 544),
+        }
         width, height = RESOLUTION_MAP.get(resolution, (960, 544))
 
         num_frames = self._compute_num_frames(duration, fps)
@@ -252,7 +252,12 @@ class VideoGenerationHandler(StateHandlerBase):
         validated_audio_path = validate_audio_file(audio_path)
         audio_path_str = str(validated_audio_path)
 
-        width, height = RESOLUTION_MAP.get(req.resolution, (960, 544))
+        RESOLUTION_MAP: dict[str, tuple[int, int]] = {
+            "540p": (960, 576),
+            "720p": (1280, 704),
+            "1080p": (960, 576),
+        }
+        width, height = RESOLUTION_MAP.get(req.resolution, (960, 576))
 
         num_frames = self._compute_num_frames(duration, fps)
 
