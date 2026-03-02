@@ -797,13 +797,14 @@ class TestForcedApiGenerateImage:
         assert r.status_code == 200
         assert r.json()["status"] == "cancelled"
 
-    def test_edit_image_routes_to_flux_api(self, client, test_state, fake_services, make_test_image):
+    def test_edit_image_routes_to_flux_api(self, client, test_state, fake_services, make_test_image, tmp_path):
         test_state.config.force_api_generations = True
+        image_path = tmp_path / "img1.png"
+        image_path.write_bytes(make_test_image(100, 100).getvalue())
 
         r = client.post(
             "/api/edit-image",
-            data={"prompt": "Make it blue", "width": "1024", "height": "1024"},
-            files={"image": ("img1.png", make_test_image(100, 100), "image/png")},
+            json={"prompt": "Make it blue", "width": 1024, "height": 1024, "imagePaths": [str(image_path)]},
         )
 
         assert r.status_code == 200
@@ -813,19 +814,18 @@ class TestForcedApiGenerateImage:
         assert len(fake_services.flux_api_client.image_edit_calls) == 1
         assert len(fake_services.image_generation_pipeline.generate_edit_calls) == 0
 
-    def test_edit_image_rejects_more_than_four_refs(self, client, test_state, make_test_image):
+    def test_edit_image_rejects_more_than_four_refs(self, client, test_state, make_test_image, tmp_path):
         test_state.config.force_api_generations = True
+
+        image_paths: list[str] = []
+        for idx in range(5):
+            p = tmp_path / f"img{idx + 1}.png"
+            p.write_bytes(make_test_image(100, 100).getvalue())
+            image_paths.append(str(p))
 
         r = client.post(
             "/api/edit-image",
-            data={"prompt": "Combine styles", "width": "1024", "height": "1024"},
-            files={
-                "image": ("img1.png", make_test_image(100, 100), "image/png"),
-                "image2": ("img2.png", make_test_image(100, 100), "image/png"),
-                "image3": ("img3.png", make_test_image(100, 100), "image/png"),
-                "image4": ("img4.png", make_test_image(100, 100), "image/png"),
-                "image5": ("img5.png", make_test_image(100, 100), "image/png"),
-            },
+            json={"prompt": "Combine styles", "width": 1024, "height": 1024, "imagePaths": image_paths},
         )
 
         assert r.status_code == 400
@@ -859,13 +859,14 @@ class TestEmptyPromptRejected:
 
 
 class TestEditImage:
-    def test_happy_path(self, client, make_test_image):
-        img_buf = make_test_image(100, 100)
+    def test_happy_path(self, client, make_test_image, create_fake_model_files, tmp_path):
+        create_fake_model_files(include_flux=True)
+        image_path = tmp_path / "test.png"
+        image_path.write_bytes(make_test_image(100, 100).getvalue())
 
         r = client.post(
             "/api/edit-image",
-            data={"prompt": "Make it blue", "width": "1024", "height": "1024"},
-            files={"image": ("test.png", img_buf, "image/png")},
+            json={"prompt": "Make it blue", "width": 1024, "height": 1024, "imagePaths": [str(image_path)]},
         )
         assert r.status_code == 200
 
@@ -877,19 +878,21 @@ class TestEditImage:
     def test_no_image(self, client):
         r = client.post(
             "/api/edit-image",
-            data={"prompt": "Make it blue", "width": "1024", "height": "1024"},
+            json={"prompt": "Make it blue", "width": 1024, "height": 1024},
         )
         assert r.status_code == 422
 
-    def test_multiple_reference_images(self, client, fake_services, make_test_image):
+    def test_multiple_reference_images(self, client, fake_services, make_test_image, create_fake_model_files, tmp_path):
+        create_fake_model_files(include_flux=True)
+        image_paths: list[str] = []
+        for idx in range(3):
+            p = tmp_path / f"img{idx + 1}.png"
+            p.write_bytes(make_test_image(100, 100).getvalue())
+            image_paths.append(str(p))
+
         r = client.post(
             "/api/edit-image",
-            data={"prompt": "Combine styles", "width": "1024", "height": "1024"},
-            files={
-                "image": ("img1.png", make_test_image(100, 100), "image/png"),
-                "image2": ("img2.png", make_test_image(100, 100), "image/png"),
-                "image3": ("img3.png", make_test_image(100, 100), "image/png"),
-            },
+            json={"prompt": "Combine styles", "width": 1024, "height": 1024, "imagePaths": image_paths},
         )
         assert r.status_code == 200
 

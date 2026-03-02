@@ -37,13 +37,18 @@ class TestSuggestGapPrompt:
         assert data["status"] == "success"
         assert data["suggested_prompt"] == "A smooth transition scene"
 
-    def test_happy_path_with_frames(self, client, test_state):
+    def test_happy_path_with_frames(self, client, test_state, make_test_image, tmp_path):
         test_state.state.app_settings.gemini_api_key = "key"
         test_state.http.queue("post", _gemini_ok("Transition clip"))
 
+        before_path = tmp_path / "before.png"
+        after_path = tmp_path / "after.png"
+        before_path.write_bytes(make_test_image().getvalue())
+        after_path.write_bytes(make_test_image().getvalue())
+
         r = client.post(
             "/api/suggest-gap-prompt",
-            json={"beforeFrame": "base64data==", "afterFrame": "base64data=="},
+            json={"beforeFrame": str(before_path), "afterFrame": str(after_path)},
         )
         assert r.status_code == 200
 

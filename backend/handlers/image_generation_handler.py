@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
 import uuid
 from datetime import datetime
@@ -18,6 +17,7 @@ from api_types import EditImageRequest, GenerateImageRequest, GenerateImageRespo
 from handlers.base import StateHandlerBase
 from handlers.generation_handler import GenerationHandler
 from handlers.pipelines_handler import PipelinesHandler
+from server_utils.media_validation import validate_image_file
 from services.interfaces import FluxAPIClient
 from state.app_state_types import AppState
 
@@ -98,15 +98,20 @@ class ImageGenerationHandler(StateHandlerBase):
         if not req.imagePaths:
             raise HTTPError(400, "At least one input image path is required for editing")
 
+        validated_paths: list[Path] = []
         for path in req.imagePaths:
-            if not os.path.isfile(path):
-                raise HTTPError(400, f"Image file not found: {path}")
+            validated_paths.append(validate_image_file(path))
 
         width = (req.width // 16) * 16
         height = (req.height // 16) * 16
 
         if self._config.force_api_generations:
-            image_bytes_list = [Path(p).read_bytes() for p in req.imagePaths]
+            image_bytes_list: list[bytes] = []
+            for raw_path, validated_path in zip(req.imagePaths, validated_paths, strict=True):
+                try:
+                    image_bytes_list.append(validated_path.read_bytes())
+                except Exception:
+                    raise HTTPError(400, f"Invalid image file: {raw_path}") from None
             return self._edit_via_api(
                 prompt=req.prompt,
                 input_images=image_bytes_list,
@@ -116,8 +121,11 @@ class ImageGenerationHandler(StateHandlerBase):
             )
 
         input_images: list[Image.Image] = []
-        for path in req.imagePaths:
-            input_images.append(Image.open(path).convert("RGB"))
+        for raw_path, validated_path in zip(req.imagePaths, validated_paths, strict=True):
+            try:
+                input_images.append(Image.open(validated_path).convert("RGB"))
+            except Exception:
+                raise HTTPError(400, f"Invalid image file: {raw_path}") from None
 
         logger.info("Image edit request: %s reference(s), %sx%s, %s steps", len(input_images), width, height, req.numSteps)
 
@@ -358,4 +366,3 @@ class ImageGenerationHandler(StateHandlerBase):
                 logger.info("Image edit cancelled by user")
                 return GenerateImageResponse(status="cancelled")
             raise HTTPError(500, str(e)) from e
-
