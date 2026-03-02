@@ -113,12 +113,35 @@ class FakeTaskRunner:
 
 class FakeLTXAPIClient:
     def __init__(self) -> None:
+        self.upload_file_calls: list[dict[str, Any]] = []
         self.text_to_video_calls: list[dict[str, Any]] = []
         self.image_to_video_calls: list[dict[str, Any]] = []
+        self.audio_to_video_calls: list[dict[str, Any]] = []
+        self.raise_on_upload_file: Exception | None = None
         self.raise_on_text_to_video: Exception | None = None
         self.raise_on_image_to_video: Exception | None = None
+        self.raise_on_audio_to_video: Exception | None = None
         self.text_to_video_result = b"fake-ltx-api-t2v-video"
         self.image_to_video_result = b"fake-ltx-api-i2v-video"
+        self.audio_to_video_result = b"fake-ltx-api-a2v-video"
+        self.upload_file_results: dict[str, str] = {}
+
+    def upload_file(
+        self,
+        *,
+        api_key: str,
+        file_path: str,
+    ) -> str:
+        self.upload_file_calls.append(
+            {
+                "api_key": api_key,
+                "file_path": file_path,
+            }
+        )
+        if self.raise_on_upload_file is not None:
+            raise self.raise_on_upload_file
+        default_uri = f"storage://uploaded/{Path(file_path).name}"
+        return self.upload_file_results.get(file_path, default_uri)
 
     def generate_text_to_video(
         self,
@@ -153,7 +176,7 @@ class FakeLTXAPIClient:
         *,
         api_key: str,
         prompt: str,
-        image_path: str,
+        image_uri: str,
         model: str,
         resolution: str,
         duration: float,
@@ -165,7 +188,7 @@ class FakeLTXAPIClient:
             {
                 "api_key": api_key,
                 "prompt": prompt,
-                "image_path": image_path,
+                "image_uri": image_uri,
                 "model": model,
                 "resolution": resolution,
                 "duration": duration,
@@ -177,6 +200,30 @@ class FakeLTXAPIClient:
         if self.raise_on_image_to_video is not None:
             raise self.raise_on_image_to_video
         return self.image_to_video_result
+
+    def generate_audio_to_video(
+        self,
+        *,
+        api_key: str,
+        prompt: str,
+        audio_uri: str,
+        image_uri: str | None,
+        model: str,
+        resolution: str,
+    ) -> bytes:
+        self.audio_to_video_calls.append(
+            {
+                "api_key": api_key,
+                "prompt": prompt,
+                "audio_uri": audio_uri,
+                "image_uri": image_uri,
+                "model": model,
+                "resolution": resolution,
+            }
+        )
+        if self.raise_on_audio_to_video is not None:
+            raise self.raise_on_audio_to_video
+        return self.audio_to_video_result
 
 
 class FakeFluxAPIClient:

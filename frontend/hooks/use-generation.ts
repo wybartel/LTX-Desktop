@@ -68,6 +68,8 @@ function getPhaseMessage(phase: string, _currentStep: number | null, totalSteps:
       return 'Validating request...'
     case 'uploading_image':
       return 'Uploading image...'
+    case 'uploading_audio':
+      return 'Uploading audio...'
     case 'loading_model':
       return 'Loading model...'
     case 'encoding_text':

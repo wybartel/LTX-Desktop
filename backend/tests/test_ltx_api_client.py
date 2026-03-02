@@ -45,26 +45,8 @@ def test_generate_text_to_video_returns_binary_content() -> None:
     assert call.json_payload["camera_motion"] == "dolly_in"
 
 
-def test_generate_image_to_video_uploads_image_then_downloads_video(tmp_path) -> None:
-    image_path = tmp_path / "input.png"
-    image_path.write_bytes(b"fake-image")
-
+def test_generate_image_to_video_with_image_uri_downloads_video() -> None:
     http = FakeHTTPClient()
-    http.queue(
-        "post",
-        FakeResponse(
-            status_code=200,
-            json_payload={
-                "upload_url": "https://upload.example.com/path",
-                "storage_uri": "storage://image/123",
-                "required_headers": {"x-ms-blob-type": "BlockBlob"},
-            },
-        ),
-    )
-    http.queue(
-        "put",
-        FakeResponse(status_code=200),
-    )
     http.queue(
         "post",
         FakeResponse(
@@ -82,7 +64,7 @@ def test_generate_image_to_video_uploads_image_then_downloads_video(tmp_path) ->
     out = client.generate_image_to_video(
         api_key="test-key",
         prompt="Animate this frame",
-        image_path=str(image_path),
+        image_uri="storage://image/123",
         model="ltx-2-3-pro",
         resolution="1920x1080",
         duration=4.0,
@@ -92,14 +74,12 @@ def test_generate_image_to_video_uploads_image_then_downloads_video(tmp_path) ->
     )
 
     assert out == b"downloaded-video"
-    assert len(http.calls) == 4
-    assert http.calls[0].url == "https://api.ltx.video/v1/upload"
-    assert http.calls[1].method == "put"
-    assert http.calls[2].url == "https://api.ltx.video/v1/image-to-video"
-    assert http.calls[2].json_payload is not None
-    assert http.calls[2].json_payload["image_uri"] == "storage://image/123"
-    assert http.calls[2].json_payload["camera_motion"] == "jib_up"
-    assert http.calls[3].url == "https://cdn.example.com/output.mp4"
+    assert len(http.calls) == 2
+    assert http.calls[0].url == "https://api.ltx.video/v1/image-to-video"
+    assert http.calls[0].json_payload is not None
+    assert http.calls[0].json_payload["image_uri"] == "storage://image/123"
+    assert http.calls[0].json_payload["camera_motion"] == "jib_up"
+    assert http.calls[1].url == "https://cdn.example.com/output.mp4"
 
 
 def test_generate_text_to_video_omits_camera_motion_when_none() -> None:
@@ -153,4 +133,112 @@ def test_generate_text_to_video_raises_on_non_200() -> None:
             duration=5.0,
             fps=24.0,
             generate_audio=False,
+        )
+
+
+def test_upload_file_returns_storage_uri(tmp_path) -> None:
+    audio_path = tmp_path / "input.wav"
+    audio_path.write_bytes(b"fake-audio")
+
+    http = FakeHTTPClient()
+    http.queue(
+        "post",
+        FakeResponse(
+            status_code=200,
+            json_payload={
+                "upload_url": "https://upload.example.com/audio",
+                "storage_uri": "storage://audio/123",
+                "required_headers": {"x-ms-blob-type": "BlockBlob"},
+            },
+        ),
+    )
+    http.queue("put", FakeResponse(status_code=200))
+
+    client = LTXAPIClientImpl(http=http, ltx_api_base_url="https://api.ltx.video")
+    out = client.upload_file(
+        api_key="test-key",
+        file_path=str(audio_path),
+    )
+
+    assert out == "storage://audio/123"
+    assert len(http.calls) == 2
+    assert http.calls[0].url == "https://api.ltx.video/v1/upload"
+    assert http.calls[1].method == "put"
+
+
+def test_generate_audio_to_video_with_audio_uri_downloads_video() -> None:
+    http = FakeHTTPClient()
+    http.queue(
+        "post",
+        FakeResponse(
+            status_code=200,
+            headers={"Content-Type": "application/json"},
+            json_payload={"video_url": "https://cdn.example.com/a2v.mp4"},
+        ),
+    )
+    http.queue("get", FakeResponse(status_code=200, content=b"downloaded-a2v-video"))
+
+    client = LTXAPIClientImpl(http=http, ltx_api_base_url="https://api.ltx.video")
+    out = client.generate_audio_to_video(
+        api_key="test-key",
+        prompt="Sync to this song",
+        audio_uri="storage://audio/123",
+        image_uri=None,
+        model="ltx-2-3-fast",
+        resolution="1920x1080",
+    )
+
+    assert out == b"downloaded-a2v-video"
+    assert len(http.calls) == 2
+    assert http.calls[0].url == "https://api.ltx.video/v1/audio-to-video"
+    assert http.calls[0].json_payload is not None
+    assert http.calls[0].json_payload["audio_uri"] == "storage://audio/123"
+    assert "image_uri" not in http.calls[0].json_payload
+    assert http.calls[1].url == "https://cdn.example.com/a2v.mp4"
+
+
+def test_generate_audio_to_video_with_image_uri_posts_both_inputs() -> None:
+    http = FakeHTTPClient()
+    http.queue(
+        "post",
+        FakeResponse(
+            status_code=200,
+            headers={"Content-Type": "video/mp4"},
+            content=b"direct-a2v-video",
+        ),
+    )
+
+    client = LTXAPIClientImpl(http=http, ltx_api_base_url="https://api.ltx.video")
+    out = client.generate_audio_to_video(
+        api_key="test-key",
+        prompt="Animate from image and audio",
+        audio_uri="storage://audio/123",
+        image_uri="storage://image/456",
+        model="ltx-2-3-pro",
+        resolution="3840x2160",
+    )
+
+    assert out == b"direct-a2v-video"
+    assert len(http.calls) == 1
+    assert http.calls[0].url == "https://api.ltx.video/v1/audio-to-video"
+    assert http.calls[0].json_payload is not None
+    assert http.calls[0].json_payload["audio_uri"] == "storage://audio/123"
+    assert http.calls[0].json_payload["image_uri"] == "storage://image/456"
+    assert http.calls[0].json_payload["model"] == "ltx-2-3-pro"
+    assert http.calls[0].json_payload["resolution"] == "3840x2160"
+
+
+def test_generate_audio_to_video_raises_on_non_200() -> None:
+    http = FakeHTTPClient()
+    http.queue("post", FakeResponse(status_code=422, text="unprocessable"))
+
+    client = LTXAPIClientImpl(http=http, ltx_api_base_url="https://api.ltx.video")
+    with pytest.raises(RuntimeError, match="422"):
+        client.generate_audio_to_video(
+            api_key="bad-key",
+            prompt="Bad request",
+            audio_uri="storage://audio/123",
+            image_uri=None,
+            model="ltx-2-3-fast",
+            resolution="1920x1080",
         )

@@ -353,15 +353,13 @@ class VideoGenerationHandler(StateHandlerBase):
         return self._outputs_dir / f"ltx2_video_{timestamp}_{self._make_generation_id()}.mp4"
 
     def _generate_forced_api(self, req: GenerateVideoRequest) -> GenerateVideoResponse:
-        if req.audioPath:
-            raise HTTPError(400, "A2V is not supported via API generation")
-
         if self._generation.is_generation_running():
             raise HTTPError(409, "Generation already in progress")
 
         generation_id = self._make_generation_id()
         self._generation.start_api_generation(generation_id)
 
+        has_input_audio = bool(req.audioPath)
         has_input_image = bool(req.imagePath)
 
         try:
@@ -382,33 +380,70 @@ class VideoGenerationHandler(StateHandlerBase):
             if api_resolution is None:
                 raise HTTPError(400, "INVALID_FORCED_API_RESOLUTION")
 
-            duration = self._parse_forced_numeric_field(req.duration, "INVALID_FORCED_API_DURATION")
-            if duration not in FORCED_API_ALLOWED_DURATIONS:
-                raise HTTPError(400, "INVALID_FORCED_API_DURATION")
-
-            fps = self._parse_forced_numeric_field(req.fps, "INVALID_FORCED_API_FPS")
-            if fps not in FORCED_API_ALLOWED_FPS:
-                raise HTTPError(400, "INVALID_FORCED_API_FPS")
-
-            generate_audio = self._parse_audio_flag(req.audio)
             prompt = req.prompt
 
             if self._generation.is_generation_cancelled():
                 raise RuntimeError("Generation was cancelled")
 
-            if has_input_image:
+            if has_input_audio:
+                audio_path = req.audioPath
+                if audio_path is None:
+                    raise HTTPError(400, "Audio path is required for audio-to-video")
+                if not os.path.isfile(audio_path):
+                    raise HTTPError(400, f"Audio file not found: {audio_path}")
+
+                image_path = req.imagePath
+                if image_path is not None and not os.path.isfile(image_path):
+                    raise HTTPError(400, f"Image file not found: {image_path}")
+
+                self._generation.update_progress("uploading_audio", 20, None, None)
+                audio_uri = self._ltx_api_client.upload_file(
+                    api_key=api_key,
+                    file_path=audio_path,
+                )
+                image_uri: str | None = None
+                if image_path is not None:
+                    self._generation.update_progress("uploading_image", 35, None, None)
+                    image_uri = self._ltx_api_client.upload_file(
+                        api_key=api_key,
+                        file_path=image_path,
+                    )
+                self._generation.update_progress("inference", 55, None, None)
+                video_bytes = self._ltx_api_client.generate_audio_to_video(
+                    api_key=api_key,
+                    prompt=prompt,
+                    audio_uri=audio_uri,
+                    image_uri=image_uri,
+                    model=api_model_id,
+                    resolution=api_resolution,
+                )
+                self._generation.update_progress("downloading_output", 85, None, None)
+            elif has_input_image:
                 image_path = req.imagePath
                 if image_path is None:
                     raise HTTPError(400, "Image path is required for image-to-video")
                 if not os.path.isfile(image_path):
                     raise HTTPError(400, f"Image file not found: {image_path}")
 
+                duration = self._parse_forced_numeric_field(req.duration, "INVALID_FORCED_API_DURATION")
+                if duration not in FORCED_API_ALLOWED_DURATIONS:
+                    raise HTTPError(400, "INVALID_FORCED_API_DURATION")
+
+                fps = self._parse_forced_numeric_field(req.fps, "INVALID_FORCED_API_FPS")
+                if fps not in FORCED_API_ALLOWED_FPS:
+                    raise HTTPError(400, "INVALID_FORCED_API_FPS")
+
+                generate_audio = self._parse_audio_flag(req.audio)
                 self._generation.update_progress("uploading_image", 20, None, None)
+                image_uri = self._ltx_api_client.upload_file(
+                    api_key=api_key,
+                    file_path=image_path,
+                )
                 self._generation.update_progress("inference", 55, None, None)
                 video_bytes = self._ltx_api_client.generate_image_to_video(
                     api_key=api_key,
                     prompt=prompt,
-                    image_path=image_path,
+                    image_uri=image_uri,
                     model=api_model_id,
                     resolution=api_resolution,
                     duration=float(duration),
@@ -418,6 +453,15 @@ class VideoGenerationHandler(StateHandlerBase):
                 )
                 self._generation.update_progress("downloading_output", 85, None, None)
             else:
+                duration = self._parse_forced_numeric_field(req.duration, "INVALID_FORCED_API_DURATION")
+                if duration not in FORCED_API_ALLOWED_DURATIONS:
+                    raise HTTPError(400, "INVALID_FORCED_API_DURATION")
+
+                fps = self._parse_forced_numeric_field(req.fps, "INVALID_FORCED_API_FPS")
+                if fps not in FORCED_API_ALLOWED_FPS:
+                    raise HTTPError(400, "INVALID_FORCED_API_FPS")
+
+                generate_audio = self._parse_audio_flag(req.audio)
                 self._generation.update_progress("inference", 55, None, None)
                 video_bytes = self._ltx_api_client.generate_text_to_video(
                     api_key=api_key,

@@ -179,7 +179,7 @@ class TestA2VGenerate:
         )
         assert r.status_code == 400
 
-    def test_a2v_forced_api_rejected(self, client, test_state, tmp_path):
+    def test_a2v_forced_api_routes_to_ltx_api(self, client, test_state, fake_services, tmp_path):
         test_state.config.force_api_generations = True
         test_state.state.app_settings.ltx_api_key = "api-key"
         audio_file = tmp_path / "test_audio.wav"
@@ -196,8 +196,51 @@ class TestA2VGenerate:
                 "audioPath": str(audio_file),
             },
         )
-        assert r.status_code == 400
-        assert r.json()["error"] == "A2V is not supported via API generation"
+        assert r.status_code == 200
+        assert r.json()["status"] == "complete"
+        assert len(fake_services.ltx_api_client.upload_file_calls) == 1
+        assert fake_services.ltx_api_client.upload_file_calls[0]["file_path"] == str(audio_file)
+        assert len(fake_services.ltx_api_client.audio_to_video_calls) == 1
+        call = fake_services.ltx_api_client.audio_to_video_calls[0]
+        assert call["audio_uri"] == "storage://uploaded/test_audio.wav"
+        assert call["image_uri"] is None
+        assert call["model"] == "ltx-2-3-fast"
+        assert call["resolution"] == "1920x1080"
+
+    def test_a2v_forced_api_routes_to_ltx_api_with_audio_and_image(
+        self, client, test_state, fake_services, make_test_image, tmp_path
+    ):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+        audio_file = tmp_path / "test_audio.wav"
+        audio_file.write_bytes(b"\x00" * 512)
+        image_path = tmp_path / "input.png"
+        image_path.write_bytes(make_test_image().getvalue())
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video with a still frame",
+                "resolution": "2160p",
+                "model": "pro",
+                "duration": "6",
+                "fps": "50",
+                "audioPath": str(audio_file),
+                "imagePath": str(image_path),
+            },
+        )
+
+        assert r.status_code == 200
+        assert r.json()["status"] == "complete"
+        assert len(fake_services.ltx_api_client.upload_file_calls) == 2
+        assert fake_services.ltx_api_client.upload_file_calls[0]["file_path"] == str(audio_file)
+        assert fake_services.ltx_api_client.upload_file_calls[1]["file_path"] == str(image_path)
+        assert len(fake_services.ltx_api_client.audio_to_video_calls) == 1
+        call = fake_services.ltx_api_client.audio_to_video_calls[0]
+        assert call["audio_uri"] == "storage://uploaded/test_audio.wav"
+        assert call["image_uri"] == "storage://uploaded/input.png"
+        assert call["model"] == "ltx-2-3-pro"
+        assert call["resolution"] == "3840x2160"
 
     def test_a2v_uses_resolution_map(self, client, test_state, fake_services, create_fake_model_files, tmp_path):
         create_fake_model_files()
@@ -227,6 +270,68 @@ class TestA2VGenerate:
             call = fake_services.a2v_pipeline.generate_calls[0]
             assert call["width"] == expected_w, f"{resolution}: expected width {expected_w}, got {call['width']}"
             assert call["height"] == expected_h, f"{resolution}: expected height {expected_h}, got {call['height']}"
+
+    def test_a2v_forced_api_rejects_missing_audio_file(self, client, test_state):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "50",
+                "audioPath": "/no/such/audio.wav",
+            },
+        )
+
+        assert r.status_code == 400
+        assert "Audio file not found" in r.json()["error"]
+
+    def test_a2v_forced_api_missing_key_returns_integrity_error(self, client, test_state, tmp_path):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = ""
+        audio_file = tmp_path / "test_audio.wav"
+        audio_file.write_bytes(b"\x00" * 512)
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "50",
+                "audioPath": str(audio_file),
+            },
+        )
+
+        assert r.status_code == 400
+        assert r.json()["error"] == "PRO_API_KEY_REQUIRED"
+
+    def test_a2v_forced_api_cancelled_response(self, client, test_state, fake_services, tmp_path):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+        fake_services.ltx_api_client.raise_on_audio_to_video = RuntimeError("cancelled")
+        audio_file = tmp_path / "test_audio.wav"
+        audio_file.write_bytes(b"\x00" * 512)
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A music video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "50",
+                "audioPath": str(audio_file),
+            },
+        )
+
+        assert r.status_code == 200
+        assert r.json()["status"] == "cancelled"
 
 
 class TestForcedApiGenerate:
@@ -280,8 +385,11 @@ class TestForcedApiGenerate:
 
         assert r.status_code == 200
         assert r.json()["status"] == "complete"
+        assert len(fake_services.ltx_api_client.upload_file_calls) == 1
+        assert fake_services.ltx_api_client.upload_file_calls[0]["file_path"] == str(image_path)
         assert len(fake_services.ltx_api_client.image_to_video_calls) == 1
         call = fake_services.ltx_api_client.image_to_video_calls[0]
+        assert call["image_uri"] == "storage://uploaded/input.png"
         assert call["model"] == "ltx-2-3-pro"
         assert call["resolution"] == "3840x2160"
         assert call["duration"] == 8.0
@@ -331,8 +439,11 @@ class TestForcedApiGenerate:
         )
 
         assert r.status_code == 200
+        assert len(fake_services.ltx_api_client.upload_file_calls) == 1
+        assert fake_services.ltx_api_client.upload_file_calls[0]["file_path"] == str(image_path)
         assert len(fake_services.ltx_api_client.image_to_video_calls) == 1
         call = fake_services.ltx_api_client.image_to_video_calls[0]
+        assert call["image_uri"] == "storage://uploaded/input-none.png"
         assert call["camera_motion"] == "none"
 
     def test_i2v_fast_routes_to_fast_model(self, client, test_state, fake_services, make_test_image, tmp_path):
@@ -356,8 +467,11 @@ class TestForcedApiGenerate:
 
         assert r.status_code == 200
         assert r.json()["status"] == "complete"
+        assert len(fake_services.ltx_api_client.upload_file_calls) == 1
+        assert fake_services.ltx_api_client.upload_file_calls[0]["file_path"] == str(image_path)
         assert len(fake_services.ltx_api_client.image_to_video_calls) == 1
         call = fake_services.ltx_api_client.image_to_video_calls[0]
+        assert call["image_uri"] == "storage://uploaded/input-fast.png"
         assert call["model"] == "ltx-2-3-fast"
         assert call["resolution"] == "1920x1080"
         assert call["duration"] == 6.0

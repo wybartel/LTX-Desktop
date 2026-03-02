@@ -75,7 +75,7 @@ class LTXAPIClientImpl:
         *,
         api_key: str,
         prompt: str,
-        image_path: str,
+        image_uri: str,
         model: str,
         resolution: str,
         duration: float,
@@ -83,7 +83,6 @@ class LTXAPIClientImpl:
         generate_audio: bool,
         camera_motion: VideoCameraMotion = "none",
     ) -> bytes:
-        image_uri = self._upload_image(image_path=image_path, api_key=api_key)
         payload: dict[str, JSONValue] = {
             "prompt": prompt,
             "image_uri": image_uri,
@@ -104,7 +103,33 @@ class LTXAPIClientImpl:
         )
         return self._extract_video_bytes(response, api_key)
 
-    def _upload_image(self, *, image_path: str, api_key: str) -> str:
+    def generate_audio_to_video(
+        self,
+        *,
+        api_key: str,
+        prompt: str,
+        audio_uri: str,
+        image_uri: str | None,
+        model: str,
+        resolution: str,
+    ) -> bytes:
+        payload: dict[str, JSONValue] = {
+            "prompt": prompt,
+            "audio_uri": audio_uri,
+            "model": model,
+            "resolution": resolution,
+        }
+        if image_uri is not None:
+            payload["image_uri"] = image_uri
+        response = self._http.post(
+            f"{self._base_url}/v1/audio-to-video",
+            headers=self._json_headers(api_key),
+            json_payload=payload,
+            timeout=1200,
+        )
+        return self._extract_video_bytes(response, api_key)
+
+    def upload_file(self, *, file_path: str, api_key: str) -> str:
         upload_resp = self._http.post(
             f"{self._base_url}/v1/upload",
             headers={"Authorization": f"Bearer {api_key}"},
@@ -122,12 +147,12 @@ class LTXAPIClientImpl:
         except Exception as exc:
             raise RuntimeError("Unexpected LTX upload response format") from exc
 
-        path_obj = Path(image_path)
+        path_obj = Path(file_path)
         mime = mimetypes.guess_type(path_obj.name)[0] or "application/octet-stream"
-        with open(path_obj, "rb") as image_file:
+        with open(path_obj, "rb") as media_file:
             put_resp = self._http.put(
                 upload_url,
-                data=image_file,
+                data=media_file,
                 headers={"Content-Type": mime, **required_headers},
                 timeout=300,
             )
