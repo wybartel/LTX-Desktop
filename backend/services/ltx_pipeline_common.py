@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import torch
 
+from api_types import ImageConditioningInput
 from services.services_utils import AudioOrNone, TilingConfigType, device_supports_fp8, sync_device
 
 if TYPE_CHECKING:
@@ -91,7 +92,7 @@ class DistilledNativePipeline:
         width: int,
         num_frames: int,
         frame_rate: float,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         tiling_config: TilingConfigType | None = None,
     ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
         from ltx_core.components.diffusion_steps import EulerDiffusionStep
@@ -101,6 +102,7 @@ class DistilledNativePipeline:
         from ltx_core.text_encoders.gemma import encode_text
         from ltx_core.types import VideoPixelShape
         from ltx_pipelines.utils.constants import DISTILLED_SIGMA_VALUES
+        from ltx_pipelines.utils.args import ImageConditioningInput as _LtxImageInput
         from ltx_pipelines.utils.helpers import (
             cleanup_memory,
             denoise_audio_video,
@@ -146,7 +148,7 @@ class DistilledNativePipeline:
 
         output_shape = VideoPixelShape(batch=1, frames=num_frames, width=width, height=height, fps=frame_rate)
         conditionings = image_conditionings_by_replacing_latent(
-            images=images,
+            images=[_LtxImageInput(img.path, img.frame_idx, img.strength) for img in images],
             height=output_shape.height,
             width=output_shape.width,
             video_encoder=video_encoder,

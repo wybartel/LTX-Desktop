@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias, TypedDict
+from typing import Literal, NamedTuple, TypeAlias, TypedDict
 from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
 NonEmptyPrompt = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+class ImageConditioningInput(NamedTuple):
+    """Image conditioning triplet used by all video pipelines."""
+
+    path: str
+    frame_idx: int
+    strength: float
 
 
 # ============================================================

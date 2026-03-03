@@ -14,9 +14,7 @@ from typing import TYPE_CHECKING, cast
 
 from PIL import Image
 
-from ltx_pipelines.utils.args import ImageConditioningInput
-
-from api_types import GenerateVideoRequest, GenerateVideoResponse, VideoCameraMotion
+from api_types import GenerateVideoRequest, GenerateVideoResponse, ImageConditioningInput, VideoCameraMotion
 from _routes._errors import HTTPError
 from handlers.base import StateHandlerBase
 from handlers.generation_handler import GenerationHandler

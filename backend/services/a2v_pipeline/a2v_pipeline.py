@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
+from api_types import ImageConditioningInput
+
 if TYPE_CHECKING:
     import torch
 
@@ -28,7 +30,7 @@ class A2VPipeline(Protocol):
         num_frames: int,
         frame_rate: float,
         num_inference_steps: int,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         audio_path: str,
         audio_start_time: float,
         audio_max_duration: float | None,

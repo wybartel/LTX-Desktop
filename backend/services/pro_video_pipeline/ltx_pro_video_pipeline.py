@@ -8,6 +8,7 @@ from typing import Final, cast
 
 import torch
 
+from api_types import ImageConditioningInput
 from services.ltx_pipeline_common import (
     default_guiders,
     default_tiling_config,
@@ -71,9 +72,11 @@ class LTXProVideoPipeline:
         num_frames: int,
         frame_rate: float,
         num_inference_steps: int,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         tiling_config: TilingConfigType,
     ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
+        from ltx_pipelines.utils.args import ImageConditioningInput as _LtxImageInput
+
         video_guider_params, audio_guider_params = default_guiders()
         return self.pipeline(
             prompt=prompt,
@@ -86,7 +89,7 @@ class LTXProVideoPipeline:
             num_inference_steps=num_inference_steps,
             video_guider_params=video_guider_params,
             audio_guider_params=audio_guider_params,
-            images=images,
+            images=[_LtxImageInput(img.path, img.frame_idx, img.strength) for img in images],
             tiling_config=tiling_config,
         )
 
@@ -101,7 +104,7 @@ class LTXProVideoPipeline:
         num_frames: int,
         frame_rate: float,
         num_inference_steps: int,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         output_path: str,
     ) -> None:
         tiling_config = default_tiling_config()

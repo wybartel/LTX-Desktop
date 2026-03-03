@@ -8,6 +8,7 @@ from typing import Final, cast
 
 import torch
 
+from api_types import ImageConditioningInput
 from services.ltx_pipeline_common import default_tiling_config, encode_video_output, video_chunks_number
 from services.services_utils import AudioOrNone, TilingConfigType, device_supports_fp8
 
@@ -50,9 +51,11 @@ class LTXFastVideoPipeline:
         width: int,
         num_frames: int,
         frame_rate: float,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         tiling_config: TilingConfigType,
     ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
+        from ltx_pipelines.utils.args import ImageConditioningInput as _LtxImageInput
+
         return self.pipeline(
             prompt=prompt,
             seed=seed,
@@ -60,7 +63,7 @@ class LTXFastVideoPipeline:
             width=width,
             num_frames=num_frames,
             frame_rate=frame_rate,
-            images=images,
+            images=[_LtxImageInput(img.path, img.frame_idx, img.strength) for img in images],
             tiling_config=tiling_config,
         )
 
@@ -73,7 +76,7 @@ class LTXFastVideoPipeline:
         width: int,
         num_frames: int,
         frame_rate: float,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         output_path: str,
     ) -> None:
         tiling_config = default_tiling_config()

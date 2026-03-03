@@ -8,6 +8,7 @@ from typing import Final, cast
 
 import torch
 
+from api_types import ImageConditioningInput
 from services.ltx_pipeline_common import (
     DistilledNativePipeline,
     default_tiling_config,
@@ -48,7 +49,7 @@ class LTXFastNativeVideoPipeline:
         width: int,
         num_frames: int,
         frame_rate: float,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         tiling_config: TilingConfigType,
     ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
         return self.pipeline(
@@ -71,7 +72,7 @@ class LTXFastNativeVideoPipeline:
         width: int,
         num_frames: int,
         frame_rate: float,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         output_path: str,
     ) -> None:
         tiling_config = default_tiling_config()

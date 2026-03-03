@@ -8,6 +8,7 @@ from typing import Final, cast
 
 import torch
 
+from api_types import ImageConditioningInput
 from services.ltx_pipeline_common import default_guiders, encode_video_output, video_chunks_number
 from services.services_utils import AudioOrNone, device_supports_fp8
 
@@ -49,8 +50,10 @@ class LTXProNativeVideoPipeline:
         num_frames: int,
         frame_rate: float,
         num_inference_steps: int,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
     ) -> tuple[torch.Tensor | Iterator[torch.Tensor], AudioOrNone]:
+        from ltx_pipelines.utils.args import ImageConditioningInput as _LtxImageInput
+
         video_guider_params, audio_guider_params = default_guiders()
         return self.pipeline(
             prompt=prompt,
@@ -63,7 +66,7 @@ class LTXProNativeVideoPipeline:
             num_inference_steps=num_inference_steps,
             video_guider_params=video_guider_params,
             audio_guider_params=audio_guider_params,
-            images=images,
+            images=[_LtxImageInput(img.path, img.frame_idx, img.strength) for img in images],
         )
 
     @torch.inference_mode()
@@ -77,7 +80,7 @@ class LTXProNativeVideoPipeline:
         num_frames: int,
         frame_rate: float,
         num_inference_steps: int,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         output_path: str,
     ) -> None:
         video, audio = self._run_inference(

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
+from api_types import ImageConditioningInput
+
 if TYPE_CHECKING:
     import torch
 
@@ -27,7 +29,7 @@ class IcLoraPipeline(Protocol):
         width: int,
         num_frames: int,
         frame_rate: float,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         video_conditioning: list[tuple[str, float]],
         output_path: str,
     ) -> None:

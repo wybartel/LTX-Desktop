@@ -18,6 +18,7 @@ from api_types import (
     IcLoraGenerateResponse,
     IcLoraListResponse,
     IcLoraModel,
+    ImageConditioningInput,
 )
 from _routes._errors import HTTPError
 from handlers.base import StateHandlerBase
@@ -150,8 +151,8 @@ class IcLoraHandler(StateHandlerBase):
             self._video_processor.release(cap)
             self._video_processor.release(writer)
 
-            images: list[tuple[str, int, float]] = [
-                (img.path, int(img.frame), float(img.strength))
+            images: list[ImageConditioningInput] = [
+                ImageConditioningInput(path=img.path, frame_idx=int(img.frame), strength=float(img.strength))
                 for img in req.images
             ]
 

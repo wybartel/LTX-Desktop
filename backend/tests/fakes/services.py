@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from PIL import Image
-from api_types import VideoCameraMotion
+from api_types import ImageConditioningInput, VideoCameraMotion
 from services.interfaces import IcLoraDownloadPayload, IcLoraModelPayload, VideoInfoPayload
 from tests.fakes.fake_gpu_info import FakeGpuInfo
 
@@ -507,7 +507,7 @@ class FakeFastVideoPipeline(_FakeVideoPipelineBase):
         width: int,
         num_frames: int,
         frame_rate: float,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         output_path: str,
     ) -> None:
         self._record_generate(
@@ -552,7 +552,7 @@ class FakeFastNativeVideoPipeline(_FakeVideoPipelineBase):
         width: int,
         num_frames: int,
         frame_rate: float,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         output_path: str,
     ) -> None:
         self._record_generate(
@@ -601,7 +601,7 @@ class FakeProVideoPipeline(_FakeVideoPipelineBase):
         num_frames: int,
         frame_rate: float,
         num_inference_steps: int,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         output_path: str,
     ) -> None:
         self._record_generate(
@@ -650,7 +650,7 @@ class FakeProNativeVideoPipeline(_FakeVideoPipelineBase):
         num_frames: int,
         frame_rate: float,
         num_inference_steps: int,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         output_path: str,
     ) -> None:
         self._record_generate(

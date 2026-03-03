@@ -7,6 +7,7 @@ from typing import cast
 
 import torch
 
+from api_types import ImageConditioningInput
 from services.ltx_pipeline_common import default_guiders, default_tiling_config, encode_video_output, video_chunks_number
 from services.services_utils import AudioOrNone, TilingConfigType, device_supports_fp8
 
@@ -63,7 +64,7 @@ class LTXa2vPipeline:
         num_frames: int,
         frame_rate: float,
         num_inference_steps: int,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         audio_path: str,
         audio_start_time: float,
         audio_max_duration: float | None,
@@ -80,7 +81,7 @@ class LTXa2vPipeline:
             frame_rate=frame_rate,
             num_inference_steps=num_inference_steps,
             video_guider_params=video_guider_params,
-            images=images,
+            images=[(img.path, img.frame_idx, img.strength) for img in images],
             audio_path=audio_path,
             audio_start_time=audio_start_time,
             audio_max_duration=audio_max_duration,
@@ -98,7 +99,7 @@ class LTXa2vPipeline:
         num_frames: int,
         frame_rate: float,
         num_inference_steps: int,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         audio_path: str,
         audio_start_time: float,
         audio_max_duration: float | None,

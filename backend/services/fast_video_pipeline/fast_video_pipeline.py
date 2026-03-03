@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar, Literal, Protocol
 
+from api_types import ImageConditioningInput
+
 if TYPE_CHECKING:
     import torch
 
@@ -28,7 +30,7 @@ class FastVideoPipeline(Protocol):
         width: int,
         num_frames: int,
         frame_rate: float,
-        images: list[tuple[str, int, float]],
+        images: list[ImageConditioningInput],
         output_path: str,
     ) -> None:
         ...
