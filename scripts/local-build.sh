@@ -1,38 +1,65 @@
 #!/usr/bin/env bash
-# build-app.sh
-# Prepares the application for packaging: Python environment, npm deps, frontend build.
+# local-build.sh
+# All-in-one local build script for creating the LTX Desktop installer.
+# Prepares the Python environment, installs npm deps, builds the frontend,
+# then packages with electron-builder via create-installer.sh.
 #
 # Usage:
-#   bash scripts/build-app.sh [options]
+#   bash scripts/local-build.sh [options]
 #
 # Options:
 #   --platform mac|win   Target platform (auto-detected if omitted)
 #   --skip-python        Use existing python-embed/ directory
-#   --skip-npm           Skip npm install
 #   --clean              Remove build artifacts before starting
+#   --unpack             Build unpacked app only (faster, no installer/dmg)
+#   --publish <mode>     Publish mode for electron-builder (always|never|onTag)
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+PYTHON_EMBED_DIR="$PROJECT_DIR/python-embed"
+RELEASE_DIR="$PROJECT_DIR/release"
+
+cat << 'BANNER'
+
+  _   _______  __  ____            _    _
+ | | |_   _\ \/ / |  _ \  ___  ___| | _| |_ ___  _ __
+ | |   | |  \  /  | | | |/ _ \/ __| |/ / __/ _ \| '_ \
+ | |___| |  /  \  | |_| |  __/\__ \   <| || (_) | |_) |
+ |_____|_| /_/\_\ |____/ \___||___/_|\_\\__\___/| .__/
+                                                 |_|
+  Local Build Script
+
+BANNER
 
 # ============================================================
 # Parse arguments
 # ============================================================
 SKIP_PYTHON=false
-SKIP_NPM=false
 CLEAN=false
 PLATFORM=""
+PKG_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-python) SKIP_PYTHON=true ;;
-    --skip-npm)    SKIP_NPM=true ;;
     --clean)       CLEAN=true ;;
+    --unpack)
+      PKG_ARGS+=("$1")
+      ;;
     --platform)
       PLATFORM="$2"
+      PKG_ARGS+=("$1" "$2")
+      shift
+      ;;
+    --publish)
+      PKG_ARGS+=("$1" "$2")
       shift
       ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 [--platform mac|win] [--skip-python] [--skip-npm] [--clean]"
+      echo "Usage: $0 [--platform mac|win] [--skip-python] [--clean] [--unpack] [--publish always|never|onTag]"
       exit 1
       ;;
   esac
@@ -48,11 +75,6 @@ if [ -z "$PLATFORM" ]; then
     *)               echo "ERROR: Could not detect platform. Use --platform mac|win"; exit 1 ;;
   esac
 fi
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-PYTHON_EMBED_DIR="$PROJECT_DIR/python-embed"
-RELEASE_DIR="$PROJECT_DIR/release"
 
 cd "$PROJECT_DIR"
 
@@ -91,7 +113,6 @@ else
   echo "[1/3] Skipping Python preparation (using existing)..."
 fi
 
-# Verify Python environment exists
 if [ ! -d "$PYTHON_EMBED_DIR" ]; then
   echo "ERROR: Python environment not found at $PYTHON_EMBED_DIR"
   echo "Run without --skip-python to create it."
@@ -102,19 +123,18 @@ echo ""
 # ============================================================
 # Step 2: Install npm dependencies
 # ============================================================
-if [ "$SKIP_NPM" = false ]; then
-  echo "[2/3] Installing npm dependencies..."
-  npm install
-else
-  echo "[2/3] Skipping npm install..."
-fi
+echo "[2/3] Installing npm dependencies..."
+npm install
 echo ""
 
 # ============================================================
-# Step 3: Build frontend and Electron
+# Step 3: Build frontend
 # ============================================================
 echo "[3/3] Building frontend and Electron app..."
 npm run build:frontend
 echo ""
 
-echo "App build complete. Run package-installer.sh to create the installer."
+# ============================================================
+# Step 4: Create installer
+# ============================================================
+bash "$SCRIPT_DIR/create-installer.sh" "${PKG_ARGS[@]+"${PKG_ARGS[@]}"}"
