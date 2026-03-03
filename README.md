@@ -1,115 +1,174 @@
-# LTX Video
+# LTX Desktop
 
-A standalone desktop application for generating AI videos using the LTX-2 model, running entirely on your local GPU.
+LTX Desktop is an open-source desktop app for generating videos with LTX models — locally on supported Windows NVIDIA GPUs, with an API mode for unsupported hardware and macOS.
+
+> **Status: Beta.** Expect breaking changes.  
+> Frontend architecture is under active refactor; large UI PRs may be declined for now (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 
 ## Features
 
-- **Local GPU Inference**: All video generation happens on your machine - no cloud required
-- **Text-to-Video**: Generate videos from text descriptions
-- **Image-to-Video**: Animate images with AI
-- **Multiple Quality Modes**: Fast (distilled) or Pro quality
-- **Audio Generation**: Optional AI-generated audio
-- **Camera Motion**: Add cinematic camera movements
+- Text-to-video generation
+- Image-to-video generation
+- Audio-to-video generation
+- Video edit generation (Retake)
+- Video Editor Interface
+- Video Editing Projects
 
-## System Requirements
+## Local vs API mode
 
-### Minimum
-- **OS**: Windows 10/11 (64-bit)
-- **GPU**: NVIDIA GPU with 12GB+ VRAM (RTX 3080 or better)
-- **RAM**: 16GB
-- **Storage**: 20GB free space (for models)
+| Platform / hardware | Generation mode | Notes |
+| --- | --- | --- |
+| Windows + CUDA GPU with **≥16GB VRAM** | Local generation | Downloads model weights locally |
+| Windows (no CUDA, <16GB VRAM, or unknown VRAM) | API-only | **LTX API key required** |
+| macOS (Apple Silicon builds) | API-only | **LTX API key required** |
+| Linux | Not officially supported | No official builds |
 
-### Recommended
-- **GPU**: NVIDIA RTX 4090 / RTX 5090 with 24GB+ VRAM
-- **RAM**: 32GB
-- **Storage**: 50GB free space (SSD recommended)
+In API-only mode, available resolutions/durations may be limited to what the API supports.
 
-## Installation
+## System requirements
 
-### For Users
-1. Download the latest installer from [Releases](https://github.com/Lightricks/ltx-desktop/releases)
-2. Run the installer
-3. Launch LTX Video
-4. On first run, the app will download required AI models (~15GB)
+### Windows (local generation)
 
-### For Developers
+- Windows 10/11 (x64)
+- NVIDIA GPU with CUDA support and **≥16GB VRAM** (more is better)
+- 16GB+ RAM (32GB recommended)
+- Plenty of free disk space for model weights and outputs
 
-#### Prerequisites
-- Node.js 20+
+### macOS (API-only)
+
+- Apple Silicon (arm64)
+- macOS 13+ (Ventura)
+- Stable internet connection
+
+## Install
+
+1. Download the latest installer from GitHub Releases: [Releases](../../releases)
+2. Install and launch **LTX Desktop**
+3. Complete first-run setup
+
+## First run & data locations
+
+LTX Desktop stores app data (settings, models, logs) in:
+
+- **Windows:** `%LOCALAPPDATA%\\LTXDesktop\\`
+- **macOS:** `~/Library/Application Support/LTXDesktop/`
+
+Model weights are downloaded into the `models/` subfolder (this can be large and may take time).
+
+On first launch you may be prompted to review/accept model license terms (license text is fetched from Hugging Face; requires internet).
+
+Text encoding: to generate videos you must configure text encoding:
+
+- **LTX API key** (cloud text encoding), or
+- **Local Text Encoder** (extra download; enables fully-local operation on supported Windows hardware)
+
+## API keys, cost, and privacy
+
+### LTX API key
+
+The LTX API is used for:
+
+- API based generations (required on macOS and on unsupported Windows hardware)
+- Cloud text encoding and prompt enhancement
+- Retake
+
+An LTX API key is required in API-only mode, but optional on Windows local mode if you enable the Local Text Encoder.
+
+Create an API key in the [LTX Console](https://console.ltx.video/api-keys/). API usage is not free.
+
+When you use API-backed features, prompts and media inputs are sent to the API service. Your API key is stored locally in your app data folder — treat it like a secret.
+
+### Gemini API key (optional)
+
+Used for AI prompt suggestions. When enabled, prompt context and frames may be sent to Google Gemini.
+
+## Architecture
+
+LTX Desktop is split into three main layers:
+
+- **Renderer (`frontend/`)**: TypeScript + React UI.
+  - Calls the local backend over HTTP at `http://localhost:8000`.
+  - Talks to Electron via the preload bridge (`window.electronAPI`).
+- **Electron (`electron/`)**: TypeScript main process + preload.
+  - Owns app lifecycle and OS integration (file dialogs, native export via ffmpeg, starting/managing the Python backend).
+  - Security: renderer is sandboxed (`contextIsolation: true`, `nodeIntegration: false`).
+- **Backend (`backend/`)**: Python + FastAPI local server.
+  - Orchestrates generation, model downloads, and GPU execution.
+  - Calls external APIs only when API-backed features are used.
+
+```mermaid
+graph TD
+  UI["Renderer (React + TS)"] -->|HTTP: localhost:8000| BE["Backend (FastAPI + Python)"]
+  UI -->|IPC via preload: window.electronAPI| EL["Electron main (TS)"]
+  EL --> OS["OS integration (files, dialogs, ffmpeg, process mgmt)"]
+  BE --> GPU["Local models + GPU (when supported)"]
+  BE --> EXT["External APIs (only for API-backed features)"]
+  EL --> DATA["App data folder (settings/models/logs)"]
+  BE --> DATA
+```
+
+## Development (quickstart)
+
+Prereqs:
+
+- Node.js
+- `uv` (Python package manager)
 - Python 3.12+
-- NVIDIA GPU with CUDA 12.1+
-- uv (Python package manager)
-- [Microsoft Visual C++ Redistributable 2015+](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) (required by native Python packages)
+- Git
 
-> **Windows note:** If you see script execution errors when running `uv sync` or `npm` commands, you may need to allow PowerShell script execution. Run PowerShell as Administrator and execute:
-> ```powershell
-> Set-ExecutionPolicy RemoteSigned
-> ```
-
-#### Setup
+Setup:
 
 ```bash
-# Clone the repository
-git clone https://github.com/Lightricks/ltx-desktop.git
-cd ltx-desktop
+# macOS
+pnpm setup:dev:mac
 
-# Install frontend dependencies
-pnpm install
-
-# Set up Python backend
-cd backend
-uv sync
-cd ..
-
-# Run in development mode
-pnpm electron:dev
+# Windows
+pnpm setup:dev:win
 ```
 
-## Project Structure
+Run:
 
-```
-ltx-desktop/
-├── electron/           # Electron main process
-│   ├── main.ts         # Application entry point
-│   └── preload.ts      # Secure IPC bridge
-├── frontend/           # React frontend
-│   ├── components/     # UI components
-│   ├── hooks/          # React hooks
-│   └── App.tsx         # Main application
-├── backend/            # Python FastAPI backend
-│   ├── inference/      # LTX-2 pipeline wrapper
-│   └── main.py         # API server
-└── resources/          # Build resources
+```bash
+pnpm dev
 ```
 
-## Usage
+Debug:
 
-1. **Enter a prompt**: Describe the video you want to generate
-2. **Optional image**: Drag an image for image-to-video generation
-3. **Adjust settings**: Choose quality, duration, resolution
-4. **Generate**: Click "Generate video" and wait for results
+```bash
+pnpm dev:debug
+```
 
-### Tips for Better Results
+`dev:debug` starts Electron with inspector enabled and starts the Python backend with `debugpy`.
 
-- Use detailed, descriptive prompts
-- Specify camera movements in your prompt
-- For image-to-video, use high-quality input images
-- "Fast" mode is great for previews, "Pro" for final renders
+Typecheck:
 
-## Performance Benchmarks
+```bash
+pnpm typecheck
+```
 
-| Configuration | Resolution | Duration | Time (RTX 5090) |
-|--------------|------------|----------|-----------------|
-| Fast         | 720p       | 5s       | ~48s            |
-| Fast         | 1080p      | 5s       | ~85s            |
-| Fast         | 720p       | 10s      | ~79s            |
-| Pro          | 720p       | 5s       | ~122s           |
+Backend tests:
+
+```bash
+pnpm backend:test
+```
+
+Building installers:
+- See [`INSTALLER.md`](INSTALLER.md)
+
+## Docs
+
+- [`INSTALLER.md`](INSTALLER.md) — building installers
+- [`RELEASING.md`](RELEASING.md) — release process
+- [`backend/architecture.md`](backend/architecture.md) — backend architecture
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) for details.
+Apache-2.0 — see [`LICENSE.txt`](LICENSE.txt).
 
-## Credits
+Third-party notices (including model licenses/terms): [`NOTICES.md`](NOTICES.md).
 
-- LTX-2 Model by [Lightricks](https://www.lightricks.com/)
-- Built with Electron, React, FastAPI, and PyTorch
+Model weights are downloaded separately and may be governed by additional licenses/terms.
