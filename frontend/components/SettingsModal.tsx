@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Download, Info, Settings, Sliders, Sparkles, X, Zap } from 'lucide-react'
+import { AlertCircle, Check, Download, Info, KeyRound, Settings, Sliders, Sparkles, X, Zap } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
 import { Button } from './ui/button'
 import { useAppSettings, type AppSettings } from '../contexts/AppSettingsContext'
@@ -17,14 +17,16 @@ interface SettingsModalProps {
   initialTab?: TabId
 }
 
-type TabId = 'general' | 'inference' | 'promptEnhancer' | 'about'
+type TabId = 'general' | 'apiKeys' | 'inference' | 'promptEnhancer' | 'about'
 
 export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProps) {
-  const { settings, updateSettings, saveLtxApiKey } = useAppSettings()
+  const { settings, updateSettings, saveLtxApiKey, saveGeminiApiKey } = useAppSettings()
   const onSettingsChange = (next: AppSettings) => updateSettings(next)
   const [activeTab, setActiveTab] = useState<TabId>('general')
   const [ltxApiKeyInput, setLtxApiKeyInput] = useState('')
   const ltxApiKeyInputRef = useRef<HTMLInputElement>(null)
+  const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('')
+  const geminiApiKeyInputRef = useRef<HTMLInputElement>(null)
   const [textEncoderStatus, setTextEncoderStatus] = useState<TextEncoderStatus | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -224,6 +226,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
 
   const tabs = [
     { id: 'general' as TabId, label: 'General', icon: Settings },
+    { id: 'apiKeys' as TabId, label: 'API Keys', icon: KeyRound },
     { id: 'inference' as TabId, label: 'Inference', icon: Sliders },
     { id: 'promptEnhancer' as TabId, label: 'Prompt Enhancer', icon: Sparkles },
     { id: 'about' as TabId, label: 'About', icon: Info },
@@ -238,7 +241,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
       />
 
       {/* Modal */}
-      <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-lg mx-4">
+      <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-xl mx-4">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
@@ -280,66 +283,8 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
         <div className="px-6 py-5 space-y-6 h-[60vh] overflow-y-auto">
           {activeTab === 'general' && (
             <>
-              {/* LTX API Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-blue-400" />
-                  <h3 className="text-sm font-semibold text-white">LTX API</h3>
-                </div>
-
-                <p className="text-xs text-zinc-500 leading-relaxed">
-                  Your LTX API key is used for cloud text encoding, prompt enhancement, and Pro generation.
-                  Add your key below to unlock these features.
-                </p>
-
-                <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3">
-                  <div className="flex gap-2">
-                    <LtxApiKeyInput
-                      ref={ltxApiKeyInputRef}
-                      value={ltxApiKeyInput}
-                      onChange={(e) => setLtxApiKeyInput(e.target.value)}
-                      placeholder={settings.hasLtxApiKey ? 'Enter new key to replace...' : 'Enter your LTX API key...'}
-                      stopPropagation
-                      className="flex-1"
-                    />
-                    <button
-                      onClick={() => {
-                        const trimmed = ltxApiKeyInput.trim()
-                        if (!trimmed) return
-                        void saveLtxApiKey(trimmed)
-                        setLtxApiKeyInput('')
-                      }}
-                      disabled={!ltxApiKeyInput.trim()}
-                      className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-                    >
-                      Save Key
-                    </button>
-                  </div>
-                  <LtxApiKeyHelperRow stopPropagation />
-                  <div className="flex items-center justify-between">
-                    <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
-                      settings.hasLtxApiKey
-                        ? 'bg-green-500/10 text-green-400'
-                        : 'bg-amber-500/10 text-amber-400'
-                    }`}>
-                      {settings.hasLtxApiKey ? (
-                        <>
-                          <Check className="h-3 w-3" />
-                          Key configured
-                        </>
-                      ) : (
-                        <>
-                          <AlertCircle className="h-3 w-3" />
-                          API key required
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Text Encoding Section */}
-              <div className="space-y-4 pt-4 border-t border-zinc-800">
+              <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <svg className="h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3" />
@@ -360,8 +305,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                   onClick={() => {
                     if (!settings.useLocalTextEncoder) return
                     if (!settings.hasLtxApiKey) {
-                      ltxApiKeyInputRef.current?.focus()
-                      ltxApiKeyInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      setActiveTab('apiKeys')
                       return
                     }
                     handleToggleLocalEncoder()
@@ -375,7 +319,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                         <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">Recommended</span>
                       </div>
                       <p className="text-xs text-zinc-400 mt-1">
-                        Fast cloud-based text encoding (~1 second). Requires an LTX API key configured above.
+                        Fast cloud-based text encoding (~1 second). Requires an LTX API key configured in the API Keys tab.
                       </p>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -389,7 +333,7 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                   {!settings.useLocalTextEncoder && !settings.hasLtxApiKey && (
                     <div className="mt-2 text-xs text-amber-400 flex items-center gap-1.5">
                       <AlertCircle className="h-3 w-3" />
-                      API key required — configure it in the LTX API section above.
+                      API key required — configure it in the API Keys tab.
                     </div>
                   )}
 
@@ -649,6 +593,136 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
             </>
           )}
 
+          {activeTab === 'apiKeys' && (
+            <>
+              {/* LTX API Key Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-blue-400" />
+                  <h3 className="text-sm font-semibold text-white">LTX API</h3>
+                </div>
+
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  Your LTX API key is used for cloud text encoding, prompt enhancement, and Pro generation.
+                  Add your key below to unlock these features.
+                </p>
+
+                <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3">
+                  <div className="flex gap-2">
+                    <LtxApiKeyInput
+                      ref={ltxApiKeyInputRef}
+                      value={ltxApiKeyInput}
+                      onChange={(e) => setLtxApiKeyInput(e.target.value)}
+                      placeholder={settings.hasLtxApiKey ? 'Enter new key to replace...' : 'Enter your LTX API key...'}
+                      stopPropagation
+                      className="flex-1"
+                    />
+                    <button
+                      onClick={() => {
+                        const trimmed = ltxApiKeyInput.trim()
+                        if (!trimmed) return
+                        void saveLtxApiKey(trimmed)
+                        setLtxApiKeyInput('')
+                      }}
+                      disabled={!ltxApiKeyInput.trim()}
+                      className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    >
+                      Save Key
+                    </button>
+                  </div>
+                  <LtxApiKeyHelperRow stopPropagation />
+                  <div className="flex items-center justify-between">
+                    <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
+                      settings.hasLtxApiKey
+                        ? 'bg-green-500/10 text-green-400'
+                        : 'bg-amber-500/10 text-amber-400'
+                    }`}>
+                      {settings.hasLtxApiKey ? (
+                        <>
+                          <Check className="h-3 w-3" />
+                          Key configured
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-3 w-3" />
+                          API key required
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gemini API Key Section */}
+              <div className="space-y-4 pt-4 border-t border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-purple-400" />
+                  <h3 className="text-sm font-semibold text-white">Gemini API</h3>
+                </div>
+
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  Your Gemini API key is used for AI-powered prompt suggestions when filling timeline gaps.
+                </p>
+
+                <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      ref={geminiApiKeyInputRef}
+                      type="password"
+                      value={geminiApiKeyInput}
+                      onChange={(e) => setGeminiApiKeyInput(e.target.value)}
+                      placeholder={settings.hasGeminiApiKey ? 'Enter new key to replace...' : 'Enter your Gemini API key...'}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={() => {
+                        const trimmed = geminiApiKeyInput.trim()
+                        if (!trimmed) return
+                        void saveGeminiApiKey(trimmed)
+                        setGeminiApiKeyInput('')
+                      }}
+                      disabled={!geminiApiKeyInput.trim()}
+                      className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    >
+                      Save Key
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${
+                      settings.hasGeminiApiKey
+                        ? 'bg-green-500/10 text-green-400'
+                        : 'bg-amber-500/10 text-amber-400'
+                    }`}>
+                      {settings.hasGeminiApiKey ? (
+                        <>
+                          <Check className="h-3 w-3" />
+                          Key configured
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-3 w-3" />
+                          API key required
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 transition-colors underline underline-offset-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Get Gemini API key →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
           {activeTab === 'inference' && (
             <>
               {/* Fast Model Settings */}
@@ -780,18 +854,12 @@ export function SettingsModal({ isOpen, onClose, initialTab }: SettingsModalProp
                           <p className="text-sm text-amber-300 font-medium">LTX API key required</p>
                           <p className="text-xs text-zinc-400 leading-relaxed">
                             Prompt enhancement runs server-side on the LTX API. To use this feature, you need to configure
-                            an API key in the General settings tab.
+                            an API key in the API Keys tab.
                           </p>
                         </div>
                       </div>
                       <button
-                        onClick={() => {
-                          setActiveTab('general')
-                          setTimeout(() => {
-                            ltxApiKeyInputRef.current?.focus()
-                            ltxApiKeyInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                          }, 100)
-                        }}
+                        onClick={() => setActiveTab('apiKeys')}
                         className="w-full mt-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
                       >
                         Set API Key
