@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # local-build.sh
 # All-in-one local build script for creating the LTX Desktop installer.
-# Prepares the Python environment, installs npm deps, builds the frontend,
+# Prepares the Python environment, installs pnpm deps, builds the frontend,
 # then packages with electron-builder via create-installer.sh.
 #
 # Usage:
@@ -121,17 +121,17 @@ fi
 echo ""
 
 # ============================================================
-# Step 2: Install npm dependencies
+# Step 2: Install pnpm dependencies
 # ============================================================
-echo "[2/3] Installing npm dependencies..."
-npm install
+echo "[2/3] Installing pnpm dependencies..."
+pnpm install
 echo ""
 
 # ============================================================
 # Step 3: Build frontend
 # ============================================================
 echo "[3/3] Building frontend and Electron app..."
-npm run build:frontend
+pnpm run build:frontend
 echo ""
 
 # ============================================================

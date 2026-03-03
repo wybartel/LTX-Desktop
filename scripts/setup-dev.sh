@@ -11,19 +11,21 @@ fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
 
 # ── Pre-checks ──────────────────────────────────────────────────────
 command -v node  >/dev/null 2>&1 || fail "node not found — install Node.js 18+"
+command -v pnpm  >/dev/null 2>&1 || fail "pnpm not found — install with: corepack enable && corepack prepare pnpm --activate"
 command -v uv    >/dev/null 2>&1 || fail "uv not found — install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
 ok "node $(node -v)"
+ok "pnpm $(pnpm --version)"
 ok "uv   $(uv --version)"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# ── npm install ─────────────────────────────────────────────────────
+# ── pnpm install ────────────────────────────────────────────────────
 echo ""
 echo "Installing Node dependencies..."
 cd "$PROJECT_DIR"
-npm install
-ok "npm install complete"
+pnpm install
+ok "pnpm install complete"
 
 # ── uv sync ─────────────────────────────────────────────────────────
 echo ""
@@ -48,6 +50,6 @@ fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Setup complete! Run the app with:  npm run dev"
-echo "  Debug mode (with debugpy):         npm run dev:debug"
+echo "  Setup complete! Run the app with:  pnpm dev"
+echo "  Debug mode (with debugpy):         pnpm dev:debug"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
