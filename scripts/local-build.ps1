@@ -1,10 +1,13 @@
-# build-app.ps1
-# Prepares the application for packaging: Python environment, npm deps, frontend build.
+# local-build.ps1
+# All-in-one local build script for creating the LTX Desktop installer.
+# Prepares the Python environment, installs npm deps, builds the frontend,
+# then packages with electron-builder via create-installer.ps1.
 
 param(
     [switch]$SkipPython,
-    [switch]$SkipNpm,
-    [switch]$Clean
+    [switch]$Clean,
+    [switch]$Unpack,
+    [string]$Publish = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,9 +17,23 @@ $ProjectDir = Split-Path -Parent $ScriptDir
 $PythonEmbedDir = Join-Path $ProjectDir "python-embed"
 $ReleaseDir = Join-Path $ProjectDir "release"
 
+Write-Host @"
+
+  _   _______  __  ____            _    _
+ | | |_   _\ \/ / |  _ \  ___  ___| | _| |_ ___  _ __
+ | |   | |  \  /  | | | |/ _ \/ __| |/ / __/ _ \| '_ \
+ | |___| |  /  \  | |_| |  __/\__ \   <| || (_) | |_) |
+ |_____|_| /_/\_\ |____/ \___||___/_|\_\\__\___/| .__/
+                                                 |_|
+  Local Build Script
+
+"@ -ForegroundColor Cyan
+
 Set-Location $ProjectDir
 
-# Clean build if requested
+# ============================================================
+# Step 0: Clean if requested
+# ============================================================
 if ($Clean) {
     Write-Host "Cleaning previous build artifacts..." -ForegroundColor Yellow
 
@@ -36,7 +53,9 @@ if ($Clean) {
     Write-Host "Clean complete." -ForegroundColor Green
 }
 
+# ============================================================
 # Step 1: Prepare Python environment
+# ============================================================
 if (-not $SkipPython) {
     Write-Host "`n[1/3] Preparing Python environment..." -ForegroundColor Yellow
 
@@ -53,26 +72,25 @@ if (-not $SkipPython) {
     Write-Host "`n[1/3] Skipping Python preparation (using existing)..." -ForegroundColor DarkYellow
 }
 
-# Verify Python environment exists
 if (-not (Test-Path $PythonEmbedDir)) {
     Write-Host "ERROR: Python environment not found at $PythonEmbedDir" -ForegroundColor Red
     Write-Host "Run without -SkipPython to create it." -ForegroundColor Red
     exit 1
 }
 
+# ============================================================
 # Step 2: Install npm dependencies
-if (-not $SkipNpm) {
-    Write-Host "`n[2/3] Installing npm dependencies..." -ForegroundColor Yellow
-    npm install
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Failed to install npm dependencies!" -ForegroundColor Red
-        exit 1
-    }
-} else {
-    Write-Host "`n[2/3] Skipping npm install..." -ForegroundColor DarkYellow
+# ============================================================
+Write-Host "`n[2/3] Installing npm dependencies..." -ForegroundColor Yellow
+npm install
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to install npm dependencies!" -ForegroundColor Red
+    exit 1
 }
 
-# Step 3: Build frontend and electron
+# ============================================================
+# Step 3: Build frontend
+# ============================================================
 Write-Host "`n[3/3] Building frontend and Electron app..." -ForegroundColor Yellow
 
 npm run build:frontend
@@ -81,4 +99,12 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "`nApp build complete. Run package-installer.ps1 to create the installer." -ForegroundColor Green
+# ============================================================
+# Step 4: Create installer
+# ============================================================
+$pkgParams = @{}
+if ($Unpack)         { $pkgParams["Unpack"] = $true }
+if ($Publish -ne "") { $pkgParams["Publish"] = $Publish }
+
+& "$ScriptDir\create-installer.ps1" @pkgParams
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

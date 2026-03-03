@@ -1,9 +1,9 @@
-# package-installer.ps1
+# create-installer.ps1
 # Runs electron-builder to produce the installer (exe).
 # This is the ONLY build stage that needs code-signing secrets.
 #
-# Expects build-app.ps1 to have already run (frontend built, python-embed ready).
-# See build-installer.ps1 for the convenience wrapper that runs both stages.
+# Expects the frontend to be built and python-embed to be ready.
+# See local-build.ps1 for the convenience wrapper that runs all stages.
 
 param(
     [switch]$Unpack,
@@ -20,12 +20,12 @@ Set-Location $ProjectDir
 
 # Verify prerequisites
 if (-not (Test-Path "dist") -or -not (Test-Path "dist-electron")) {
-    Write-Host "ERROR: Frontend not built. Run build-app.ps1 first." -ForegroundColor Red
+    Write-Host "ERROR: Frontend not built. Run local-build.ps1 or 'npm run build:frontend' first." -ForegroundColor Red
     exit 1
 }
 
 if (-not (Test-Path "python-embed")) {
-    Write-Host "ERROR: Python environment not found. Run build-app.ps1 first." -ForegroundColor Red
+    Write-Host "ERROR: Python environment not found. Run local-build.ps1 or prepare-python.ps1 first." -ForegroundColor Red
     exit 1
 }
 

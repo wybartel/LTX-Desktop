@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# package-installer.sh
+# create-installer.sh
 # Runs electron-builder to produce the installer (dmg/exe).
 # This is the ONLY build stage that needs code-signing secrets.
 #
-# Expects build-app.sh to have already run (frontend built, python-embed ready).
-# See build-installer.sh for the convenience wrapper that runs both stages.
+# Expects the frontend to be built and python-embed to be ready.
+# See local-build.sh for the convenience wrapper that runs all stages.
 #
 # Usage:
-#   bash scripts/package-installer.sh [options]
+#   bash scripts/create-installer.sh [options]
 #
 # Options:
 #   --platform mac|win   Target platform (auto-detected if omitted)
@@ -63,12 +63,12 @@ cd "$PROJECT_DIR"
 # Verify prerequisites
 # ============================================================
 if [ ! -d "dist" ] || [ ! -d "dist-electron" ]; then
-  echo "ERROR: Frontend not built. Run build-app.sh first."
+  echo "ERROR: Frontend not built. Run local-build.sh or 'npm run build:frontend' first."
   exit 1
 fi
 
 if [ ! -d "python-embed" ]; then
-  echo "ERROR: Python environment not found. Run build-app.sh first."
+  echo "ERROR: Python environment not found. Run local-build.sh or prepare-python.sh first."
   exit 1
 fi
 

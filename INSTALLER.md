@@ -67,7 +67,7 @@ npm run build:mac:skip-python
 npm run prepare:python:mac
 
 # Build with full control
-bash scripts/build-installer.sh --platform mac --skip-npm --unpack
+bash scripts/local-build.sh --platform mac --unpack
 ```
 
 ### Windows
@@ -86,15 +86,14 @@ npm run prepare:python
 npm run build:fast
 
 # Clean build
-powershell -File scripts/build-installer.ps1 -Clean
+powershell -File scripts/local-build.ps1 -Clean
 ```
 
 ### Build Script Options
 
-The `build-installer.sh` script accepts:
+The `local-build.sh` script accepts:
 - `--platform mac|win` — Target platform (auto-detected if omitted)
 - `--skip-python` — Use existing `python-embed/` directory
-- `--skip-npm` — Skip `npm install`
 - `--clean` — Remove build artifacts before starting
 - `--unpack` — Build unpacked app only (faster, no installer/DMG)
 

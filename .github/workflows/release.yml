@@ -4,12 +4,6 @@ on:
   push:
     tags: ["v*.*.*"]
   workflow_dispatch:
-    inputs:
-      skip-python:
-        description: "Skip Python env preparation (use cached)"
-        required: false
-        type: boolean
-        default: false
 
 concurrency:
   group: release-${{ github.ref }}
@@ -119,14 +113,17 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Build app (macOS)
-        if: matrix.os == 'macos'
-        run: bash scripts/build-app.sh --platform mac --skip-npm
+      - name: Prepare Python environment (macOS)
+        if: matrix.os == 'macos' && !hashFiles('python-embed/**')
+        run: bash scripts/prepare-python.sh
 
-      - name: Build app (Windows)
-        if: matrix.os == 'windows'
+      - name: Prepare Python environment (Windows)
+        if: matrix.os == 'windows' && !hashFiles('python-embed/**')
         shell: pwsh
-        run: scripts/build-app.ps1 -SkipNpm
+        run: scripts/prepare-python.ps1
+
+      - name: Build frontend
+        run: npm run build:frontend
 
       # Download VC++ Redistributable for the Windows NSIS installer
       - name: Download VC++ Redistributable (Windows)
@@ -137,7 +134,7 @@ jobs:
             "https://aka.ms/vs/17/release/vc_redist.x64.exe"
           ls -lh resources/vc_redist.x64.exe
 
-      # ── Stage 2: Package installer (signing secrets available) ───
+      # ── Stage 2: Create installer (signing secrets available) ─────
       # Only electron-builder runs here — the only step that needs
       # access to code-signing certificates and notarization credentials.
 
@@ -165,7 +162,7 @@ jobs:
           _APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           _APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 
-      - name: Package installer (macOS)
+      - name: Create installer (macOS)
         if: matrix.os == 'macos'
         run: |
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
@@ -173,19 +170,19 @@ jobs:
           else
             PUBLISH="--publish never"
           fi
-          bash scripts/package-installer.sh --platform mac $PUBLISH
+          bash scripts/create-installer.sh --platform mac $PUBLISH
 
           # Clean up API key
           [ -n "${APPLE_API_KEY:-}" ] && rm -f "$APPLE_API_KEY" || true
 
-      - name: Package installer (Windows)
+      - name: Create installer (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
         run: |
           if ("${{ github.ref }}".StartsWith("refs/tags/v")) {
-            scripts/package-installer.ps1 -Publish always
+            scripts/create-installer.ps1 -Publish always
           } else {
-            scripts/package-installer.ps1 -Publish never
+            scripts/create-installer.ps1 -Publish never
           }
         # env:
           # Uncomment when code signing certificates are configured:
