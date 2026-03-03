@@ -54,7 +54,7 @@ git clone https://github.com/Lightricks/ltx-desktop.git
 cd ltx-desktop
 
 # Install frontend dependencies
-npm install
+pnpm install
 
 # Set up Python backend
 cd backend
@@ -62,7 +62,7 @@ uv sync
 cd ..
 
 # Run in development mode
-npm run electron:dev
+pnpm electron:dev
 ```
 
 ## Project Structure

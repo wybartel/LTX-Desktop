@@ -84,14 +84,14 @@ esac
 
 if [ "$UNPACK" = true ]; then
   echo "Packaging unpacked app (fast mode)..."
-  npx electron-builder $BUILDER_ARGS --dir
+  pnpm exec electron-builder $BUILDER_ARGS --dir
 else
   PUBLISH_ARGS=""
   if [ -n "$PUBLISH" ]; then
     PUBLISH_ARGS="--publish $PUBLISH"
   fi
   echo "Packaging installer..."
-  npx electron-builder $BUILDER_ARGS $PUBLISH_ARGS
+  pnpm exec electron-builder $BUILDER_ARGS $PUBLISH_ARGS
 fi
 echo ""
 

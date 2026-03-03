@@ -32,14 +32,14 @@ if (-not (Test-Path "python-embed")) {
 # Build with electron-builder
 if ($Unpack) {
     Write-Host "Packaging unpacked app (fast mode)..." -ForegroundColor Yellow
-    npx electron-builder --win --dir
+    pnpm exec electron-builder --win --dir
 } else {
     Write-Host "Packaging installer..." -ForegroundColor Yellow
     $PublishArgs = @()
     if ($Publish -ne "") {
         $PublishArgs = @("--publish", $Publish)
     }
-    npx electron-builder --win @PublishArgs
+    pnpm exec electron-builder --win @PublishArgs
 }
 
 if ($LASTEXITCODE -ne 0) {
