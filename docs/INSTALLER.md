@@ -2,14 +2,14 @@
 
 This guide explains how to build a distributable installer for **LTX Desktop**.
 
-- For running from source and debugging: see [`README.md`](README.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
-- For end-user requirements and first-run behavior: see [`README.md`](README.md).
+- For running from source and debugging: see [`README.md`](../README.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- For end-user requirements and first-run behavior: see [`README.md`](../README.md).
 
 ## What Gets Bundled
 
 The installer includes:
 - **Electron app** (React frontend + Electron shell)
-- **Embedded Python** (version from [`backend/.python-version`](backend/.python-version)) with all dependencies pre-installed:
+- **Embedded Python** (version from [`backend/.python-version`](../backend/.python-version)) with all dependencies pre-installed:
   - PyTorch (CUDA on Windows, MPS on macOS)
   - FastAPI, Diffusers, Transformers
   - LTX-2 inference packages
@@ -49,7 +49,7 @@ pnpm build:win
 ```
 
 This will:
-1. Download a standalone Python distribution (version from [`backend/.python-version`](backend/.python-version))
+1. Download a standalone Python distribution (version from [`backend/.python-version`](../backend/.python-version))
 2. Install all Python dependencies (~10GB on Windows with CUDA, ~2-3GB on macOS with MPS)
 3. Build the frontend
 4. Package everything with electron-builder
@@ -140,7 +140,7 @@ Expected sizes:
 - **macOS**: ~2-3GB (PyTorch MPS is much smaller than CUDA variant)
 
 ### Runtime / first-run issues
-End-user topics like system requirements, first-run setup, and model download behavior are documented in [`README.md`](README.md).
+End-user topics like system requirements, first-run setup, and model download behavior are documented in [`README.md`](../README.md).
 
 ## Advanced: Manual Build Steps
 
