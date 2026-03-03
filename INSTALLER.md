@@ -63,11 +63,11 @@ npm run build:mac
 # Skip Python setup (if already prepared)
 npm run build:mac:skip-python
 
+# Fast rebuild (unpacked, skip Python + npm)
+npm run build:fast:mac
+
 # Just prepare Python environment
 npm run prepare:python:mac
-
-# Build with full control
-bash scripts/local-build.sh --platform mac --unpack
 ```
 
 ### Windows
@@ -80,10 +80,10 @@ npm run build:win
 npm run build:win:skip-python
 
 # Just prepare Python environment
-npm run prepare:python
+npm run prepare:python:win
 
 # Fast rebuild (unpacked, skip Python + npm)
-npm run build:fast
+npm run build:fast:win
 
 # Clean build
 powershell -File scripts/local-build.ps1 -Clean
@@ -156,16 +156,16 @@ For developers working on the codebase:
 
 ### macOS
 ```bash
-npm run setup:dev:mac   # Create venv + install Python deps
-npm install             # Install Node deps
+npm run setup:dev:mac   # Install Node + Python deps, verify environment
 npm run dev             # Start in dev mode
+npm run dev:debug       # Start with debugging (Electron inspector + Python debugpy)
 ```
 
 ### Windows
 ```powershell
-npm run setup:dev       # Create venv + install Python deps
-npm install             # Install Node deps
+npm run setup:dev:win   # Install Node + Python deps, verify environment
 npm run dev             # Start in dev mode
+npm run dev:debug       # Start with debugging (Electron inspector + Python debugpy)
 ```
 
 ### Development vs Production

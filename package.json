@@ -8,24 +8,28 @@
   "license": "Apache-2.0",
   "private": true,
   "scripts": {
+    "setup:dev:mac": "bash scripts/setup-dev.sh",
+    "setup:dev:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-dev.ps1",
+
     "dev": "vite",
     "dev:debug": "cross-env BACKEND_DEBUG=1 ELECTRON_DEBUG=1 vite",
-    "build": "vite build && electron-builder",
-    "build:frontend": "vite build",
+
+    "typecheck": "concurrently \"npm run typecheck:ts\" \"npm run typecheck:py\"",
+    "typecheck:ts": "tsc --noEmit",
+    "typecheck:py": "cd backend && uv run pyright",
+
     "build:mac": "bash scripts/local-build.sh --platform mac",
-    "build:mac:skip-python": "bash scripts/local-build.sh --platform mac --skip-python",
     "build:win": "powershell -ExecutionPolicy Bypass -File scripts/local-build.ps1",
+    "build:mac:skip-python": "bash scripts/local-build.sh --platform mac --skip-python",
     "build:win:skip-python": "powershell -ExecutionPolicy Bypass -File scripts/local-build.ps1 -SkipPython",
-    "build:fast": "powershell -ExecutionPolicy Bypass -File scripts/local-build.ps1 -Unpack -SkipPython",
-    "prepare:python": "powershell -ExecutionPolicy Bypass -File scripts/prepare-python.ps1",
+    "build:fast:mac": "bash scripts/local-build.sh --platform mac --unpack --skip-python",
+    "build:fast:win": "powershell -ExecutionPolicy Bypass -File scripts/local-build.ps1 -Unpack -SkipPython",
     "prepare:python:mac": "bash scripts/prepare-python.sh",
-    "setup:dev": "powershell -ExecutionPolicy Bypass -File scripts/setup-dev.ps1",
-    "setup:dev:mac": "bash scripts/setup-dev.sh",
-    "preview": "vite preview",
-    "electron:dev": "vite",
-    "electron:build": "npm run build:frontend && electron-builder",
-    "typecheck": "tsc --noEmit",
-    "start:unpacked": "powershell -Command \"& '.\\release\\win-unpacked\\LTX Desktop.exe'\""
+    "prepare:python:win": "powershell -ExecutionPolicy Bypass -File scripts/prepare-python.ps1",
+    "build:frontend": "vite build",
+
+    "start:unpacked:mac": "open release/mac-arm64/LTX\\ Desktop.app",
+    "start:unpacked:win": "powershell -Command \"& '.\\release\\win-unpacked\\LTX Desktop.exe'\""
   },
   "dependencies": {
     "class-variance-authority": "^0.7.0",
