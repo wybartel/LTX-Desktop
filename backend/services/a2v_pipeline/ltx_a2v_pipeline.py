@@ -50,7 +50,7 @@ class LTXa2vPipeline:
                 LoraPathStrengthAndSDOps(distilled_lora_path, 1.0, LTXV_LORA_COMFY_RENAMING_MAP),
             ],
             loras=[],
-            device=cast(str, device),
+            device=device,
             quantization=QuantizationPolicy.fp8_cast() if device_supports_fp8(device) else None,
         )
 

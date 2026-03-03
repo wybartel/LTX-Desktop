@@ -28,7 +28,7 @@ def _make_progress_tqdm_class(callback: Callable[[int, int], None]) -> type:
     class _ProgressTqdm(tqdm_auto):  # type: ignore[reportUntypedBaseClass]
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             kwargs["disable"] = True
-            super().__init__(*args, **kwargs)
+            super().__init__(*args, **kwargs)  # type: ignore[reportUnknownMemberType]
             if self.total is not None:
                 with lock:
                     shared["total"] += int(self.total)
@@ -59,7 +59,7 @@ def _patch_http_get_progress(callback: Callable[[int, int], None]) -> Iterator[N
     huggingface_hub upgrade, this patch needs to be revisited.
     """
     tqdm_cls = _make_progress_tqdm_class(callback)
-    original_http_get = file_download.http_get
+    original_http_get: Callable[..., Any] = file_download.http_get  # type: ignore[reportUnknownMemberType]
 
     def _wrapped_http_get(*args: Any, **kwargs: Any) -> None:
         if kwargs.get("_tqdm_bar") is None:

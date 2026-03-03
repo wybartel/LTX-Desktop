@@ -411,8 +411,6 @@ class VideoGenerationHandler(StateHandlerBase):
                 raise RuntimeError("Generation was cancelled")
 
             if has_input_audio:
-                if audio_path is None:
-                    raise HTTPError(400, "Audio path is required for audio-to-video")
                 validated_audio_path = validate_audio_file(audio_path)
                 validated_image_path: Path | None = None
                 if image_path is not None:
@@ -441,8 +439,6 @@ class VideoGenerationHandler(StateHandlerBase):
                 )
                 self._generation.update_progress("downloading_output", 85, None, None)
             elif has_input_image:
-                if image_path is None:
-                    raise HTTPError(400, "Image path is required for image-to-video")
                 validated_image_path = validate_image_file(image_path)
 
                 duration = self._parse_forced_numeric_field(req.duration, "INVALID_FORCED_API_DURATION")
