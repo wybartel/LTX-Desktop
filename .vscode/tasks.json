@@ -12,13 +12,7 @@
     {
       "label": "dev:debug",
       "type": "shell",
-      "command": "npx vite",
-      "options": {
-        "env": {
-          "BACKEND_DEBUG": "1",
-          "ELECTRON_DEBUG": "1"
-        }
-      },
+      "command": "npm run dev:debug",
       "isBackground": true,
       "problemMatcher": {
         "owner": "electron-dev",
