@@ -32,11 +32,13 @@ export const LtxApiKeyInput = forwardRef<HTMLInputElement, LtxApiKeyInputProps>(
 )
 LtxApiKeyInput.displayName = 'LtxApiKeyInput'
 
-interface LtxApiKeyHelperRowProps {
+interface ApiKeyHelperRowProps {
   stopPropagation?: boolean
+  label?: string
+  onOpenKey?: () => void
 }
 
-export function LtxApiKeyHelperRow({ stopPropagation }: LtxApiKeyHelperRowProps) {
+export function ApiKeyHelperRow({ stopPropagation, label = 'Get API key', onOpenKey }: ApiKeyHelperRowProps) {
   return (
     <div className="mt-2 flex items-center justify-between gap-3">
       <span className="text-xs text-zinc-500">Your key stays in your local app settings.</span>
@@ -44,13 +46,27 @@ export function LtxApiKeyHelperRow({ stopPropagation }: LtxApiKeyHelperRowProps)
         type="button"
         onClick={(e) => {
           if (stopPropagation) e.stopPropagation()
-          window.electronAPI.openLtxApiKeyPage()
+          onOpenKey?.()
         }}
         className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
       >
-        Get API key
+        {label}
         <ExternalLink className="h-3 w-3" />
       </button>
     </div>
+  )
+}
+
+interface LtxApiKeyHelperRowProps {
+  stopPropagation?: boolean
+}
+
+export function LtxApiKeyHelperRow({ stopPropagation }: LtxApiKeyHelperRowProps) {
+  return (
+    <ApiKeyHelperRow
+      stopPropagation={stopPropagation}
+      label="Get API key"
+      onOpenKey={() => window.electronAPI.openLtxApiKeyPage()}
+    />
   )
 }

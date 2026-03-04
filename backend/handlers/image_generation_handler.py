@@ -18,7 +18,7 @@ from handlers.base import StateHandlerBase
 from handlers.generation_handler import GenerationHandler
 from handlers.pipelines_handler import PipelinesHandler
 from server_utils.media_validation import validate_image_file
-from services.interfaces import FluxAPIClient
+from services.interfaces import ZitAPIClient
 from state.app_state_types import AppState
 
 if TYPE_CHECKING:
@@ -36,14 +36,14 @@ class ImageGenerationHandler(StateHandlerBase):
         pipelines_handler: PipelinesHandler,
         outputs_dir: Path,
         config: RuntimeConfig,
-        flux_api_client: FluxAPIClient,
+        zit_api_client: ZitAPIClient,
     ) -> None:
         super().__init__(state, lock)
         self._generation = generation_handler
         self._pipelines = pipelines_handler
         self._outputs_dir = outputs_dir
         self._config = config
-        self._flux_api_client = flux_api_client
+        self._zit_api_client = zit_api_client
 
     def generate(self, req: GenerateImageRequest) -> GenerateImageResponse:
         if self._generation.is_generation_running():
@@ -258,13 +258,14 @@ class ImageGenerationHandler(StateHandlerBase):
         generation_id = uuid.uuid4().hex[:8]
         output_paths: list[Path] = []
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        settings = self.state.app_settings.model_copy(deep=True)
 
         try:
             self._generation.start_api_generation(generation_id)
             self._generation.update_progress("validating_request", 5, None, None)
 
-            if not self._flux_api_client.is_configured():
-                raise HTTPError(500, "BFL_API_KEY_NOT_CONFIGURED")
+            if not settings.fal_api_key.strip():
+                raise HTTPError(500, "FAL_API_KEY_NOT_CONFIGURED")
 
             for idx in range(num_images):
                 if self._generation.is_generation_cancelled():
@@ -272,7 +273,8 @@ class ImageGenerationHandler(StateHandlerBase):
 
                 inference_progress = 15 + int((idx / num_images) * 60)
                 self._generation.update_progress("inference", inference_progress, None, None)
-                image_bytes = self._flux_api_client.generate_text_to_image(
+                image_bytes = self._zit_api_client.generate_text_to_image(
+                    api_key=settings.fal_api_key,
                     prompt=prompt,
                     width=width,
                     height=height,
@@ -286,7 +288,7 @@ class ImageGenerationHandler(StateHandlerBase):
                 download_progress = 75 + int(((idx + 1) / num_images) * 20)
                 self._generation.update_progress("downloading_output", download_progress, None, None)
 
-                output_path = self._outputs_dir / f"flux_image_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+                output_path = self._outputs_dir / f"zit_api_image_{timestamp}_{uuid.uuid4().hex[:8]}.png"
                 output_path.write_bytes(image_bytes)
                 output_paths.append(output_path)
 
@@ -314,9 +316,6 @@ class ImageGenerationHandler(StateHandlerBase):
         height: int,
         num_inference_steps: int,
     ) -> GenerateImageResponse:
-        if len(input_images) > 4:
-            raise HTTPError(400, "INVALID_KLEIN_REFERENCE_COUNT")
-
         generation_id = uuid.uuid4().hex[:8]
         output_path: Path | None = None
         settings = self.state.app_settings.model_copy(deep=True)
@@ -326,13 +325,14 @@ class ImageGenerationHandler(StateHandlerBase):
             self._generation.start_api_generation(generation_id)
             self._generation.update_progress("validating_request", 5, None, None)
 
-            if not self._flux_api_client.is_configured():
-                raise HTTPError(500, "BFL_API_KEY_NOT_CONFIGURED")
+            if not settings.fal_api_key.strip():
+                raise HTTPError(500, "FAL_API_KEY_NOT_CONFIGURED")
 
             self._generation.update_progress("uploading_image", 25, None, None)
             self._generation.update_progress("inference", 55, None, None)
 
-            image_bytes = self._flux_api_client.generate_image_edit(
+            image_bytes = self._zit_api_client.generate_image_edit(
+                api_key=settings.fal_api_key,
                 prompt=prompt,
                 width=width,
                 height=height,
@@ -346,7 +346,7 @@ class ImageGenerationHandler(StateHandlerBase):
 
             self._generation.update_progress("downloading_output", 85, None, None)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = self._outputs_dir / f"flux_edit_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+            output_path = self._outputs_dir / f"zit_api_edit_{timestamp}_{uuid.uuid4().hex[:8]}.png"
             output_path.write_bytes(image_bytes)
 
             if self._generation.is_generation_cancelled():

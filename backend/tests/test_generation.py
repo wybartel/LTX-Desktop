@@ -764,8 +764,9 @@ class TestGenerateImage:
 
 
 class TestForcedApiGenerateImage:
-    def test_generate_image_routes_to_flux_api(self, client, test_state, fake_services):
+    def test_generate_image_routes_to_zit_api(self, client, test_state, fake_services):
         test_state.config.force_api_generations = True
+        test_state.state.app_settings.fal_api_key = "fal-key"
 
         r = client.post(
             "/api/generate-image",
@@ -776,29 +777,31 @@ class TestForcedApiGenerateImage:
         data = r.json()
         assert data["status"] == "complete"
         assert len(data["image_paths"]) == 2
-        assert len(fake_services.flux_api_client.text_to_image_calls) == 2
+        assert len(fake_services.zit_api_client.text_to_image_calls) == 2
         assert len(fake_services.image_generation_pipeline.generate_calls) == 0
 
-    def test_generate_image_missing_bfl_key(self, client, test_state, fake_services):
+    def test_generate_image_missing_fal_key(self, client, test_state, fake_services):
         test_state.config.force_api_generations = True
-        fake_services.flux_api_client.configured = False
+        test_state.state.app_settings.fal_api_key = ""
 
         r = client.post("/api/generate-image", json={"prompt": "A cat"})
 
         assert r.status_code == 500
-        assert r.json()["error"] == "BFL_API_KEY_NOT_CONFIGURED"
+        assert r.json()["error"] == "FAL_API_KEY_NOT_CONFIGURED"
 
     def test_generate_image_cancelled(self, client, test_state, fake_services):
         test_state.config.force_api_generations = True
-        fake_services.flux_api_client.raise_on_text_to_image = RuntimeError("cancelled")
+        test_state.state.app_settings.fal_api_key = "fal-key"
+        fake_services.zit_api_client.raise_on_text_to_image = RuntimeError("cancelled")
 
         r = client.post("/api/generate-image", json={"prompt": "A cat"})
 
         assert r.status_code == 200
         assert r.json()["status"] == "cancelled"
 
-    def test_edit_image_routes_to_flux_api(self, client, test_state, fake_services, make_test_image, tmp_path):
+    def test_edit_image_routes_to_zit_api(self, client, test_state, fake_services, make_test_image, tmp_path):
         test_state.config.force_api_generations = True
+        test_state.state.app_settings.fal_api_key = "fal-key"
         image_path = tmp_path / "img1.png"
         image_path.write_bytes(make_test_image(100, 100).getvalue())
 
@@ -811,25 +814,8 @@ class TestForcedApiGenerateImage:
         data = r.json()
         assert data["status"] == "complete"
         assert len(data["image_paths"]) == 1
-        assert len(fake_services.flux_api_client.image_edit_calls) == 1
+        assert len(fake_services.zit_api_client.image_edit_calls) == 1
         assert len(fake_services.image_generation_pipeline.generate_edit_calls) == 0
-
-    def test_edit_image_rejects_more_than_four_refs(self, client, test_state, make_test_image, tmp_path):
-        test_state.config.force_api_generations = True
-
-        image_paths: list[str] = []
-        for idx in range(5):
-            p = tmp_path / f"img{idx + 1}.png"
-            p.write_bytes(make_test_image(100, 100).getvalue())
-            image_paths.append(str(p))
-
-        r = client.post(
-            "/api/edit-image",
-            json={"prompt": "Combine styles", "width": 1024, "height": 1024, "imagePaths": image_paths},
-        )
-
-        assert r.status_code == 400
-        assert r.json()["error"] == "INVALID_KLEIN_REFERENCE_COUNT"
 
 
 class TestEmptyPromptRejected:

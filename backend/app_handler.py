@@ -26,7 +26,7 @@ from services.interfaces import (
     A2VPipeline,
     FastNativeVideoPipeline,
     FastVideoPipeline,
-    FluxAPIClient,
+    ZitAPIClient,
     ImageGenerationPipeline,
     GpuCleaner,
     GpuInfo,
@@ -59,7 +59,7 @@ class AppHandler:
         text_encoder: TextEncoder,
         task_runner: TaskRunner,
         ltx_api_client: LTXAPIClient,
-        flux_api_client: FluxAPIClient,
+        zit_api_client: ZitAPIClient,
         fast_video_pipeline_class: type[FastVideoPipeline],
         fast_native_video_pipeline_class: type[FastNativeVideoPipeline],
         pro_video_pipeline_class: type[ProVideoPipeline],
@@ -79,7 +79,7 @@ class AppHandler:
         self.video_processor = video_processor
         self.task_runner = task_runner
         self.ltx_api_client = ltx_api_client
-        self.flux_api_client = flux_api_client
+        self.zit_api_client = zit_api_client
         self.fast_video_pipeline_class = fast_video_pipeline_class
         self.fast_native_video_pipeline_class = fast_native_video_pipeline_class
         self.pro_video_pipeline_class = pro_video_pipeline_class
@@ -179,7 +179,7 @@ class AppHandler:
             pipelines_handler=self.pipelines,
             outputs_dir=config.outputs_dir,
             config=config,
-            flux_api_client=flux_api_client,
+            zit_api_client=zit_api_client,
         )
 
         self.health = HealthHandler(
@@ -233,7 +233,7 @@ class ServiceBundle:
     text_encoder: TextEncoder
     task_runner: TaskRunner
     ltx_api_client: LTXAPIClient
-    flux_api_client: FluxAPIClient
+    zit_api_client: ZitAPIClient
     fast_video_pipeline_class: type[FastVideoPipeline]
     fast_native_video_pipeline_class: type[FastNativeVideoPipeline]
     pro_video_pipeline_class: type[ProVideoPipeline]
@@ -248,7 +248,7 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
     """Build real runtime services with lazy heavy imports isolated from tests."""
     from services.fast_native_video_pipeline.ltx_fast_native_video_pipeline import LTXFastNativeVideoPipeline
     from services.fast_video_pipeline.ltx_fast_video_pipeline import LTXFastVideoPipeline
-    from services.flux_api_client.flux_api_client_impl import FluxAPIClientImpl
+    from services.zit_api_client.zit_api_client_impl import ZitAPIClientImpl
     from services.gpu_cleaner.torch_cleaner import TorchCleaner
     from services.gpu_info.gpu_info_impl import GpuInfoImpl
     from services.http_client.http_client_impl import HTTPClientImpl
@@ -279,7 +279,7 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
         ),
         task_runner=ThreadingRunner(),
         ltx_api_client=LTXAPIClientImpl(http=http, ltx_api_base_url=config.ltx_api_base_url),
-        flux_api_client=FluxAPIClientImpl(http=http),
+        zit_api_client=ZitAPIClientImpl(http=http),
         fast_video_pipeline_class=LTXFastVideoPipeline,
         fast_native_video_pipeline_class=LTXFastNativeVideoPipeline,
         pro_video_pipeline_class=LTXProVideoPipeline,
@@ -309,7 +309,7 @@ def build_initial_state(
         text_encoder=bundle.text_encoder,
         task_runner=bundle.task_runner,
         ltx_api_client=bundle.ltx_api_client,
-        flux_api_client=bundle.flux_api_client,
+        zit_api_client=bundle.zit_api_client,
         fast_video_pipeline_class=bundle.fast_video_pipeline_class,
         fast_native_video_pipeline_class=bundle.fast_native_video_pipeline_class,
         pro_video_pipeline_class=bundle.pro_video_pipeline_class,

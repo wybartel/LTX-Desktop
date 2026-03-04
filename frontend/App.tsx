@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, AlertCircle, Settings, FileText } from 'lucide-react'
 import { ProjectProvider, useProjects } from './contexts/ProjectContext'
 import { KeyboardShortcutsProvider } from './contexts/KeyboardShortcutsContext'
@@ -13,7 +13,7 @@ import { LaunchGate } from './components/FirstRunSetup'
 import { PythonSetup } from './components/PythonSetup'
 import { SettingsModal, type SettingsTabId } from './components/SettingsModal'
 import { LogViewer } from './components/LogViewer'
-import { ApiUpsellModal, buildProApiUpsellCopy } from './components/ApiUpsellModal'
+import { ApiGatewayModal, type ApiGatewaySection } from './components/ApiGatewayModal'
 import { Button } from './components/ui/button'
 
 type SetupState = 'loading' | { needsSetup: boolean; needsLicense: boolean }
@@ -22,7 +22,7 @@ type RequiredModelsGateState = 'checking' | 'missing' | 'ready'
 function AppContent() {
   const { currentView } = useProjects()
   const { status, processStatus, isLoading: backendLoading, error: backendError } = useBackend()
-  const { settings, saveLtxApiKey, forceApiGenerations, isLoaded, runtimePolicyLoaded } = useAppSettings()
+  const { settings, saveLtxApiKey, saveFalApiKey, forceApiGenerations, isLoaded, runtimePolicyLoaded } = useAppSettings()
 
   const [pythonReady, setPythonReady] = useState<boolean | null>(null)
   const [backendStarted, setBackendStarted] = useState(false)
@@ -35,14 +35,15 @@ function AppContent() {
   const [requiredModelsGate, setRequiredModelsGate] = useState<RequiredModelsGateState>('checking')
   const setupCompletionInFlightRef = useRef<Promise<void> | null>(null)
 
-  const baseUpsellCopy = buildProApiUpsellCopy()
-  const forcedApiUpsellCopy = {
-    ...baseUpsellCopy,
-    title: 'Connect LTX API',
-    description: 'This app is configured for API-only generation. Add your API key to continue.',
-    primaryActionLabel: 'Save API key',
-    secondaryActionLabel: undefined,
+  type ApiGatewayRequest = {
+    requiredKeys: Array<'ltx' | 'fal'>
+    title: string
+    description: string
+    blocking?: boolean
+    includeOptionalMissing?: boolean
   }
+
+  const [apiGatewayRequest, setApiGatewayRequest] = useState<ApiGatewayRequest | null>(null)
 
   const isBackendRestarting = processStatus === 'restarting'
   const isBackendDead = processStatus === 'dead'
@@ -56,6 +57,22 @@ function AppContent() {
     }
     window.addEventListener('open-settings', handler)
     return () => window.removeEventListener('open-settings', handler)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail ?? {}
+      const requiredKeys = Array.isArray(detail.requiredKeys) ? detail.requiredKeys : ['ltx']
+      setApiGatewayRequest({
+        requiredKeys,
+        title: detail.title ?? 'Connect API Keys',
+        description: detail.description ?? 'Add the required API keys to continue.',
+        blocking: detail.blocking ?? false,
+        includeOptionalMissing: detail.includeOptionalMissing ?? false,
+      })
+    }
+    window.addEventListener('open-api-gateway', handler)
+    return () => window.removeEventListener('open-api-gateway', handler)
   }, [])
 
   useEffect(() => {
@@ -337,7 +354,71 @@ function AppContent() {
   const shouldBlockUntilSettingsLoaded = forceApiGenerations && !isLoaded
   const shouldShowForcedFirstRunUpsell = isForcedFirstRun && isLoaded && !settings.hasLtxApiKey
   const shouldShowGlobalForcedUpsell = forceApiGenerations && !setupState.needsSetup && isLoaded && !settings.hasLtxApiKey
-  const shouldBlockForApiKey = shouldShowForcedFirstRunUpsell || shouldShowGlobalForcedUpsell
+  const shouldBlockForLtxKey = shouldShowForcedFirstRunUpsell || shouldShowGlobalForcedUpsell
+
+  const forcedGatewayRequest: ApiGatewayRequest = {
+    requiredKeys: ['ltx'],
+    title: 'Connect API Keys',
+    description: 'This app is configured for API-only generation. Add your API key to continue.',
+    blocking: true,
+    includeOptionalMissing: true,
+  }
+
+  const activeGatewayRequest = shouldBlockForLtxKey ? forcedGatewayRequest : apiGatewayRequest
+  const shouldShowGateway = activeGatewayRequest !== null
+
+  const gatewaySections: ApiGatewaySection[] = useMemo(() => {
+    if (!activeGatewayRequest) return []
+
+    const handleSaveLtxKey = async (apiKey: string) => {
+      if (isForcedFirstRun) {
+        await saveApiKeyForFirstRun(apiKey)
+        return
+      }
+      await saveLtxApiKey(apiKey)
+    }
+
+    const sections: ApiGatewaySection[] = [
+      {
+        keyType: 'ltx',
+        title: 'LTX API',
+        description: 'Video generation, prompt enhancement, and cloud text encoding.',
+        required: activeGatewayRequest.requiredKeys.includes('ltx'),
+        isConfigured: settings.hasLtxApiKey,
+        inputLabel: 'LTX API key',
+        placeholder: 'Enter your LTX API key...',
+        onSave: handleSaveLtxKey,
+        onGetKey: () => window.electronAPI.openLtxApiKeyPage(),
+        getKeyLabel: 'Get LTX API key',
+      },
+      {
+        keyType: 'fal',
+        title: 'FAL AI',
+        description: 'Required to generate images with Z Image Turbo.',
+        required: activeGatewayRequest.requiredKeys.includes('fal'),
+        isConfigured: settings.hasFalApiKey,
+        inputLabel: 'FAL AI API key',
+        placeholder: 'Enter your FAL AI API key...',
+        onSave: saveFalApiKey,
+        onGetKey: () => window.electronAPI.openFalApiKeyPage(),
+        getKeyLabel: 'Get FAL API key',
+      },
+    ]
+
+    return sections.filter((section) => {
+      if (section.required) return true
+      if (activeGatewayRequest.includeOptionalMissing && !section.isConfigured) return true
+      return false
+    })
+  }, [
+    activeGatewayRequest,
+    isForcedFirstRun,
+    saveApiKeyForFirstRun,
+    saveFalApiKey,
+    saveLtxApiKey,
+    settings.hasFalApiKey,
+    settings.hasLtxApiKey,
+  ])
 
   const renderView = () => {
     switch (currentView) {
@@ -384,20 +465,13 @@ function AppContent() {
         }}
         initialTab={settingsInitialTab}
       />
-      <ApiUpsellModal
-        isOpen={shouldBlockForApiKey}
-        blocking
-        onClose={() => {
-          // Blocking mode intentionally does not allow close.
-        }}
-        onSaveApiKey={async (apiKey) => {
-          if (isForcedFirstRun) {
-            await saveApiKeyForFirstRun(apiKey)
-            return
-          }
-          await saveLtxApiKey(apiKey)
-        }}
-        copy={forcedApiUpsellCopy}
+      <ApiGatewayModal
+        isOpen={shouldShowGateway}
+        blocking={activeGatewayRequest?.blocking}
+        onClose={() => setApiGatewayRequest(null)}
+        title={activeGatewayRequest?.title ?? 'Connect API Keys'}
+        description={activeGatewayRequest?.description ?? 'Add the required API keys to continue.'}
+        sections={gatewaySections}
       />
 
       {shouldBlockUntilSettingsLoaded && (

@@ -13,6 +13,7 @@ export interface AppSettings {
   useTorchCompile: boolean
   loadOnStartup: boolean
   hasLtxApiKey: boolean
+  hasFalApiKey: boolean
   hasGeminiApiKey: boolean
   useLocalTextEncoder: boolean
   fastModel: FastModelSettings
@@ -28,6 +29,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   useTorchCompile: false,
   loadOnStartup: true,
   hasLtxApiKey: false,
+  hasFalApiKey: false,
   hasGeminiApiKey: false,
   useLocalTextEncoder: false,
   fastModel: { useUpscaler: true },
@@ -48,6 +50,7 @@ interface AppSettingsContextValue {
   updateSettings: (patch: Partial<AppSettings> | ((prev: AppSettings) => AppSettings)) => void
   refreshSettings: () => Promise<void>
   saveLtxApiKey: (value: string) => Promise<void>
+  saveFalApiKey: (value: string) => Promise<void>
   saveGeminiApiKey: (value: string) => Promise<void>
   forceApiGenerations: boolean
 }
@@ -71,6 +74,7 @@ function normalizeAppSettings(data: Partial<AppSettings>): AppSettings {
     useTorchCompile: data.useTorchCompile ?? DEFAULT_APP_SETTINGS.useTorchCompile,
     loadOnStartup: data.loadOnStartup ?? DEFAULT_APP_SETTINGS.loadOnStartup,
     hasLtxApiKey: data.hasLtxApiKey ?? DEFAULT_APP_SETTINGS.hasLtxApiKey,
+    hasFalApiKey: data.hasFalApiKey ?? DEFAULT_APP_SETTINGS.hasFalApiKey,
     hasGeminiApiKey: data.hasGeminiApiKey ?? DEFAULT_APP_SETTINGS.hasGeminiApiKey,
     useLocalTextEncoder: data.useLocalTextEncoder ?? DEFAULT_APP_SETTINGS.useLocalTextEncoder,
     fastModel: data.fastModel ?? DEFAULT_APP_SETTINGS.fastModel,
@@ -204,7 +208,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     if (!backendUrl || !isLoaded || backendProcessStatus !== 'alive') return
     const syncTimer = setTimeout(async () => {
       try {
-        const { hasLtxApiKey: _a, hasGeminiApiKey: _b, ...syncPayload } = settings
+        const { hasLtxApiKey: _a, hasFalApiKey: _b, hasGeminiApiKey: _c, ...syncPayload } = settings
         await fetch(`${backendUrl}/api/settings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -245,6 +249,16 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     await refreshSettings()
   }, [backendUrl, refreshSettings])
 
+  const saveFalApiKey = useCallback(async (value: string) => {
+    if (!backendUrl) return
+    await fetch(`${backendUrl}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ falApiKey: value }),
+    })
+    await refreshSettings()
+  }, [backendUrl, refreshSettings])
+
   const contextValue = useMemo<AppSettingsContextValue>(
     () => ({
       settings,
@@ -253,10 +267,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       updateSettings,
       refreshSettings,
       saveLtxApiKey,
+      saveFalApiKey,
       saveGeminiApiKey,
       forceApiGenerations,
     }),
-    [forceApiGenerations, isLoaded, refreshSettings, runtimePolicyLoaded, saveGeminiApiKey, saveLtxApiKey, settings, updateSettings],
+    [forceApiGenerations, isLoaded, refreshSettings, runtimePolicyLoaded, saveFalApiKey, saveGeminiApiKey, saveLtxApiKey, settings, updateSettings],
   )
 
   return <AppSettingsContext.Provider value={contextValue}>{children}</AppSettingsContext.Provider>

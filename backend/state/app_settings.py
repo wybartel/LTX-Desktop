@@ -63,6 +63,7 @@ class AppSettings(SettingsBaseModel):
     use_torch_compile: bool = False
     load_on_startup: bool = False
     ltx_api_key: str = ""
+    fal_api_key: str = ""
     use_local_text_encoder: bool = False
     fast_model: FastModelSettings = Field(default_factory=FastModelSettings)
     pro_model: ProModelSettings = Field(default_factory=ProModelSettings)
@@ -132,6 +133,7 @@ class SettingsResponse(SettingsBaseModel):
     use_torch_compile: bool = False
     load_on_startup: bool = False
     has_ltx_api_key: bool = False
+    has_fal_api_key: bool = False
     use_local_text_encoder: bool = False
     fast_model: FastModelSettings = Field(default_factory=FastModelSettings)
     pro_model: ProModelSettings = Field(default_factory=ProModelSettings)
@@ -146,7 +148,9 @@ class SettingsResponse(SettingsBaseModel):
 def to_settings_response(settings: AppSettings) -> SettingsResponse:
     data = settings.model_dump(by_alias=False)
     ltx_key = data.pop("ltx_api_key", "")
+    fal_key = data.pop("fal_api_key", "")
     gemini_key = data.pop("gemini_api_key", "")
     data["has_ltx_api_key"] = bool(ltx_key)
+    data["has_fal_api_key"] = bool(fal_key)
     data["has_gemini_api_key"] = bool(gemini_key)
     return SettingsResponse.model_validate(data)

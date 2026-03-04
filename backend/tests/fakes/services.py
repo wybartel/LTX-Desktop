@@ -226,15 +226,15 @@ class FakeLTXAPIClient:
         return self.audio_to_video_result
 
 
-class FakeFluxAPIClient:
+class FakeZitAPIClient:
     def __init__(self) -> None:
         self.configured = True
         self.text_to_image_calls: list[dict[str, Any]] = []
         self.image_edit_calls: list[dict[str, Any]] = []
         self.raise_on_text_to_image: Exception | None = None
         self.raise_on_image_edit: Exception | None = None
-        self.text_to_image_result = b"fake-flux-api-image"
-        self.image_edit_result = b"fake-flux-api-edit-image"
+        self.text_to_image_result = b"fake-zit-api-image"
+        self.image_edit_result = b"fake-zit-api-edit-image"
 
     def is_configured(self) -> bool:
         return self.configured
@@ -242,6 +242,7 @@ class FakeFluxAPIClient:
     def generate_text_to_image(
         self,
         *,
+        api_key: str,
         prompt: str,
         width: int,
         height: int,
@@ -250,6 +251,7 @@ class FakeFluxAPIClient:
     ) -> bytes:
         self.text_to_image_calls.append(
             {
+                "api_key": api_key,
                 "prompt": prompt,
                 "width": width,
                 "height": height,
@@ -264,6 +266,7 @@ class FakeFluxAPIClient:
     def generate_image_edit(
         self,
         *,
+        api_key: str,
         prompt: str,
         width: int,
         height: int,
@@ -273,6 +276,7 @@ class FakeFluxAPIClient:
     ) -> bytes:
         self.image_edit_calls.append(
             {
+                "api_key": api_key,
                 "prompt": prompt,
                 "width": width,
                 "height": height,
@@ -669,7 +673,7 @@ class FakeProNativeVideoPipeline(_FakeVideoPipelineBase):
         )
 
 
-class FakeFluxOutput:
+class FakeZitOutput:
     def __init__(self, color: str = "red") -> None:
         self.images = [Image.new("RGB", (32, 32), color)]
 
@@ -701,17 +705,17 @@ class FakeImageGenerationPipeline:
         self.raise_on_generate: Exception | None = None
         self.raise_on_generate_edit: Exception | None = None
 
-    def generate(self, **kwargs: Any) -> FakeFluxOutput:
+    def generate(self, **kwargs: Any) -> FakeZitOutput:
         self.generate_calls.append(kwargs)
         if self.raise_on_generate is not None:
             raise self.raise_on_generate
-        return FakeFluxOutput(color="blue")
+        return FakeZitOutput(color="blue")
 
-    def generate_edit(self, **kwargs: Any) -> FakeFluxOutput:
+    def generate_edit(self, **kwargs: Any) -> FakeZitOutput:
         self.generate_edit_calls.append(kwargs)
         if self.raise_on_generate_edit is not None:
             raise self.raise_on_generate_edit
-        return FakeFluxOutput(color="green")
+        return FakeZitOutput(color="green")
 
     def to(self, device: str) -> None:
         self.device = device
@@ -878,7 +882,7 @@ class FakeServices:
     text_encoder: FakeTextEncoder = field(default_factory=FakeTextEncoder)
     task_runner: FakeTaskRunner = field(default_factory=FakeTaskRunner)
     ltx_api_client: FakeLTXAPIClient = field(default_factory=FakeLTXAPIClient)
-    flux_api_client: FakeFluxAPIClient = field(default_factory=FakeFluxAPIClient)
+    zit_api_client: FakeZitAPIClient = field(default_factory=FakeZitAPIClient)
     fast_video_pipeline: FakeFastVideoPipeline = field(default_factory=FakeFastVideoPipeline)
     fast_native_video_pipeline: FakeFastNativeVideoPipeline = field(default_factory=FakeFastNativeVideoPipeline)
     pro_video_pipeline: FakeProVideoPipeline = field(default_factory=FakeProVideoPipeline)

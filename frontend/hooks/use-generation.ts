@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import type { GenerationSettings } from '../components/SettingsPanel'
+import { useAppSettings } from '../contexts/AppSettingsContext'
 
 interface GenerationState {
   isGenerating: boolean
@@ -87,6 +88,7 @@ function getPhaseMessage(phase: string, _currentStep: number | null, totalSteps:
 }
 
 export function useGeneration(): UseGenerationReturn {
+  const { settings: appSettings, forceApiGenerations } = useAppSettings()
   const [state, setState] = useState<GenerationState>({
     isGenerating: false,
     progress: 0,
@@ -257,7 +259,7 @@ export function useGeneration(): UseGenerationReturn {
         clearInterval(progressInterval)
       }
     }
-  }, [])
+  }, [appSettings.hasFalApiKey, forceApiGenerations])
 
   const cancel = useCallback(async () => {
     // Abort the fetch request
@@ -278,12 +280,24 @@ export function useGeneration(): UseGenerationReturn {
       isGenerating: false,
       statusMessage: 'Cancelled',
     }))
-  }, [])
+  }, [appSettings.hasFalApiKey, forceApiGenerations])
 
   const generateImage = useCallback(async (
     prompt: string,
     settings: GenerationSettings
   ) => {
+    if (forceApiGenerations && !appSettings.hasFalApiKey) {
+      window.dispatchEvent(new CustomEvent('open-api-gateway', {
+        detail: {
+          requiredKeys: ['fal'],
+          title: 'Connect FAL AI',
+          description: 'FAL AI is required for generating images with Z Image Turbo when API generations are enabled.',
+          blocking: false,
+        },
+      }))
+      return
+    }
+
     const numImages = settings.variations || 1
     
     setState({
@@ -419,6 +433,18 @@ export function useGeneration(): UseGenerationReturn {
     settings: GenerationSettings
   ) => {
     if (imagePaths.length === 0) return
+
+    if (forceApiGenerations && !appSettings.hasFalApiKey) {
+      window.dispatchEvent(new CustomEvent('open-api-gateway', {
+        detail: {
+          requiredKeys: ['fal'],
+          title: 'Connect FAL AI',
+          description: 'FAL AI is required for generating images with Z Image Turbo when API generations are enabled.',
+          blocking: false,
+        },
+      }))
+      return
+    }
 
     setState({
       isGenerating: true,

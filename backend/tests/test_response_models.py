@@ -74,6 +74,7 @@ class TestSettingsCamelCaseKeys:
         assert "fast_model" not in data
         assert "seedLocked" in data
         assert "seed_locked" not in data
+        assert "hasFalApiKey" in data
 
 
 class TestGenerateSnakeCaseKeys:

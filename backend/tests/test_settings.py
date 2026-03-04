@@ -18,6 +18,7 @@ class TestGetSettings:
         assert data["useTorchCompile"] is False
         assert data["loadOnStartup"] is False
         assert data["hasLtxApiKey"] is False
+        assert data["hasFalApiKey"] is False
         assert data["useLocalTextEncoder"] is False
         assert data["fastModel"] == {"useUpscaler": True}
         assert data["proModel"] == {"steps": 20, "useUpscaler": True}
@@ -28,6 +29,7 @@ class TestGetSettings:
         assert data["seedLocked"] is False
         assert data["lockedSeed"] == 42
         assert "ltxApiKey" not in data
+        assert "falApiKey" not in data
         assert "geminiApiKey" not in data
 
     def test_reflects_changed_settings(self, client, test_state):
@@ -99,16 +101,26 @@ class TestPostSettings:
         assert len(te.prompt_cache) <= 2
 
     def test_update_api_keys(self, client, test_state):
-        r = client.post("/api/settings", json={"ltxApiKey": "ltx-key-abc", "geminiApiKey": "gemini-key-xyz"})
+        r = client.post(
+            "/api/settings",
+            json={
+                "ltxApiKey": "ltx-key-abc",
+                "geminiApiKey": "gemini-key-xyz",
+                "falApiKey": "fal-key-123",
+            },
+        )
         assert r.status_code == 200
         assert test_state.state.app_settings.ltx_api_key == "ltx-key-abc"
         assert test_state.state.app_settings.gemini_api_key == "gemini-key-xyz"
+        assert test_state.state.app_settings.fal_api_key == "fal-key-123"
 
     def test_empty_string_does_not_erase_key(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "real-key"
-        r = client.post("/api/settings", json={"ltxApiKey": ""})
+        test_state.state.app_settings.fal_api_key = "fal-key"
+        r = client.post("/api/settings", json={"ltxApiKey": "", "falApiKey": ""})
         assert r.status_code == 200
         assert test_state.state.app_settings.ltx_api_key == "real-key"
+        assert test_state.state.app_settings.fal_api_key == "fal-key"
 
     def test_omitted_key_does_not_erase_key(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "real-key"
@@ -133,7 +145,7 @@ class TestSettingsPersistence:
             text_encoder=fake_services.text_encoder,
             task_runner=fake_services.task_runner,
             ltx_api_client=fake_services.ltx_api_client,
-            flux_api_client=fake_services.flux_api_client,
+            zit_api_client=fake_services.zit_api_client,
             fast_video_pipeline_class=type(fake_services.fast_video_pipeline),
             fast_native_video_pipeline_class=type(fake_services.fast_native_video_pipeline),
             pro_video_pipeline_class=type(fake_services.pro_video_pipeline),

@@ -1,17 +1,15 @@
-"""Flux API client protocol for BFL image generation."""
+"""Z-Image Turbo API client protocol for FAL endpoints."""
 
 from __future__ import annotations
 
 from typing import Protocol
 
 
-class FluxAPIClient(Protocol):
-    def is_configured(self) -> bool:
-        ...
-
+class ZitAPIClient(Protocol):
     def generate_text_to_image(
         self,
         *,
+        api_key: str,
         prompt: str,
         width: int,
         height: int,
@@ -23,6 +21,7 @@ class FluxAPIClient(Protocol):
     def generate_image_edit(
         self,
         *,
+        api_key: str,
         prompt: str,
         width: int,
         height: int,
