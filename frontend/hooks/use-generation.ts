@@ -88,7 +88,7 @@ function getPhaseMessage(phase: string, _currentStep: number | null, totalSteps:
 }
 
 export function useGeneration(): UseGenerationReturn {
-  const { settings: appSettings, forceApiGenerations } = useAppSettings()
+  const { settings: appSettings, forceApiGenerations, refreshSettings } = useAppSettings()
   const [state, setState] = useState<GenerationState>({
     isGenerating: false,
     progress: 0,
@@ -259,7 +259,7 @@ export function useGeneration(): UseGenerationReturn {
         clearInterval(progressInterval)
       }
     }
-  }, [appSettings.hasFalApiKey, forceApiGenerations])
+  }, [])
 
   const cancel = useCallback(async () => {
     // Abort the fetch request
@@ -280,22 +280,44 @@ export function useGeneration(): UseGenerationReturn {
       isGenerating: false,
       statusMessage: 'Cancelled',
     }))
-  }, [appSettings.hasFalApiKey, forceApiGenerations])
+  }, [])
 
   const generateImage = useCallback(async (
     prompt: string,
     settings: GenerationSettings
   ) => {
-    if (forceApiGenerations && !appSettings.hasFalApiKey) {
-      window.dispatchEvent(new CustomEvent('open-api-gateway', {
-        detail: {
-          requiredKeys: ['fal'],
-          title: 'Connect FAL AI',
-          description: 'FAL AI is required for generating images with Z Image Turbo when API generations are enabled.',
-          blocking: false,
-        },
-      }))
-      return
+    if (forceApiGenerations) {
+      try {
+        const backendUrl = await window.electronAPI.getBackendUrl()
+        const response = await fetch(`${backendUrl}/api/settings`)
+        if (response.ok) {
+          const payload = await response.json()
+          if (!payload?.hasFalApiKey) {
+            void refreshSettings()
+            window.dispatchEvent(new CustomEvent('open-api-gateway', {
+              detail: {
+                requiredKeys: ['fal'],
+                title: 'Connect FAL AI',
+                description: 'FAL AI is required for generating images with Z Image Turbo when API generations are enabled.',
+                blocking: false,
+              },
+            }))
+            return
+          }
+        }
+      } catch {
+        if (!appSettings.hasFalApiKey) {
+          window.dispatchEvent(new CustomEvent('open-api-gateway', {
+            detail: {
+              requiredKeys: ['fal'],
+              title: 'Connect FAL AI',
+              description: 'FAL AI is required for generating images with Z Image Turbo when API generations are enabled.',
+              blocking: false,
+            },
+          }))
+          return
+        }
+      }
     }
 
     const numImages = settings.variations || 1
@@ -425,7 +447,7 @@ export function useGeneration(): UseGenerationReturn {
         }))
       }
     }
-  }, [])
+  }, [appSettings.hasFalApiKey, forceApiGenerations, refreshSettings])
 
   const editImage = useCallback(async (
     prompt: string,
@@ -434,16 +456,38 @@ export function useGeneration(): UseGenerationReturn {
   ) => {
     if (imagePaths.length === 0) return
 
-    if (forceApiGenerations && !appSettings.hasFalApiKey) {
-      window.dispatchEvent(new CustomEvent('open-api-gateway', {
-        detail: {
-          requiredKeys: ['fal'],
-          title: 'Connect FAL AI',
-          description: 'FAL AI is required for generating images with Z Image Turbo when API generations are enabled.',
-          blocking: false,
-        },
-      }))
-      return
+    if (forceApiGenerations) {
+      try {
+        const backendUrl = await window.electronAPI.getBackendUrl()
+        const response = await fetch(`${backendUrl}/api/settings`)
+        if (response.ok) {
+          const payload = await response.json()
+          if (!payload?.hasFalApiKey) {
+            void refreshSettings()
+            window.dispatchEvent(new CustomEvent('open-api-gateway', {
+              detail: {
+                requiredKeys: ['fal'],
+                title: 'Connect FAL AI',
+                description: 'FAL AI is required for generating images with Z Image Turbo when API generations are enabled.',
+                blocking: false,
+              },
+            }))
+            return
+          }
+        }
+      } catch {
+        if (!appSettings.hasFalApiKey) {
+          window.dispatchEvent(new CustomEvent('open-api-gateway', {
+            detail: {
+              requiredKeys: ['fal'],
+              title: 'Connect FAL AI',
+              description: 'FAL AI is required for generating images with Z Image Turbo when API generations are enabled.',
+              blocking: false,
+            },
+          }))
+          return
+        }
+      }
     }
 
     setState({
@@ -556,7 +600,7 @@ export function useGeneration(): UseGenerationReturn {
         }))
       }
     }
-  }, [])
+  }, [appSettings.hasFalApiKey, forceApiGenerations, refreshSettings])
 
   const reset = useCallback(() => {
     setState({

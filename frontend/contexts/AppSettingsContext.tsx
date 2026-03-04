@@ -231,31 +231,43 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
 
   const saveLtxApiKey = useCallback(async (value: string) => {
     if (!backendUrl) return
-    await fetch(`${backendUrl}/api/settings`, {
+    const response = await fetch(`${backendUrl}/api/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ltxApiKey: value }),
     })
+    if (!response.ok) {
+      const detail = await response.text()
+      throw new Error(detail || 'Failed to save LTX API key.')
+    }
     await refreshSettings()
   }, [backendUrl, refreshSettings])
 
   const saveGeminiApiKey = useCallback(async (value: string) => {
     if (!backendUrl) return
-    await fetch(`${backendUrl}/api/settings`, {
+    const response = await fetch(`${backendUrl}/api/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ geminiApiKey: value }),
     })
+    if (!response.ok) {
+      const detail = await response.text()
+      throw new Error(detail || 'Failed to save Gemini API key.')
+    }
     await refreshSettings()
   }, [backendUrl, refreshSettings])
 
   const saveFalApiKey = useCallback(async (value: string) => {
     if (!backendUrl) return
-    await fetch(`${backendUrl}/api/settings`, {
+    const response = await fetch(`${backendUrl}/api/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ falApiKey: value }),
     })
+    if (!response.ok) {
+      const detail = await response.text()
+      throw new Error(detail || 'Failed to save FAL API key.')
+    }
     await refreshSettings()
   }, [backendUrl, refreshSettings])
 
