@@ -247,6 +247,8 @@ class VideoGenerationHandler(StateHandlerBase):
     def _generate_a2v(
         self, req: GenerateVideoRequest, duration: int, fps: int, *, audio_path: str
     ) -> GenerateVideoResponse:
+        if req.model != "pro":
+            logger.warning("A2V local requested with model=%s; A2V always uses pro pipeline", req.model)
         validated_audio_path = validate_audio_file(audio_path)
         audio_path_str = str(validated_audio_path)
 
@@ -411,6 +413,9 @@ class VideoGenerationHandler(StateHandlerBase):
                 raise RuntimeError("Generation was cancelled")
 
             if has_input_audio:
+                if requested_model != "pro":
+                    logger.warning("A2V requested with model=%s; overriding to 'pro'", requested_model)
+                api_model_id = FORCED_API_MODEL_MAP["pro"]
                 validated_audio_path = validate_audio_file(audio_path)
                 validated_image_path: Path | None = None
                 if image_path is not None:

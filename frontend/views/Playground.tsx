@@ -47,6 +47,13 @@ export function Playground() {
     setSettings((prev) => sanitizeForcedApiVideoSettings({ ...prev, model: 'fast' }))
   }, [forceApiGenerations])
 
+  // Force pro model when audio is attached (A2V only supports pro)
+  useEffect(() => {
+    if (selectedAudio && settings.model !== 'pro') {
+      setSettings(prev => ({ ...prev, model: 'pro' }))
+    }
+  }, [selectedAudio]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Handle mode change
   const handleModeChange = (newMode: GenerationMode) => {
     setMode(newMode)
@@ -81,6 +88,7 @@ export function Playground() {
       if (!prompt.trim()) return
       const imagePath = selectedImage ? fileUrlToPath(selectedImage) : null
       const audioPath = selectedAudio ? fileUrlToPath(selectedAudio) : null
+      if (audioPath) effectiveVideoSettings.model = 'pro'
       generate(prompt, imagePath, effectiveVideoSettings, audioPath)
     }
   }
@@ -189,6 +197,7 @@ export function Playground() {
               disabled={isGenerating}
               mode={mode}
               forceApiGenerations={forceApiGenerations}
+              hasAudio={!!selectedAudio}
             />
 
             {/* Error Display */}

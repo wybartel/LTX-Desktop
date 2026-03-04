@@ -255,7 +255,7 @@ class TestA2VGenerate:
         call = fake_services.ltx_api_client.audio_to_video_calls[0]
         assert call["audio_uri"] == "storage://uploaded/test_audio.wav"
         assert call["image_uri"] is None
-        assert call["model"] == "ltx-2-3-fast"
+        assert call["model"] == "ltx-2-3-pro"
         assert call["resolution"] == "1920x1080"
 
     def test_a2v_forced_api_routes_to_ltx_api_with_audio_and_image(

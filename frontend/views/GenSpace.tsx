@@ -572,11 +572,11 @@ function PromptBar({
               options={
                 forceApiGenerations
                   ? [
-                      { value: 'fast', label: 'LTX-2.3 Fast (API)' },
+                      { value: 'fast', label: 'LTX-2.3 Fast (API)', disabled: !!inputAudio, tooltip: inputAudio ? 'Fast model is not available for Audio-to-Video' : undefined },
                       { value: 'pro', label: 'LTX-2.3 Pro (API)' },
                     ]
                   : [
-                      { value: 'fast', label: 'LTX-2.0 Fast' },
+                      { value: 'fast', label: 'LTX-2.0 Fast', disabled: !!inputAudio, tooltip: inputAudio ? 'Fast model is not available for Audio-to-Video' : undefined },
                       { value: 'pro', label: 'LTX-2.0 Pro' },
                     ]
               }
@@ -804,6 +804,13 @@ export function GenSpace() {
     setSettings((prev) => applyForcedVideoSettings({ ...prev, model: 'fast' }))
   }, [applyForcedVideoSettings, forceApiGenerations])
 
+  // Force pro model when audio is attached (A2V only supports pro)
+  useEffect(() => {
+    if (inputAudio && settings.model !== 'pro') {
+      setSettings(prev => applyForcedVideoSettings({ ...prev, model: 'pro' }))
+    }
+  }, [inputAudio]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Only show assets that were generated (have generationParams), not imported files
   const assets = (currentProject?.assets || []).filter(a => a.generationParams)
   const [lastPrompt, setLastPrompt] = useState('')
@@ -930,6 +937,7 @@ export function GenSpace() {
       const imagePath = inputImage ? fileUrlToPath(inputImage) : null
       const audioPath = inputAudio ? fileUrlToPath(inputAudio) : null
       const videoSettings = applyForcedVideoSettings(settings)
+      if (audioPath) videoSettings.model = 'pro'
 
       generate(
         prompt,

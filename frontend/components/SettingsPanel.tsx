@@ -27,6 +27,7 @@ interface SettingsPanelProps {
   disabled?: boolean
   mode?: GenerationMode
   forceApiGenerations?: boolean
+  hasAudio?: boolean
 }
 
 export function SettingsPanel({
@@ -35,6 +36,7 @@ export function SettingsPanel({
   disabled,
   mode = 'text-to-video',
   forceApiGenerations = false,
+  hasAudio = false,
 }: SettingsPanelProps) {
   const isImageMode = mode === 'text-to-image'
 
@@ -104,7 +106,7 @@ export function SettingsPanel({
             onChange={(e) => handleChange('model', e.target.value)}
             disabled={disabled}
           >
-            <option value="fast">Fast (Distilled)</option>
+            <option value="fast" disabled={hasAudio}>Fast (Distilled)</option>
             <option value="pro">Pro (Full)</option>
           </Select>
           {settings.model === 'pro' && (
@@ -120,7 +122,7 @@ export function SettingsPanel({
           onChange={(e) => handleChange('model', e.target.value)}
           disabled={disabled}
         >
-          <option value="fast">LTX-2.3 Fast (API)</option>
+          <option value="fast" disabled={hasAudio}>LTX-2.3 Fast (API)</option>
           <option value="pro">LTX-2.3 Pro (API)</option>
         </Select>
       )}
