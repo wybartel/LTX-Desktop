@@ -254,6 +254,76 @@ function AppContent() {
     </div>
   ) : null
 
+  const showGlobalControls = currentView !== 'home' && status.connected && !setupState.needsSetup
+  const shouldBlockUntilSettingsLoaded = forceApiGenerations && !isLoaded
+  const shouldShowForcedFirstRunUpsell = isForcedFirstRun && isLoaded && !settings.hasLtxApiKey
+  const shouldShowGlobalForcedUpsell = forceApiGenerations && !setupState.needsSetup && isLoaded && !settings.hasLtxApiKey
+  const shouldBlockForLtxKey = shouldShowForcedFirstRunUpsell || shouldShowGlobalForcedUpsell
+
+  const forcedGatewayRequest: ApiGatewayRequest = {
+    requiredKeys: ['ltx'],
+    title: 'Connect API Keys',
+    description: 'This app is configured for API-only generation. Add your API key to continue.',
+    blocking: true,
+    includeOptionalMissing: true,
+  }
+
+  const activeGatewayRequest = shouldBlockForLtxKey ? forcedGatewayRequest : apiGatewayRequest
+  const shouldShowGateway = activeGatewayRequest !== null
+
+  const gatewaySections: ApiGatewaySection[] = useMemo(() => {
+    if (!activeGatewayRequest) return []
+
+    const handleSaveLtxKey = async (apiKey: string) => {
+      if (isForcedFirstRun) {
+        await saveApiKeyForFirstRun(apiKey)
+        return
+      }
+      await saveLtxApiKey(apiKey)
+    }
+
+    const sections: ApiGatewaySection[] = [
+      {
+        keyType: 'ltx',
+        title: 'LTX API',
+        description: 'Video generation, prompt enhancement, and cloud text encoding.',
+        required: activeGatewayRequest.requiredKeys.includes('ltx'),
+        isConfigured: settings.hasLtxApiKey,
+        inputLabel: 'LTX API key',
+        placeholder: 'Enter your LTX API key...',
+        onSave: handleSaveLtxKey,
+        onGetKey: () => window.electronAPI.openLtxApiKeyPage(),
+        getKeyLabel: 'Get LTX API key',
+      },
+      {
+        keyType: 'fal',
+        title: 'FAL AI',
+        description: 'Required to generate images with Z Image Turbo.',
+        required: activeGatewayRequest.requiredKeys.includes('fal'),
+        isConfigured: settings.hasFalApiKey,
+        inputLabel: 'FAL AI API key',
+        placeholder: 'Enter your FAL AI API key...',
+        onSave: saveFalApiKey,
+        onGetKey: () => window.electronAPI.openFalApiKeyPage(),
+        getKeyLabel: 'Get FAL API key',
+      },
+    ]
+
+    return sections.filter((section) => {
+      if (section.required) return true
+      if (activeGatewayRequest.includeOptionalMissing && !section.isConfigured) return true
+      return false
+    })
+  }, [
+    activeGatewayRequest,
+    isForcedFirstRun,
+    saveApiKeyForFirstRun,
+    saveFalApiKey,
+    saveLtxApiKey,
+    settings.hasFalApiKey,
+    settings.hasLtxApiKey,
+  ])
+
   if (pythonReady === null) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
@@ -349,76 +419,6 @@ function AppContent() {
   if (requiredModelsGate === 'missing') {
     return <LaunchGate showLicenseStep={false} onComplete={handleMissingModelsComplete} />
   }
-
-  const showGlobalControls = currentView !== 'home' && status.connected && !setupState.needsSetup
-  const shouldBlockUntilSettingsLoaded = forceApiGenerations && !isLoaded
-  const shouldShowForcedFirstRunUpsell = isForcedFirstRun && isLoaded && !settings.hasLtxApiKey
-  const shouldShowGlobalForcedUpsell = forceApiGenerations && !setupState.needsSetup && isLoaded && !settings.hasLtxApiKey
-  const shouldBlockForLtxKey = shouldShowForcedFirstRunUpsell || shouldShowGlobalForcedUpsell
-
-  const forcedGatewayRequest: ApiGatewayRequest = {
-    requiredKeys: ['ltx'],
-    title: 'Connect API Keys',
-    description: 'This app is configured for API-only generation. Add your API key to continue.',
-    blocking: true,
-    includeOptionalMissing: true,
-  }
-
-  const activeGatewayRequest = shouldBlockForLtxKey ? forcedGatewayRequest : apiGatewayRequest
-  const shouldShowGateway = activeGatewayRequest !== null
-
-  const gatewaySections: ApiGatewaySection[] = useMemo(() => {
-    if (!activeGatewayRequest) return []
-
-    const handleSaveLtxKey = async (apiKey: string) => {
-      if (isForcedFirstRun) {
-        await saveApiKeyForFirstRun(apiKey)
-        return
-      }
-      await saveLtxApiKey(apiKey)
-    }
-
-    const sections: ApiGatewaySection[] = [
-      {
-        keyType: 'ltx',
-        title: 'LTX API',
-        description: 'Video generation, prompt enhancement, and cloud text encoding.',
-        required: activeGatewayRequest.requiredKeys.includes('ltx'),
-        isConfigured: settings.hasLtxApiKey,
-        inputLabel: 'LTX API key',
-        placeholder: 'Enter your LTX API key...',
-        onSave: handleSaveLtxKey,
-        onGetKey: () => window.electronAPI.openLtxApiKeyPage(),
-        getKeyLabel: 'Get LTX API key',
-      },
-      {
-        keyType: 'fal',
-        title: 'FAL AI',
-        description: 'Required to generate images with Z Image Turbo.',
-        required: activeGatewayRequest.requiredKeys.includes('fal'),
-        isConfigured: settings.hasFalApiKey,
-        inputLabel: 'FAL AI API key',
-        placeholder: 'Enter your FAL AI API key...',
-        onSave: saveFalApiKey,
-        onGetKey: () => window.electronAPI.openFalApiKeyPage(),
-        getKeyLabel: 'Get FAL API key',
-      },
-    ]
-
-    return sections.filter((section) => {
-      if (section.required) return true
-      if (activeGatewayRequest.includeOptionalMissing && !section.isConfigured) return true
-      return false
-    })
-  }, [
-    activeGatewayRequest,
-    isForcedFirstRun,
-    saveApiKeyForFirstRun,
-    saveFalApiKey,
-    saveLtxApiKey,
-    settings.hasFalApiKey,
-    settings.hasLtxApiKey,
-  ])
 
   const renderView = () => {
     switch (currentView) {
