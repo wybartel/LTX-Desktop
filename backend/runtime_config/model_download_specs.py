@@ -34,15 +34,15 @@ MODEL_FILE_ORDER: tuple[ModelFileType, ...] = (
 
 DEFAULT_MODEL_DOWNLOAD_SPECS: dict[ModelFileType, ModelFileDownloadSpec] = {
     "checkpoint": ModelFileDownloadSpec(
-        relative_path=Path("ltx-2-19b-distilled-fp8.safetensors"),
-        expected_size_bytes=19_000_000_000,
+        relative_path=Path("ltx-2.3-20b-distilled.safetensors"),
+        expected_size_bytes=43_000_000_000,
         is_folder=False,
         repo_id="Lightricks/LTX-2",
-        description="Main transformer model (FP8)",
+        description="Main transformer model",
     ),
     "upsampler": ModelFileDownloadSpec(
-        relative_path=Path("ltx-2-spatial-upscaler-x2-1.0.safetensors"),
-        expected_size_bytes=1_000_000_000,
+        relative_path=Path("ltx-2.3-spatial-upscaler-x2-1.0.safetensors"),
+        expected_size_bytes=1_900_000_000,
         is_folder=False,
         repo_id="Lightricks/LTX-2",
         description="2x Upscaler",

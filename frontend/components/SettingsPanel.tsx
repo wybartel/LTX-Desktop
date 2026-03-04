@@ -47,11 +47,6 @@ export function SettingsPanel({
       return
     }
 
-    // If switching to Pro and duration is 20, reset to 10
-    if (key === 'model' && value === 'pro' && settings.duration === 20) {
-      onSettingsChange({ ...settings, [key]: value, duration: 10 })
-      return
-    }
     onSettingsChange(nextSettings)
   }
 

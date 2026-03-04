@@ -94,16 +94,7 @@ class VideoGenerationHandler(StateHandlerBase):
         if audio_path:
             return self._generate_a2v(req, duration, fps, audio_path=audio_path)
 
-        use_upsampler = resolution == "1080p"
-        if not use_upsampler:
-            if model_type == "fast":
-                model_type = "fast-native"
-                logger.info("Resolution %s - using fast-native pipeline (no upsampler)", resolution)
-            elif model_type == "pro":
-                model_type = "pro-native"
-                logger.info("Resolution %s - using pro-native pipeline (no upsampler)", resolution)
-        else:
-            logger.info("Resolution %s - using 2-stage pipeline with upsampler", resolution)
+        logger.info("Resolution %s - using 2-stage distilled pipeline with upsampler", resolution)
 
         RESOLUTION_MAP: dict[str, tuple[int, int]] = {
             "540p": (960, 544),
@@ -164,6 +155,10 @@ class VideoGenerationHandler(StateHandlerBase):
         camera_motion: VideoCameraMotion,
         negative_prompt: str,
     ) -> str:
+        t_total_start = time.perf_counter()
+        gen_mode = "i2v" if image is not None else "t2v"
+        logger.info("[%s] Generation started (model=%s, %dx%d, %d frames, %d fps)", gen_mode, model_type, width, height, num_frames, int(fps))
+
         if self._generation.is_generation_cancelled():
             raise RuntimeError("Generation was cancelled")
 
@@ -173,7 +168,11 @@ class VideoGenerationHandler(StateHandlerBase):
         total_steps = 8 if model_type in ("fast", "fast-native") else self.state.app_settings.pro_model.steps
 
         self._generation.update_progress("loading_model", 5, 0, total_steps)
+        t_load_start = time.perf_counter()
         pipeline_state = self._pipelines.load_gpu_pipeline(model_type, should_warm=False)
+        t_load_end = time.perf_counter()
+        logger.info("[%s] Pipeline load: %.2fs", gen_mode, t_load_end - t_load_start)
+
         self._generation.update_progress("encoding_text", 10, 0, total_steps)
 
         enhanced_prompt = prompt + self._camera_motion_prompts.get(camera_motion, "")
@@ -194,7 +193,12 @@ class VideoGenerationHandler(StateHandlerBase):
                 enhance = use_api_encoding and settings.prompt_enhancer_enabled_i2v
             else:
                 enhance = use_api_encoding and settings.prompt_enhancer_enabled_t2v
+
+            encoding_method = "api" if use_api_encoding else "local"
+            t_text_start = time.perf_counter()
             self._text.prepare_text_encoding(enhanced_prompt, enhance_prompt=enhance)
+            t_text_end = time.perf_counter()
+            logger.info("[%s] Text encoding (%s): %.2fs", gen_mode, encoding_method, t_text_end - t_text_start)
 
             self._generation.update_progress("inference", 15, 0, total_steps)
 
@@ -205,6 +209,7 @@ class VideoGenerationHandler(StateHandlerBase):
             pro_steps = self.state.app_settings.pro_model.steps
             neg = negative_prompt if negative_prompt else self._default_negative_prompt
 
+            t_inference_start = time.perf_counter()
             if model_type in {"fast", "fast-native"}:
                 fast_pipeline = cast(FastVideoPipeline | FastNativeVideoPipeline, pipeline_state.pipeline)
                 fast_pipeline.generate(
@@ -231,11 +236,18 @@ class VideoGenerationHandler(StateHandlerBase):
                     images=images,
                     output_path=str(output_path),
                 )
+            t_inference_end = time.perf_counter()
+            logger.info("[%s] Inference: %.2fs", gen_mode, t_inference_end - t_inference_start)
 
             if self._generation.is_generation_cancelled():
                 if output_path.exists():
                     output_path.unlink()
                 raise RuntimeError("Generation was cancelled")
+
+            t_total_end = time.perf_counter()
+            logger.info("[%s] Total generation: %.2fs (load=%.2fs, text=%.2fs, inference=%.2fs)",
+                        gen_mode, t_total_end - t_total_start,
+                        t_load_end - t_load_start, t_text_end - t_text_start, t_inference_end - t_inference_start)
 
             self._generation.update_progress("complete", 100, total_steps, total_steps)
             return str(output_path)

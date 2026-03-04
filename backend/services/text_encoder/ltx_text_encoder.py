@@ -183,11 +183,12 @@ class LTXTextEncoder:
                 return None
 
             embeddings = conditioning[0][0]
-            if embeddings.shape[-1] > 3840:
-                video_context = embeddings[..., :3840].to(dtype=torch.bfloat16, device=self.device)
-                audio_context = embeddings[..., 3840:].to(dtype=torch.bfloat16, device=self.device)
+            video_dim = 4096
+            if embeddings.shape[-1] > video_dim:
+                video_context = embeddings[..., :video_dim].contiguous().to(dtype=torch.bfloat16, device=self.device)
+                audio_context = embeddings[..., video_dim:].contiguous().to(dtype=torch.bfloat16, device=self.device)
             else:
-                video_context = embeddings.to(dtype=torch.bfloat16, device=self.device)
+                video_context = embeddings.contiguous().to(dtype=torch.bfloat16, device=self.device)
                 audio_context = None
 
             logger.info("Text encoded via API in %.1fs", time.time() - start)
