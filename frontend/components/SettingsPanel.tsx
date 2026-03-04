@@ -39,6 +39,7 @@ export function SettingsPanel({
   hasAudio = false,
 }: SettingsPanelProps) {
   const isImageMode = mode === 'text-to-image'
+  const LOCAL_MAX_DURATION: Record<string, number> = { '540p': 20, '720p': 10, '1080p': 5 }
 
   const handleChange = (key: keyof GenerationSettings, value: string | number | boolean) => {
     const nextSettings = { ...settings, [key]: value } as GenerationSettings
@@ -47,10 +48,19 @@ export function SettingsPanel({
       return
     }
 
+    // Clamp duration when resolution changes for local generation
+    if (key === 'videoResolution' && !forceApiGenerations) {
+      const maxDur = LOCAL_MAX_DURATION[value as string] ?? 20
+      if (nextSettings.duration > maxDur) {
+        nextSettings.duration = maxDur
+      }
+    }
+
     onSettingsChange(nextSettings)
   }
 
-  const durationOptions = forceApiGenerations ? [...FORCED_API_VIDEO_DURATIONS] : [5, 6, 8, 10, 20]
+  const localMaxDuration = LOCAL_MAX_DURATION[settings.videoResolution] ?? 20
+  const durationOptions = forceApiGenerations ? [...FORCED_API_VIDEO_DURATIONS] : [5, 6, 8, 10, 20].filter(d => d <= localMaxDuration)
   const resolutionOptions = forceApiGenerations ? [...FORCED_API_VIDEO_RESOLUTIONS] : ['1080p', '720p', '540p']
   const fpsOptions = forceApiGenerations ? [...FORCED_API_VIDEO_FPS] : [24, 25, 50]
 

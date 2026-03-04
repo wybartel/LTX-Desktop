@@ -327,7 +327,9 @@ function PromptBar({
   const audioInputRef = useRef<HTMLInputElement>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [isAudioDragOver, setIsAudioDragOver] = useState(false)
-  const videoDurationOptions = forceApiGenerations ? [...FORCED_API_VIDEO_DURATIONS] : [5, 6, 8, 10, 20]
+  const LOCAL_MAX_DURATION: Record<string, number> = { '540p': 20, '720p': 10, '1080p': 5 }
+  const localMaxDuration = LOCAL_MAX_DURATION[settings.videoResolution] ?? 20
+  const videoDurationOptions = forceApiGenerations ? [...FORCED_API_VIDEO_DURATIONS] : [5, 6, 8, 10, 20].filter(d => d <= localMaxDuration)
   const videoResolutionOptions = forceApiGenerations ? [...FORCED_API_VIDEO_RESOLUTIONS] : ['540p', '720p', '1080p']
   const videoFpsOptions = forceApiGenerations ? [...FORCED_API_VIDEO_FPS] : [24, 25, 50]
 
@@ -610,7 +612,11 @@ function PromptBar({
             <SettingsDropdown
               title="RESOLUTION"
               value={settings.videoResolution}
-              onChange={(v) => onSettingsChange({ ...settings, videoResolution: v })}
+              onChange={(v) => {
+                const maxDur = LOCAL_MAX_DURATION[v] ?? 20
+                const clampedDuration = settings.duration > maxDur ? maxDur : settings.duration
+                onSettingsChange({ ...settings, videoResolution: v, duration: clampedDuration })
+              }}
               options={videoResolutionOptions.map((value) => ({ value, label: value }))}
               trigger={
                 <>
