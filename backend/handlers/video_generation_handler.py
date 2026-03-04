@@ -49,6 +49,7 @@ FORCED_API_RESOLUTION_MAP: dict[str, dict[str, str]] = {
     "1440p": {"16:9": "2560x1440", "9:16": "1440x2560"},
     "2160p": {"16:9": "3840x2160", "9:16": "2160x3840"},
 }
+A2V_FORCED_API_RESOLUTION = "1920x1080"
 FORCED_API_ALLOWED_ASPECT_RATIOS = {"16:9", "9:16"}
 FORCED_API_ALLOWED_FPS = {24, 25, 48, 50}
 
@@ -100,7 +101,16 @@ class VideoGenerationHandler(StateHandlerBase):
         if audio_path:
             return self._generate_a2v(req, duration, fps, audio_path=audio_path)
 
-        logger.info("Resolution %s - using 2-stage distilled pipeline with upsampler", resolution)
+        use_upsampler = resolution == "1080p"
+        if not use_upsampler:
+            if model_type == "fast":
+                model_type = "fast-native"
+                logger.info("Resolution %s - using fast-native pipeline (no upsampler)", resolution)
+            elif model_type == "pro":
+                model_type = "pro-native"
+                logger.info("Resolution %s - using pro-native pipeline (no upsampler)", resolution)
+        else:
+            logger.info("Resolution %s - using 2-stage pipeline with upsampler", resolution)
 
         RESOLUTION_MAP: dict[str, tuple[int, int]] = {
             "540p": (960, 544),
@@ -439,6 +449,9 @@ class VideoGenerationHandler(StateHandlerBase):
                 if requested_model != "pro":
                     logger.warning("A2V requested with model=%s; overriding to 'pro'", requested_model)
                 api_model_id = FORCED_API_MODEL_MAP["pro"]
+                if api_resolution != A2V_FORCED_API_RESOLUTION:
+                    logger.warning("A2V requested with resolution=%s; overriding to '%s'", api_resolution, A2V_FORCED_API_RESOLUTION)
+                api_resolution = A2V_FORCED_API_RESOLUTION
                 validated_audio_path = validate_audio_file(audio_path)
                 validated_image_path: Path | None = None
                 if image_path is not None:

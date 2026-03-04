@@ -153,6 +153,7 @@ class TestSettingsPersistence:
             image_generation_pipeline_class=type(fake_services.image_generation_pipeline),
             ic_lora_pipeline_class=type(fake_services.ic_lora_pipeline),
             a2v_pipeline_class=type(fake_services.a2v_pipeline),
+            retake_pipeline_class=type(fake_services.retake_pipeline),
             ic_lora_model_downloader=fake_services.ic_lora_model_downloader,
         )
         return build_initial_state(test_state.config, default_app_settings.model_copy(deep=True), service_bundle=bundle)

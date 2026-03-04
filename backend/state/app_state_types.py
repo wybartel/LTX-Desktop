@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         IcLoraPipeline,
         ProNativeVideoPipeline,
         ProVideoPipeline,
+        RetakePipeline,
         TextEncoder,
     )
     import torch
@@ -119,6 +120,13 @@ class A2VPipelineState:
     pipeline: A2VPipeline
 
 
+@dataclass
+class RetakePipelineState:
+    pipeline: RetakePipeline
+    distilled: bool
+    quantized: bool
+
+
 # ============================================================
 # Generation state
 # ============================================================
@@ -165,7 +173,7 @@ GenerationState = GenerationRunning | GenerationComplete | GenerationError | Gen
 
 @dataclass
 class GpuSlot:
-    active_pipeline: VideoPipelineState | ICLoraState | A2VPipelineState | ImageGenerationPipeline
+    active_pipeline: VideoPipelineState | ICLoraState | A2VPipelineState | RetakePipelineState | ImageGenerationPipeline
     generation: GenerationState | None
 
 

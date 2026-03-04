@@ -37,6 +37,7 @@ from services.interfaces import (
     ModelDownloader,
     ProNativeVideoPipeline,
     ProVideoPipeline,
+    RetakePipeline,
     TaskRunner,
     TextEncoder,
     VideoProcessor,
@@ -67,6 +68,7 @@ class AppHandler:
         image_generation_pipeline_class: type[ImageGenerationPipeline],
         ic_lora_pipeline_class: type[IcLoraPipeline],
         a2v_pipeline_class: type[A2VPipeline],
+        retake_pipeline_class: type[RetakePipeline],
         ic_lora_model_downloader: IcLoraModelDownloader,
     ) -> None:
         self.config = config
@@ -87,6 +89,7 @@ class AppHandler:
         self.image_generation_pipeline_class = image_generation_pipeline_class
         self.ic_lora_pipeline_class = ic_lora_pipeline_class
         self.a2v_pipeline_class = a2v_pipeline_class
+        self.retake_pipeline_class = retake_pipeline_class
         self.ic_lora_model_downloader = ic_lora_model_downloader
 
         self._lock = threading.RLock()
@@ -152,6 +155,7 @@ class AppHandler:
             image_generation_pipeline_class=image_generation_pipeline_class,
             ic_lora_pipeline_class=ic_lora_pipeline_class,
             a2v_pipeline_class=a2v_pipeline_class,
+            retake_pipeline_class=retake_pipeline_class,
             config=config,
             outputs_dir=config.outputs_dir,
             device=config.device,
@@ -204,6 +208,10 @@ class AppHandler:
             state=self.state,
             lock=self._lock,
             ltx_api_client=ltx_api_client,
+            config=config,
+            generation_handler=self.generation,
+            pipelines_handler=self.pipelines,
+            text_handler=self.text,
             outputs_dir=config.outputs_dir,
         )
 
@@ -241,6 +249,7 @@ class ServiceBundle:
     image_generation_pipeline_class: type[ImageGenerationPipeline]
     ic_lora_pipeline_class: type[IcLoraPipeline]
     a2v_pipeline_class: type[A2VPipeline]
+    retake_pipeline_class: type[RetakePipeline]
     ic_lora_model_downloader: IcLoraModelDownloader
 
 
@@ -260,6 +269,7 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
     from services.model_downloader.hugging_face_downloader import HuggingFaceDownloader
     from services.pro_native_video_pipeline.ltx_pro_native_video_pipeline import LTXProNativeVideoPipeline
     from services.pro_video_pipeline.ltx_pro_video_pipeline import LTXProVideoPipeline
+    from services.retake_pipeline.ltx_retake_pipeline import LTXRetakePipeline
     from services.task_runner.threading_runner import ThreadingRunner
     from services.text_encoder.ltx_text_encoder import LTXTextEncoder
     from services.video_processor.video_processor_impl import VideoProcessorImpl
@@ -287,6 +297,7 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
         image_generation_pipeline_class=ZitImageGenerationPipeline,
         ic_lora_pipeline_class=LTXIcLoraPipeline,
         a2v_pipeline_class=LTXa2vPipeline,
+        retake_pipeline_class=LTXRetakePipeline,
         ic_lora_model_downloader=IcLoraModelDownloaderImpl(),
     )
 
@@ -317,5 +328,6 @@ def build_initial_state(
         image_generation_pipeline_class=bundle.image_generation_pipeline_class,
         ic_lora_pipeline_class=bundle.ic_lora_pipeline_class,
         a2v_pipeline_class=bundle.a2v_pipeline_class,
+        retake_pipeline_class=bundle.retake_pipeline_class,
         ic_lora_model_downloader=bundle.ic_lora_model_downloader,
     )

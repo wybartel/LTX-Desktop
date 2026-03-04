@@ -20,9 +20,10 @@ from services.interfaces import (
     IcLoraPipeline,
     ProNativeVideoPipeline,
     ProVideoPipeline,
+    RetakePipeline,
     VideoPipelineModelType,
 )
-from services.services_utils import get_device_type
+from services.services_utils import device_supports_fp8, get_device_type
 from state.app_state_types import (
     A2VPipelineState,
     AppState,
@@ -30,6 +31,7 @@ from state.app_state_types import (
     GenerationRunning,
     GpuSlot,
     ICLoraState,
+    RetakePipelineState,
     VideoPipelineState,
     VideoPipelineWarmth,
 )
@@ -54,6 +56,7 @@ class PipelinesHandler(StateHandlerBase):
         image_generation_pipeline_class: type[ImageGenerationPipeline],
         ic_lora_pipeline_class: type[IcLoraPipeline],
         a2v_pipeline_class: type[A2VPipeline],
+        retake_pipeline_class: type[RetakePipeline],
         config: RuntimeConfig,
         outputs_dir: Path,
         device: torch.device,
@@ -68,6 +71,7 @@ class PipelinesHandler(StateHandlerBase):
         self._image_generation_pipeline_class = image_generation_pipeline_class
         self._ic_lora_pipeline_class = ic_lora_pipeline_class
         self._a2v_pipeline_class = a2v_pipeline_class
+        self._retake_pipeline_class = retake_pipeline_class
         self._config = config
         self._outputs_dir = outputs_dir
         self._device = device
@@ -90,7 +94,7 @@ class PipelinesHandler(StateHandlerBase):
     def _assert_invariants(self) -> None:
         gpu_is_zit = False
         match self.state.gpu_slot:
-            case GpuSlot(active_pipeline=VideoPipelineState() | ICLoraState() | A2VPipelineState()):
+            case GpuSlot(active_pipeline=VideoPipelineState() | ICLoraState() | A2VPipelineState() | RetakePipelineState()):
                 gpu_is_zit = False
             case GpuSlot():
                 gpu_is_zit = True
@@ -182,7 +186,7 @@ class PipelinesHandler(StateHandlerBase):
                 return
 
             active = self.state.gpu_slot.active_pipeline
-            if isinstance(active, (VideoPipelineState, ICLoraState, A2VPipelineState)):
+            if isinstance(active, (VideoPipelineState, ICLoraState, A2VPipelineState, RetakePipelineState)):
                 return
 
             generation = self.state.gpu_slot.generation
@@ -204,7 +208,7 @@ class PipelinesHandler(StateHandlerBase):
         with self._lock:
             if self.state.gpu_slot is not None:
                 active = self.state.gpu_slot.active_pipeline
-                if not isinstance(active, (VideoPipelineState, ICLoraState, A2VPipelineState)):
+                if not isinstance(active, (VideoPipelineState, ICLoraState, A2VPipelineState, RetakePipelineState)):
                     return active
                 self._ensure_no_running_generation()
 
@@ -264,7 +268,7 @@ class PipelinesHandler(StateHandlerBase):
                 return
 
             active = self.state.gpu_slot.active_pipeline
-            if isinstance(active, (VideoPipelineState, ICLoraState, A2VPipelineState)):
+            if isinstance(active, (VideoPipelineState, ICLoraState, A2VPipelineState, RetakePipelineState)):
                 self.state.gpu_slot = None
                 self._assert_invariants()
                 should_cleanup = True
@@ -351,6 +355,39 @@ class PipelinesHandler(StateHandlerBase):
             self._device,
         )
         state = A2VPipelineState(pipeline=pipeline)
+
+        with self._lock:
+            self.state.gpu_slot = GpuSlot(active_pipeline=state, generation=None)
+            self._assert_invariants()
+        return state
+
+    def load_retake_pipeline(self, *, distilled: bool = True) -> RetakePipelineState:
+        self._install_text_patches_if_needed()
+
+        quantized = device_supports_fp8(self._device)
+
+        with self._lock:
+            match self.state.gpu_slot:
+                case GpuSlot(
+                    active_pipeline=RetakePipelineState(distilled=current_distilled, quantized=current_quantized) as state
+                ) if current_distilled == distilled and current_quantized == quantized:
+                    return state
+                case _:
+                    pass
+
+        self._evict_gpu_pipeline_for_swap()
+
+        from ltx_core.quantization import QuantizationPolicy
+
+        quantization = QuantizationPolicy.fp8_cast() if quantized else None
+        pipeline = self._retake_pipeline_class.create(
+            checkpoint_path=str(self._config.model_path("checkpoint")),
+            gemma_root=self._text_handler.resolve_gemma_root(),
+            device=self._device,
+            loras=[],
+            quantization=quantization,
+        )
+        state = RetakePipelineState(pipeline=pipeline, distilled=distilled, quantized=quantized)
 
         with self._lock:
             self.state.gpu_slot = GpuSlot(active_pipeline=state, generation=None)

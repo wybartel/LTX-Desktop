@@ -291,7 +291,7 @@ class TestA2VGenerate:
         assert call["audio_uri"] == "storage://uploaded/test_audio.wav"
         assert call["image_uri"] == "storage://uploaded/input.png"
         assert call["model"] == "ltx-2-3-pro"
-        assert call["resolution"] == "3840x2160"
+        assert call["resolution"] == "1920x1080"
 
     def test_a2v_uses_resolution_map(self, client, test_state, fake_services, create_fake_model_files, tmp_path):
         create_fake_model_files()
@@ -874,7 +874,32 @@ class TestForcedApiGenerate:
 
         assert r.status_code == 200
         call = fake_services.ltx_api_client.audio_to_video_calls[0]
-        assert call["resolution"] == "1080x1920"
+        assert call["resolution"] == "1920x1080"
+
+    def test_a2v_forced_api_overrides_resolution_and_aspect_ratio(self, client, test_state, fake_services, tmp_path):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "test_key"
+        audio_file = tmp_path / "test_audio.wav"
+        _write_test_wav(audio_file)
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A big video",
+                "resolution": "2160p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "25",
+                "audioPath": str(audio_file),
+                "aspectRatio": "9:16",
+            },
+        )
+
+        assert r.status_code == 200
+        assert r.json()["status"] == "complete"
+        call = fake_services.ltx_api_client.audio_to_video_calls[0]
+        assert call["resolution"] == "1920x1080"
+        assert call["model"] == "ltx-2-3-pro"
 
 
 class TestGenerateCancel:
