@@ -2,7 +2,7 @@
 
 import inspect
 
-from huggingface_hub import file_download
+from huggingface_hub import hf_hub_download
 
 from state.app_state_types import FileDownloadCompleted, FileDownloadRunning
 
@@ -256,22 +256,15 @@ class TestAtomicDownloads:
 class TestHuggingFaceInternals:
     """Guard tests for huggingface_hub internals we rely on.
 
-    We monkey-patch ``file_download.http_get`` to inject a custom tqdm bar
-    for progress tracking during ``hf_hub_download`` (which has no public
-    ``tqdm_class`` parameter, unlike ``snapshot_download``).
+    We rely on the public ``tqdm_class`` parameter on ``hf_hub_download``
+    for progress tracking (used by both HTTP and Xet downloads).
 
-    If these tests break after a huggingface_hub upgrade, the internal API
-    has changed.  Find an alternative approach and raise to a developer.
+    If this test breaks after a huggingface_hub upgrade, the public API
+    has changed. Find an alternative approach and raise to a developer.
     """
 
-    def test_http_get_exists_and_is_callable(self):
-        assert hasattr(file_download, "http_get"), (
-            "file_download.http_get no longer exists — progress patch for hf_hub_download is broken"
-        )
-        assert callable(file_download.http_get)
-
-    def test_http_get_accepts_tqdm_bar(self):
-        sig = inspect.signature(file_download.http_get)
-        assert "_tqdm_bar" in sig.parameters, (
-            "file_download.http_get no longer accepts _tqdm_bar — progress patch for hf_hub_download is broken"
+    def test_hf_hub_download_accepts_tqdm_class(self):
+        sig = inspect.signature(hf_hub_download)
+        assert "tqdm_class" in sig.parameters, (
+            "hf_hub_download no longer accepts tqdm_class — progress tracking is broken"
         )

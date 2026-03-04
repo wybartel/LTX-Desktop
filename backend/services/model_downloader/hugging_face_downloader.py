@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import contextlib
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 from threading import Lock
 from typing import Any
-from unittest.mock import patch
 
-from huggingface_hub import file_download, hf_hub_download, snapshot_download  # type: ignore[reportUnknownVariableType]
+from huggingface_hub import hf_hub_download, snapshot_download  # type: ignore[reportUnknownVariableType]
 from tqdm.auto import tqdm as tqdm_auto  # type: ignore[reportUnknownVariableType]
 
 
@@ -45,31 +43,6 @@ def _make_progress_tqdm_class(callback: Callable[[int, int], None]) -> type:
     return _ProgressTqdm
 
 
-@contextlib.contextmanager
-def _patch_http_get_progress(callback: Callable[[int, int], None]) -> Iterator[None]:
-    """Temporarily monkey-patch ``huggingface_hub.file_download.http_get``
-    to inject a custom tqdm bar that forwards progress to *callback*.
-
-    ``hf_hub_download`` does not expose a ``tqdm_class`` parameter (unlike
-    ``snapshot_download``), but its internal ``http_get`` accepts a private
-    ``_tqdm_bar`` kwarg.  We wrap ``http_get`` to inject our own bar when
-    the caller hasn't already provided one.
-
-    See ``test_http_get_accepts_tqdm_bar`` — if that test breaks after a
-    huggingface_hub upgrade, this patch needs to be revisited.
-    """
-    tqdm_cls = _make_progress_tqdm_class(callback)
-    original_http_get: Callable[..., Any] = file_download.http_get  # type: ignore[reportUnknownMemberType]
-
-    def _wrapped_http_get(*args: Any, **kwargs: Any) -> None:
-        if kwargs.get("_tqdm_bar") is None:
-            kwargs["_tqdm_bar"] = tqdm_cls(disable=True)
-        return original_http_get(*args, **kwargs)
-
-    with patch.object(file_download, "http_get", _wrapped_http_get):
-        yield
-
-
 class HuggingFaceDownloader:
     """Wraps huggingface_hub download functions."""
 
@@ -80,9 +53,13 @@ class HuggingFaceDownloader:
         local_dir: str,
         on_progress: Callable[[int, int], None] | None = None,
     ) -> Path:
-        ctx = _patch_http_get_progress(on_progress) if on_progress is not None else contextlib.nullcontext()
-        with ctx:
-            path = hf_hub_download(repo_id=repo_id, filename=filename, local_dir=local_dir)
+        tqdm_class = _make_progress_tqdm_class(on_progress) if on_progress is not None else None
+        path = hf_hub_download(
+            repo_id=repo_id,
+            filename=filename,
+            local_dir=local_dir,
+            tqdm_class=tqdm_class,
+        )
         return Path(path)
 
     def download_snapshot(
