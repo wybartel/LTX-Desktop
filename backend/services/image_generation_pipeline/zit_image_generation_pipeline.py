@@ -27,15 +27,26 @@ class ZitImageGenerationPipeline:
 
     def __init__(self, model_path: str, device: str | None = None) -> None:
         self._device: str | None = None
+        self._cpu_offload_active = False
         self.pipeline = ZImagePipeline.from_pretrained(  # type: ignore[reportUnknownMemberType]
             model_path,
             torch_dtype=torch.bfloat16,
         )
-        self.edit_pipeline = ZImageImg2ImgPipeline.from_pipe(self.pipeline)  # type: ignore[reportUnknownMemberType]
+        self._edit_pipeline: ZImageImg2ImgPipeline | None = None
         if device is not None:
             self.to(device)
 
+    def _ensure_edit_pipeline(self) -> ZImageImg2ImgPipeline:
+        if self._edit_pipeline is not None:
+            return self._edit_pipeline
+        self._edit_pipeline = ZImageImg2ImgPipeline.from_pipe(self.pipeline)  # type: ignore[reportUnknownMemberType]
+        if self._cpu_offload_active:
+            self._edit_pipeline.enable_model_cpu_offload()  # type: ignore[reportUnknownMemberType]
+        return self._edit_pipeline
+
     def _resolve_generator_device(self) -> str:
+        if self._cpu_offload_active:
+            return "cuda"
         if self._device is not None:
             return self._device
 
@@ -92,8 +103,9 @@ class ZitImageGenerationPipeline:
         seed: int,
     ) -> ImagePipelineOutputLike:
         del guidance_scale
+        edit_pipe = self._ensure_edit_pipeline()
         generator = torch.Generator(device=self._resolve_generator_device()).manual_seed(seed)
-        output = self.edit_pipeline(  # type: ignore[reportUnknownMemberType]
+        output = edit_pipe(  # type: ignore[reportUnknownMemberType]
             prompt=prompt,
             image=image,
             height=height,
@@ -108,6 +120,14 @@ class ZitImageGenerationPipeline:
 
     def to(self, device: str) -> None:
         runtime_device = get_device_type(device)
-        self.pipeline.to(runtime_device)  # type: ignore[reportUnknownMemberType]
-        self.edit_pipeline.to(runtime_device)  # type: ignore[reportUnknownMemberType]
+        if runtime_device in ("cuda", "mps"):
+            self.pipeline.enable_model_cpu_offload()  # type: ignore[reportUnknownMemberType]
+            self._cpu_offload_active = True
+            if self._edit_pipeline is not None:
+                self._edit_pipeline.enable_model_cpu_offload()  # type: ignore[reportUnknownMemberType]
+        else:
+            self._cpu_offload_active = False
+            self.pipeline.to(runtime_device)  # type: ignore[reportUnknownMemberType]
+            if self._edit_pipeline is not None:
+                self._edit_pipeline.to(runtime_device)  # type: ignore[reportUnknownMemberType]
         self._device = runtime_device

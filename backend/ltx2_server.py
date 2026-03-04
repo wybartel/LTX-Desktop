@@ -77,6 +77,8 @@ if use_sage_attention:
 
         _original_sdpa = F.scaled_dot_product_attention
 
+        _SAGE_SUPPORTED_HEADDIMS = {64, 96, 128}
+
         def patched_sdpa(
             query: torch.Tensor,
             key: torch.Tensor,
@@ -89,7 +91,12 @@ if use_sage_attention:
         ) -> torch.Tensor:
             global _sageattention_runtime_fallback_logged
             try:
-                if query.dim() == 4 and attn_mask is None and dropout_p == 0.0:
+                if (
+                    query.dim() == 4
+                    and attn_mask is None
+                    and dropout_p == 0.0
+                    and query.shape[-1] in _SAGE_SUPPORTED_HEADDIMS
+                ):
                     return cast(torch.Tensor, sageattn(query, key, value, is_causal=is_causal, tensor_layout="HND"))  # type: ignore[reportUnnecessaryCast]
                 else:
                     return _original_sdpa(query, key, value, attn_mask=attn_mask,
