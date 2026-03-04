@@ -72,7 +72,7 @@ class ImageGenerationHandler(StateHandlerBase):
             )
 
         try:
-            self._pipelines.load_flux_to_gpu()
+            self._pipelines.load_zit_to_gpu()
             self._generation.start_generation(generation_id)
             output_paths = self.generate_image(
                 prompt=req.prompt,
@@ -138,7 +138,7 @@ class ImageGenerationHandler(StateHandlerBase):
             seed = int(time.time()) % 2147483647
 
         try:
-            self._pipelines.load_flux_to_gpu()
+            self._pipelines.load_zit_to_gpu()
             self._generation.start_generation(generation_id)
             output_paths = self.edit_image(
                 prompt=req.prompt,
@@ -170,7 +170,7 @@ class ImageGenerationHandler(StateHandlerBase):
             raise RuntimeError("Generation was cancelled")
 
         self._generation.update_progress("loading_model", 5, 0, num_inference_steps)
-        flux = self._pipelines.load_flux_to_gpu()
+        zit = self._pipelines.load_zit_to_gpu()
         self._generation.update_progress("inference", 15, 0, num_inference_steps)
 
         if seed is None:
@@ -186,16 +186,16 @@ class ImageGenerationHandler(StateHandlerBase):
             progress = 15 + int((i / num_images) * 80)
             self._generation.update_progress("inference", progress, i, num_images)
 
-            result = flux.generate(
+            result = zit.generate(
                 prompt=prompt,
                 height=height,
                 width=width,
-                guidance_scale=1.0,
+                guidance_scale=0.0,
                 num_inference_steps=num_inference_steps,
                 seed=seed + i,
             )
 
-            output_path = self._outputs_dir / f"flux_image_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+            output_path = self._outputs_dir / f"zit_image_{timestamp}_{uuid.uuid4().hex[:8]}.png"
             result.images[0].save(str(output_path))
             outputs.append(str(output_path))
 
@@ -218,25 +218,25 @@ class ImageGenerationHandler(StateHandlerBase):
             raise RuntimeError("Generation was cancelled")
 
         self._generation.update_progress("loading_model", 5, 0, num_inference_steps)
-        flux = self._pipelines.load_flux_to_gpu()
+        zit = self._pipelines.load_zit_to_gpu()
         self._generation.update_progress("inference", 15, 0, num_inference_steps)
 
         if seed is None:
             seed = int(time.time()) % 2147483647
 
         image_input: Image.Image | list[Image.Image] = input_images if len(input_images) > 1 else input_images[0]
-        result = flux.generate_edit(
+        result = zit.generate_edit(
             prompt=prompt,
             image=image_input,
             height=height,
             width=width,
-            guidance_scale=1.0,
+            guidance_scale=0.0,
             num_inference_steps=num_inference_steps,
             seed=seed,
         )
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = self._outputs_dir / f"flux_edit_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+        output_path = self._outputs_dir / f"zit_edit_{timestamp}_{uuid.uuid4().hex[:8]}.png"
         result.images[0].save(str(output_path))
 
         if self._generation.is_generation_cancelled():

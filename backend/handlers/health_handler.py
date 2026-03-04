@@ -141,12 +141,12 @@ class HealthHandler(StateHandlerBase):
                     case _:
                         pass
 
-            flux_models_path = self._config.model_path("flux")
-            flux_exists = flux_models_path.exists() and any(flux_models_path.iterdir())
-            if flux_exists:
-                self.set_startup_loading("Preloading Flux to CPU", 85)
+            zit_models_path = self._config.model_path("zit")
+            zit_exists = zit_models_path.exists() and any(zit_models_path.iterdir())
+            if zit_exists:
+                self.set_startup_loading("Preloading Z-Image-Turbo to CPU", 85)
                 if self.state.cpu_slot is None:
-                    self._pipelines.preload_flux_to_cpu()
+                    self._pipelines.preload_zit_to_cpu()
 
             self.set_startup_ready()
         except Exception as exc:

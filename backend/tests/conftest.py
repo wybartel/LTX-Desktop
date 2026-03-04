@@ -110,7 +110,7 @@ def default_app_settings() -> AppSettings:
 
 @pytest.fixture
 def create_fake_model_files(test_state):
-    def _create(include_flux: bool = False):
+    def _create(include_zit: bool = False):
         for path in (
             test_state.config.model_path("checkpoint"),
             test_state.config.model_path("upsampler"),
@@ -127,10 +127,10 @@ def create_fake_model_files(test_state):
         tokenizer_dir.mkdir(parents=True, exist_ok=True)
         (tokenizer_dir / "tokenizer.model").write_bytes(b"\x00" * 1024)
 
-        if include_flux:
-            flux_dir = test_state.config.model_path("flux")
-            flux_dir.mkdir(parents=True, exist_ok=True)
-            (flux_dir / "model.safetensors").write_bytes(b"\x00" * 1024)
+        if include_zit:
+            zit_dir = test_state.config.model_path("zit")
+            zit_dir.mkdir(parents=True, exist_ok=True)
+            (zit_dir / "model.safetensors").write_bytes(b"\x00" * 1024)
 
     return _create
 

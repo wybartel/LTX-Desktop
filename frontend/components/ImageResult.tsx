@@ -23,7 +23,7 @@ export function ImageResult({
     if (imageUrl) {
       const a = document.createElement('a')
       a.href = imageUrl
-      a.download = `flux-image-${Date.now()}.png`
+      a.download = `zit-image-${Date.now()}.png`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

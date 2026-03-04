@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { logger } from '../lib/logger'
 import './FirstRunSetup.css'
 
-interface FirstRunSetupProps {
+interface LaunchGateProps {
   licenseOnly?: boolean
   showLicenseStep?: boolean
   onComplete: () => Promise<void>
@@ -37,7 +37,12 @@ const INSTALL_MESSAGES = [
 ]
 
 
-export function FirstRunSetup({ licenseOnly, showLicenseStep = true, onComplete, onAcceptLicense }: FirstRunSetupProps) {
+export function LaunchGate({
+  licenseOnly,
+  showLicenseStep = true,
+  onComplete,
+  onAcceptLicense,
+}: LaunchGateProps) {
   const [currentStep, setCurrentStep] = useState<Step>(showLicenseStep ? 'license' : 'location')
   const [installPath, setInstallPath] = useState('')
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null)
@@ -235,19 +240,6 @@ export function FirstRunSetup({ licenseOnly, showLicenseStep = true, onComplete,
     }
     if (currentStep === 'complete') {
       await handleFinish()
-    }
-  }
-
-  // Handle cancel/finish
-  const handleCancel = async () => {
-    setActionError(null)
-    setIsActionPending(true)
-    try {
-      await onComplete()
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Failed to complete setup.')
-    } finally {
-      setIsActionPending(false)
     }
   }
 
@@ -839,28 +831,6 @@ export function FirstRunSetup({ licenseOnly, showLicenseStep = true, onComplete,
           <div style={{ fontSize: 11, color: '#666' }}>© 2026 Lightricks</div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-            {/* Cancel Button */}
-            {currentStep !== 'complete' && currentStep !== 'license' && (
-              <button
-                onClick={handleCancel}
-                disabled={isActionPending}
-                style={{
-                  padding: '10px 28px',
-                  borderRadius: 9999,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: isActionPending ? 'not-allowed' : 'pointer',
-                  background: 'transparent',
-                  border: '1px solid #444',
-                  color: '#ffffff',
-                  transition: 'all 0.2s ease',
-                  opacity: isActionPending ? 0.6 : 1
-                }}
-              >
-                Cancel
-              </button>
-            )}
-
             {/* Next/Install/Finish Button */}
             {currentStep !== 'installing' && (
               <button

@@ -90,7 +90,7 @@ class TestGenerateSnakeCaseKeys:
 
 class TestGenerateImageSnakeCaseKeys:
     def test_snake_case_keys(self, client, create_fake_model_files):
-        create_fake_model_files(include_flux=True)
+        create_fake_model_files(include_zit=True)
         r = client.post("/api/generate-image", json={"prompt": "test"})
         assert r.status_code == 200
         data = r.json()

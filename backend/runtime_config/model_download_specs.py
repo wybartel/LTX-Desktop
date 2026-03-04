@@ -28,7 +28,7 @@ MODEL_FILE_ORDER: tuple[ModelFileType, ...] = (
     "upsampler",
     "distilled_lora",
     "text_encoder",
-    "flux",
+    "zit",
 )
 
 
@@ -62,18 +62,18 @@ DEFAULT_MODEL_DOWNLOAD_SPECS: dict[ModelFileType, ModelFileDownloadSpec] = {
         description="Gemma text encoder",
         snapshot_allow_patterns=("text_encoder/*", "tokenizer/*"),
     ),
-    "flux": ModelFileDownloadSpec(
-        relative_path=Path("FLUX.2-klein-4B"),
-        expected_size_bytes=15_000_000_000,
+    "zit": ModelFileDownloadSpec(
+        relative_path=Path("Z-Image-Turbo"),
+        expected_size_bytes=31_000_000_000,
         is_folder=True,
-        repo_id="black-forest-labs/FLUX.2-klein-4B",
-        description="Flux model for text-to-image",
+        repo_id="Tongyi-MAI/Z-Image-Turbo",
+        description="Z-Image-Turbo model for text-to-image and image editing",
     ),
 }
 
 
 DEFAULT_REQUIRED_MODEL_TYPES: frozenset[ModelFileType] = frozenset(
-    {"checkpoint", "upsampler", "distilled_lora", "flux"}
+    {"checkpoint", "upsampler", "distilled_lora", "zit"}
 )
 
 

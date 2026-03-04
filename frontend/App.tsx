@@ -9,7 +9,7 @@ import { logger } from './lib/logger'
 import { Home } from './views/Home'
 import { Project } from './views/Project'
 import { Playground } from './views/Playground'
-import { FirstRunSetup } from './components/FirstRunSetup'
+import { LaunchGate } from './components/FirstRunSetup'
 import { PythonSetup } from './components/PythonSetup'
 import { SettingsModal, type SettingsTabId } from './components/SettingsModal'
 import { LogViewer } from './components/LogViewer'
@@ -17,6 +17,7 @@ import { ApiUpsellModal, buildProApiUpsellCopy } from './components/ApiUpsellMod
 import { Button } from './components/ui/button'
 
 type SetupState = 'loading' | { needsSetup: boolean; needsLicense: boolean }
+type RequiredModelsGateState = 'checking' | 'missing' | 'ready'
 
 function AppContent() {
   const { currentView } = useProjects()
@@ -31,6 +32,7 @@ function AppContent() {
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false)
   const [isFinalizingFirstRun, setIsFinalizingFirstRun] = useState(false)
   const [firstRunFinalizeError, setFirstRunFinalizeError] = useState<string | null>(null)
+  const [requiredModelsGate, setRequiredModelsGate] = useState<RequiredModelsGateState>('checking')
   const setupCompletionInFlightRef = useRef<Promise<void> | null>(null)
 
   const baseUpsellCopy = buildProApiUpsellCopy()
@@ -157,12 +159,71 @@ function AppContent() {
   const shouldAutoFinalizeForcedFirstRun =
     isForcedFirstRun && isLoaded && settings.hasLtxApiKey && !isFinalizingFirstRun && !firstRunFinalizeError
 
+  const areRequiredModelsDownloaded = useCallback(async () => {
+    const backendUrl = await window.electronAPI.getBackendUrl()
+    const response = await fetch(`${backendUrl}/api/models/status`)
+    if (!response.ok) {
+      throw new Error(`Model status fetch failed with status ${response.status}`)
+    }
+    const payload = (await response.json()) as { all_downloaded?: boolean }
+    return payload.all_downloaded === true
+  }, [])
+
+  const handleMissingModelsComplete = useCallback(async () => {
+    const allDownloaded = await areRequiredModelsDownloaded()
+    if (!allDownloaded) {
+      throw new Error('Required models are still missing. Please finish downloading before continuing.')
+    }
+    await handleFirstRunComplete()
+    setRequiredModelsGate('ready')
+  }, [areRequiredModelsDownloaded, handleFirstRunComplete])
+
   useEffect(() => {
     if (!shouldAutoFinalizeForcedFirstRun) return
     void handleFirstRunComplete().catch(() => {
       // Error state is handled via firstRunFinalizeError.
     })
   }, [shouldAutoFinalizeForcedFirstRun, handleFirstRunComplete])
+
+  useEffect(() => {
+    if (setupState === 'loading' || waitingForRuntimePolicy || backendLoading || !status.connected) {
+      return
+    }
+
+    if (forceApiGenerations || setupState.needsLicense || setupState.needsSetup) {
+      setRequiredModelsGate('ready')
+      return
+    }
+
+    let cancelled = false
+    setRequiredModelsGate('checking')
+
+    const checkRequiredModels = async () => {
+      try {
+        const allDownloaded = await areRequiredModelsDownloaded()
+        if (cancelled) return
+        setRequiredModelsGate(allDownloaded ? 'ready' : 'missing')
+      } catch (e) {
+        logger.error(`Failed to check required model status: ${e}`)
+        if (cancelled) return
+        // Do not block app launch on transient status-check failures.
+        setRequiredModelsGate('ready')
+      }
+    }
+
+    void checkRequiredModels()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    areRequiredModelsDownloaded,
+    backendLoading,
+    forceApiGenerations,
+    setupState,
+    status.connected,
+    waitingForRuntimePolicy,
+  ])
 
   const restartingOverlay = isBackendRestarting ? (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -208,7 +269,14 @@ function AppContent() {
     )
   }
 
-  if (backendLoading || setupState === 'loading' || waitingForRuntimePolicy) {
+  const waitingForRequiredModels =
+    requiredModelsGate === 'checking' &&
+    status.connected &&
+    setupState !== 'loading' &&
+    !waitingForRuntimePolicy &&
+    !forceApiGenerations
+
+  if (backendLoading || setupState === 'loading' || waitingForRuntimePolicy || waitingForRequiredModels) {
     return (
       <div className="relative h-screen w-screen">
         <div className="h-screen bg-background flex items-center justify-center">
@@ -239,7 +307,7 @@ function AppContent() {
   if (setupState.needsLicense) {
     const licenseOnly = forceApiGenerations || !setupState.needsSetup
     return (
-      <FirstRunSetup
+      <LaunchGate
         showLicenseStep
         licenseOnly={licenseOnly}
         onAcceptLicense={handleAcceptLicense}
@@ -258,7 +326,11 @@ function AppContent() {
   }
 
   if (setupState.needsSetup && !forceApiGenerations) {
-    return <FirstRunSetup showLicenseStep={false} onComplete={handleFirstRunComplete} />
+    return <LaunchGate showLicenseStep={false} onComplete={handleFirstRunComplete} />
+  }
+
+  if (requiredModelsGate === 'missing') {
+    return <LaunchGate showLicenseStep={false} onComplete={handleMissingModelsComplete} />
   }
 
   const showGlobalControls = currentView !== 'home' && status.connected && !setupState.needsSetup

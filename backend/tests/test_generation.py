@@ -713,7 +713,7 @@ class TestGenerationProgress:
 
 class TestGenerateImage:
     def test_happy_path(self, client, create_fake_model_files):
-        create_fake_model_files(include_flux=True)
+        create_fake_model_files(include_zit=True)
         r = client.post(
             "/api/generate-image",
             json={"prompt": "A cat", "width": 1024, "height": 1024, "numSteps": 4},
@@ -726,7 +726,7 @@ class TestGenerateImage:
         assert Path(data["image_paths"][0]).exists()
 
     def test_dimension_clamping(self, client, fake_services, create_fake_model_files):
-        create_fake_model_files(include_flux=True)
+        create_fake_model_files(include_zit=True)
         r = client.post(
             "/api/generate-image",
             json={"prompt": "test", "width": 1023, "height": 1023},
@@ -738,7 +738,7 @@ class TestGenerateImage:
         assert call["height"] == 1008
 
     def test_num_images_clamped(self, client, fake_services, create_fake_model_files):
-        create_fake_model_files(include_flux=True)
+        create_fake_model_files(include_zit=True)
         r = client.post(
             "/api/generate-image",
             json={"prompt": "test", "numImages": 20},
@@ -748,14 +748,14 @@ class TestGenerateImage:
         assert len(fake_services.image_generation_pipeline.generate_calls) == 12
 
     def test_error(self, client, fake_services, create_fake_model_files):
-        create_fake_model_files(include_flux=True)
+        create_fake_model_files(include_zit=True)
         fake_services.image_generation_pipeline.raise_on_generate = RuntimeError("GPU OOM")
 
         r = client.post("/api/generate-image", json={"prompt": "test"})
         assert r.status_code == 500
 
     def test_cancelled(self, client, fake_services, create_fake_model_files):
-        create_fake_model_files(include_flux=True)
+        create_fake_model_files(include_zit=True)
         fake_services.image_generation_pipeline.raise_on_generate = RuntimeError("cancelled")
 
         r = client.post("/api/generate-image", json={"prompt": "test"})
@@ -860,7 +860,7 @@ class TestEmptyPromptRejected:
 
 class TestEditImage:
     def test_happy_path(self, client, make_test_image, create_fake_model_files, tmp_path):
-        create_fake_model_files(include_flux=True)
+        create_fake_model_files(include_zit=True)
         image_path = tmp_path / "test.png"
         image_path.write_bytes(make_test_image(100, 100).getvalue())
 
@@ -883,7 +883,7 @@ class TestEditImage:
         assert r.status_code == 422
 
     def test_multiple_reference_images(self, client, fake_services, make_test_image, create_fake_model_files, tmp_path):
-        create_fake_model_files(include_flux=True)
+        create_fake_model_files(include_zit=True)
         image_paths: list[str] = []
         for idx in range(3):
             p = tmp_path / f"img{idx + 1}.png"

@@ -48,7 +48,7 @@ def test_downloading_path_is_derived_from_specs(tmp_path):
     config = _build_config(tmp_path)
 
     assert config.downloading_path("checkpoint") == config.downloading_dir
-    assert config.downloading_path("flux") == config.downloading_dir / "FLUX.2-klein-4B"
+    assert config.downloading_path("zit") == config.downloading_dir / "Z-Image-Turbo"
     assert config.downloading_path("text_encoder") == config.downloading_dir
 
 
