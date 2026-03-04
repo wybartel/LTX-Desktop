@@ -50,7 +50,7 @@ In API-only mode, available resolutions/durations may be limited to what the API
 
 LTX Desktop stores app data (settings, models, logs) in:
 
-- **Windows:** `%LOCALAPPDATA%\\LTXDesktop\\`
+- **Windows:** `%LOCALAPPDATA%\LTXDesktop\`
 - **macOS:** `~/Library/Application Support/LTXDesktop/`
 
 Model weights are downloaded into the `models/` subfolder (this can be large and may take time).
