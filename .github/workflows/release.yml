@@ -65,9 +65,10 @@ jobs:
       github.repository == 'Lightricks/ltx-desktop' &&
       always() && (needs.release-gate.result == 'success' || needs.release-gate.result == 'skipped')
     runs-on: ${{ matrix.runner }}
+    environment: azure
     permissions:
       contents: write
-      id-token: write  # Required for GCP Workload Identity Federation
+      id-token: write  # Required for GCP + Azure OIDC
     strategy:
       fail-fast: false
       matrix:
@@ -177,6 +178,17 @@ jobs:
           # Clean up API key
           [ -n "${APPLE_API_KEY:-}" ] && rm -f "$APPLE_API_KEY" || true
 
+      # Azure OIDC login for Windows code signing via Azure Trusted Signing.
+      # electron-builder's Invoke-TrustedSigning uses DefaultAzureCredential,
+      # which picks up AzureCliCredential from this session.
+      - name: Azure login for code signing (Windows)
+        if: matrix.os == 'windows'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Create installer (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
@@ -186,10 +198,13 @@ jobs:
           } else {
             scripts/create-installer.ps1 -Publish never
           }
-        # env:
-          # Uncomment when code signing certificates are configured:
-          # CSC_LINK: ${{ secrets.WIN_CERTIFICATE }}
-          # CSC_KEY_PASSWORD: ${{ secrets.WIN_CERTIFICATE_PASSWORD }}
+        env:
+          # Required by electron-builder's azure signing validation.
+          # Actual auth is via AzureCliCredential (OIDC login above);
+          # AZURE_CLIENT_SECRET is a dummy to pass the env var check.
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: "unused-oidc-via-cli"
 
       # Create, split, and upload python-embed archive (Windows only)
       # GitHub Releases has a 2 GB per-asset limit; the archive exceeds that.
