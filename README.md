@@ -78,6 +78,12 @@ Create an API key in the [LTX Console](https://console.ltx.video/api-keys/). API
 
 When you use API-backed features, prompts and media inputs are sent to the API service. Your API key is stored locally in your app data folder — treat it like a secret.
 
+### fal API key (optional)
+
+Used for Z Image Turbo text-to-image generation in API mode. When enabled, image generation requests are sent to fal.ai.
+
+Create an API key in the [fal dashboard](https://fal.ai/dashboard/keys).
+
 ### Gemini API key (optional)
 
 Used for AI prompt suggestions. When enabled, prompt context and frames may be sent to Google Gemini.
