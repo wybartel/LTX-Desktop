@@ -108,7 +108,7 @@ class VideoGenerationHandler(StateHandlerBase):
         RESOLUTION_MAP: dict[str, tuple[int, int]] = {
             "540p": (960, 544),
             "720p": (1280, 704),
-            "1080p": (960, 544),
+            "1080p": (1920, 1088),
         }
         width, height = RESOLUTION_MAP.get(resolution, (960, 544))
 
@@ -253,7 +253,7 @@ class VideoGenerationHandler(StateHandlerBase):
         RESOLUTION_MAP: dict[str, tuple[int, int]] = {
             "540p": (960, 576),
             "720p": (1280, 704),
-            "1080p": (960, 576),
+            "1080p": (1920, 1088),
         }
         width, height = RESOLUTION_MAP.get(req.resolution, (960, 576))
 
