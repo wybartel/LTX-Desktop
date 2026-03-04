@@ -87,13 +87,13 @@ function AssetCard({
         <video 
           ref={videoRef}
           src={asset.url} 
-          className="w-full aspect-video object-cover" 
+          className="w-full aspect-video object-contain"
           muted={isMuted}
           loop
           onTimeUpdate={handleTimeUpdate}
         />
       ) : (
-        <img src={asset.url} alt="" className="w-full aspect-video object-cover" />
+        <img src={asset.url} alt="" className="w-full aspect-video object-contain" />
       )}
       
       {/* Favorite heart - always visible when favorited */}
@@ -1228,7 +1228,7 @@ export function GenSpace() {
                 src={selectedAsset.url}
                 controls
                 autoPlay
-                className="w-full rounded-xl"
+                className="w-full rounded-xl object-contain max-h-[75vh]"
               />
             ) : (
               <img
