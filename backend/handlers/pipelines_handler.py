@@ -88,17 +88,17 @@ class PipelinesHandler(StateHandlerBase):
                 return False
 
     def _assert_invariants(self) -> None:
-        gpu_is_flux = False
+        gpu_is_zit = False
         match self.state.gpu_slot:
             case GpuSlot(active_pipeline=VideoPipelineState() | ICLoraState() | A2VPipelineState()):
-                gpu_is_flux = False
+                gpu_is_zit = False
             case GpuSlot():
-                gpu_is_flux = True
+                gpu_is_zit = True
             case _:
-                gpu_is_flux = False
+                gpu_is_zit = False
 
-        if gpu_is_flux and self.state.cpu_slot is not None:
-            raise RuntimeError("Invariant violation: Flux cannot be in both GPU and CPU slots")
+        if gpu_is_zit and self.state.cpu_slot is not None:
+            raise RuntimeError("Invariant violation: ZIT cannot be in both GPU and CPU slots")
 
     def _install_text_patches_if_needed(self) -> None:
         te = self.state.text_encoder
@@ -174,8 +174,8 @@ class PipelinesHandler(StateHandlerBase):
             self._assert_invariants()
         self._gpu_cleaner.cleanup()
 
-    def park_flux_on_cpu(self) -> None:
-        flux: ImageGenerationPipeline | None = None
+    def park_zit_on_cpu(self) -> None:
+        zit: ImageGenerationPipeline | None = None
 
         with self._lock:
             if self.state.gpu_slot is None:
@@ -187,20 +187,20 @@ class PipelinesHandler(StateHandlerBase):
 
             generation = self.state.gpu_slot.generation
             if isinstance(generation, GenerationRunning):
-                raise RuntimeError("Cannot park Flux while generation is running")
+                raise RuntimeError("Cannot park ZIT while generation is running")
 
-            flux = active
+            zit = active
             self.state.gpu_slot = None
 
-        assert flux is not None
-        flux.to("cpu")
+        assert zit is not None
+        zit.to("cpu")
         self._gpu_cleaner.cleanup()
 
         with self._lock:
-            self.state.cpu_slot = CpuSlot(active_pipeline=flux)
+            self.state.cpu_slot = CpuSlot(active_pipeline=zit)
             self._assert_invariants()
 
-    def load_flux_to_gpu(self) -> ImageGenerationPipeline:
+    def load_zit_to_gpu(self) -> ImageGenerationPipeline:
         with self._lock:
             if self.state.gpu_slot is not None:
                 active = self.state.gpu_slot.active_pipeline
@@ -208,33 +208,33 @@ class PipelinesHandler(StateHandlerBase):
                     return active
                 self._ensure_no_running_generation()
 
-        flux_service: ImageGenerationPipeline | None = None
+        zit_service: ImageGenerationPipeline | None = None
 
         with self._lock:
             match self.state.cpu_slot:
                 case CpuSlot(active_pipeline=stored):
-                    flux_service = stored
+                    zit_service = stored
                     self.state.cpu_slot = None
                 case _:
-                    flux_service = None
+                    zit_service = None
 
-        if flux_service is None:
-            flux_path = self._config.model_path("flux")
-            if not (flux_path.exists() and any(flux_path.iterdir())):
-                raise RuntimeError("Flux model not downloaded. Please download the AI models first using the Model Status menu.")
-            flux_service = self._image_generation_pipeline_class.create(str(flux_path), self._runtime_device)
+        if zit_service is None:
+            zit_path = self._config.model_path("zit")
+            if not (zit_path.exists() and any(zit_path.iterdir())):
+                raise RuntimeError("Z-Image-Turbo model not downloaded. Please download the AI models first using the Model Status menu.")
+            zit_service = self._image_generation_pipeline_class.create(str(zit_path), self._runtime_device)
         else:
-            flux_service.to(self._runtime_device)
+            zit_service.to(self._runtime_device)
 
         self._gpu_cleaner.cleanup()
 
         with self._lock:
-            self.state.gpu_slot = GpuSlot(active_pipeline=flux_service, generation=None)
+            self.state.gpu_slot = GpuSlot(active_pipeline=zit_service, generation=None)
             self._assert_invariants()
 
-        return flux_service
+        return zit_service
 
-    def preload_flux_to_cpu(self) -> ImageGenerationPipeline:
+    def preload_zit_to_cpu(self) -> ImageGenerationPipeline:
         with self._lock:
             match self.state.cpu_slot:
                 case CpuSlot(active_pipeline=existing):
@@ -242,20 +242,20 @@ class PipelinesHandler(StateHandlerBase):
                 case _:
                     pass
 
-        flux_path = self._config.model_path("flux")
-        if not (flux_path.exists() and any(flux_path.iterdir())):
-            raise RuntimeError("Flux model not downloaded. Please download the AI models first using the Model Status menu.")
+        zit_path = self._config.model_path("zit")
+        if not (zit_path.exists() and any(zit_path.iterdir())):
+            raise RuntimeError("Z-Image-Turbo model not downloaded. Please download the AI models first using the Model Status menu.")
 
-        flux_service = self._image_generation_pipeline_class.create(str(flux_path), None)
+        zit_service = self._image_generation_pipeline_class.create(str(zit_path), None)
         with self._lock:
             if self.state.cpu_slot is None:
-                self.state.cpu_slot = CpuSlot(active_pipeline=flux_service)
+                self.state.cpu_slot = CpuSlot(active_pipeline=zit_service)
                 self._assert_invariants()
-                return flux_service
+                return zit_service
             return self.state.cpu_slot.active_pipeline
 
     def _evict_gpu_pipeline_for_swap(self) -> None:
-        should_park_flux = False
+        should_park_zit = False
         should_cleanup = False
 
         with self._lock:
@@ -269,10 +269,10 @@ class PipelinesHandler(StateHandlerBase):
                 self._assert_invariants()
                 should_cleanup = True
             else:
-                should_park_flux = True
+                should_park_zit = True
 
-        if should_park_flux:
-            self.park_flux_on_cpu()
+        if should_park_zit:
+            self.park_zit_on_cpu()
         elif should_cleanup:
             self._gpu_cleaner.cleanup()
 

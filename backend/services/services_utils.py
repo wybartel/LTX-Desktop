@@ -124,5 +124,5 @@ class VideoWriterLike(Protocol):
         ...
 
 
-class FluxPipelineOutputLike(Protocol):
+class ImagePipelineOutputLike(Protocol):
     images: Sequence[PILImageType]

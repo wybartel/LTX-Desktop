@@ -320,7 +320,7 @@ export function useGeneration(): UseGenerationReturn {
               ...prev,
               progress: data.progress,
               statusMessage: data.phase === 'loading_model' 
-                ? 'Loading Flux model...' 
+                ? 'Loading Z-Image Turbo model...' 
                 : data.phase === 'inference'
                   ? numImages > 1 
                     ? `Generating image ${currentImage + 1}/${totalImages}...`
@@ -449,7 +449,7 @@ export function useGeneration(): UseGenerationReturn {
               ...prev,
               progress: data.progress,
               statusMessage: data.phase === 'loading_model'
-                ? 'Loading Flux model...'
+                ? 'Loading Z-Image Turbo model...'
                 : data.phase === 'inference'
                   ? 'Editing image...'
                   : data.phase === 'complete'

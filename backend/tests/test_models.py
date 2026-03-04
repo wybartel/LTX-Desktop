@@ -31,12 +31,12 @@ class TestModelsStatus:
         assert r.json()["all_downloaded"] is False
 
     def test_all_downloaded(self, client, create_fake_model_files):
-        create_fake_model_files(include_flux=True)
+        create_fake_model_files(include_zit=True)
         r = client.get("/api/models/status")
         assert r.json()["all_downloaded"] is True
 
     def test_with_api_key(self, client, create_fake_model_files, test_state):
-        create_fake_model_files(include_flux=True)
+        create_fake_model_files(include_zit=True)
         test_state.state.app_settings.ltx_api_key = "test-key"
 
         r = client.get("/api/models/status")

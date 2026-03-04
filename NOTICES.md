@@ -17,10 +17,10 @@ used by LTX Desktop.
   License: Gemma Terms of Use
   https://ai.google.dev/gemma/terms
 
-- **FLUX.2-klein-4B**
-  Copyright (c) Black Forest Labs.
+- **Z-Image-Turbo**
+  Copyright (c) Alibaba Tongyi Lab.
   License: Apache License 2.0
-  https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/blob/main/LICENSE.md
+  https://huggingface.co/Tongyi-MAI/Z-Image-Turbo
 
 ---
 

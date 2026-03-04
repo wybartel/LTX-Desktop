@@ -30,10 +30,10 @@ def test_cancel_marks_running_generation(test_state):
     assert out.id == "gen-1"
 
 
-def test_flux_slot_invariant_enforced(test_state, fake_services):
-    flux = fake_services.image_generation_pipeline
-    test_state.state.gpu_slot = GpuSlot(active_pipeline=flux, generation=None)
-    test_state.state.cpu_slot = CpuSlot(active_pipeline=flux)
+def test_zit_slot_invariant_enforced(test_state, fake_services):
+    zit = fake_services.image_generation_pipeline
+    test_state.state.gpu_slot = GpuSlot(active_pipeline=zit, generation=None)
+    test_state.state.cpu_slot = CpuSlot(active_pipeline=zit)
 
     with test_state._lock:  # noqa: SLF001 - explicit invariant check in tests
         with pytest.raises(RuntimeError, match="Invariant violation"):
@@ -138,8 +138,8 @@ def test_mps_skips_torch_compile(test_state, fake_services):
     assert pipeline_state.is_compiled is False
 
 
-def test_startup_warmup_keeps_fast_on_gpu_and_preloads_flux_on_cpu(test_state, fake_services, create_fake_model_files):
-    create_fake_model_files(include_flux=True)
+def test_startup_warmup_keeps_fast_on_gpu_and_preloads_zit_on_cpu(test_state, fake_services, create_fake_model_files):
+    create_fake_model_files(include_zit=True)
     test_state.state.app_settings.load_on_startup = True
 
     test_state.health.default_warmup()

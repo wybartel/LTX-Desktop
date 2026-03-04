@@ -97,7 +97,7 @@ class AppHandler:
                 "upsampler": None,
                 "distilled_lora": None,
                 "text_encoder": None,
-                "flux": None,
+                "zit": None,
             },
             downloading_session=None,
             gpu_slot=None,
@@ -255,7 +255,7 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
     from services.ic_lora_model_downloader.ic_lora_model_downloader_impl import IcLoraModelDownloaderImpl
     from services.a2v_pipeline.ltx_a2v_pipeline import LTXa2vPipeline
     from services.ic_lora_pipeline.ltx_ic_lora_pipeline import LTXIcLoraPipeline
-    from services.image_generation_pipeline.flux_image_generation_pipeline import FluxImageGenerationPipeline
+    from services.image_generation_pipeline.zit_image_generation_pipeline import ZitImageGenerationPipeline
     from services.ltx_api_client.ltx_api_client_impl import LTXAPIClientImpl
     from services.model_downloader.hugging_face_downloader import HuggingFaceDownloader
     from services.pro_native_video_pipeline.ltx_pro_native_video_pipeline import LTXProNativeVideoPipeline
@@ -284,7 +284,7 @@ def build_default_service_bundle(config: RuntimeConfig) -> ServiceBundle:
         fast_native_video_pipeline_class=LTXFastNativeVideoPipeline,
         pro_video_pipeline_class=LTXProVideoPipeline,
         pro_native_video_pipeline_class=LTXProNativeVideoPipeline,
-        image_generation_pipeline_class=FluxImageGenerationPipeline,
+        image_generation_pipeline_class=ZitImageGenerationPipeline,
         ic_lora_pipeline_class=LTXIcLoraPipeline,
         a2v_pipeline_class=LTXa2vPipeline,
         ic_lora_model_downloader=IcLoraModelDownloaderImpl(),

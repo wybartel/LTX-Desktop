@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from services.services_utils import FluxPipelineOutputLike, PILImageType
+from services.services_utils import ImagePipelineOutputLike, PILImageType
 
 
 class ImageGenerationPipeline(Protocol):
@@ -23,7 +23,7 @@ class ImageGenerationPipeline(Protocol):
         guidance_scale: float,
         num_inference_steps: int,
         seed: int,
-    ) -> FluxPipelineOutputLike:
+    ) -> ImagePipelineOutputLike:
         ...
 
     def generate_edit(
@@ -35,7 +35,7 @@ class ImageGenerationPipeline(Protocol):
         guidance_scale: float,
         num_inference_steps: int,
         seed: int,
-    ) -> FluxPipelineOutputLike:
+    ) -> ImagePipelineOutputLike:
         ...
 
     def to(self, device: str) -> None:

@@ -274,7 +274,7 @@ function LightricksIcon({ className }: { className?: string }) {
   )
 }
 
-function FluxIcon({ className }: { className?: string }) {
+function ZitIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M19.113 12.2515H16.5605L14.008 8.63382L6.04545 19.9068H8.60348L14.0079 12.2518L16.5605 12.2515L11.156 19.9068H13.721L19.113 12.2515V15.8693L16.2716 19.9073V22.0063H2L14.008 5L19.113 12.2515Z" fill="currentColor"/>
@@ -529,8 +529,8 @@ function PromptBar({
           <>
             {/* Model indicator */}
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-800/50">
-              <FluxIcon className="h-3.5 w-3.5" />
-              <span className="text-zinc-300 font-medium">FLUX Klein</span>
+              <ZitIcon className="h-3.5 w-3.5" />
+              <span className="text-zinc-300 font-medium">Z-Image Turbo</span>
             </div>
             
             {/* Resolution dropdown */}
