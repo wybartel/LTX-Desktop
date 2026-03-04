@@ -348,7 +348,6 @@ class PipelinesHandler(StateHandlerBase):
             str(self._config.model_path("checkpoint")),
             self._text_handler.resolve_gemma_root(),
             str(self._config.model_path("upsampler")),
-            str(self._config.model_path("distilled_lora")),
             self._device,
         )
         state = A2VPipelineState(pipeline=pipeline)

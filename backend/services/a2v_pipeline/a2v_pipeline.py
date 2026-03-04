@@ -16,7 +16,6 @@ class A2VPipeline(Protocol):
         checkpoint_path: str,
         gemma_root: str | None,
         upsampler_path: str,
-        distilled_lora_path: str,
         device: torch.device,
     ) -> "A2VPipeline": ...
 

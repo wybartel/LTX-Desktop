@@ -298,8 +298,7 @@ class VideoGenerationHandler(StateHandlerBase):
 
             output_path = self._make_output_path()
 
-            pro_steps = self.state.app_settings.pro_model.steps
-            total_steps = pro_steps
+            total_steps = 11  # distilled: 8 steps (stage 1) + 3 steps (stage 2)
 
             a2v_settings = self.state.app_settings
             a2v_use_api = bool(a2v_settings.ltx_api_key) and not a2v_settings.use_local_text_encoder
@@ -321,7 +320,7 @@ class VideoGenerationHandler(StateHandlerBase):
                 width=width,
                 num_frames=num_frames,
                 frame_rate=fps,
-                num_inference_steps=pro_steps,
+                num_inference_steps=total_steps,
                 images=images,
                 audio_path=audio_path_str,
                 audio_start_time=0.0,

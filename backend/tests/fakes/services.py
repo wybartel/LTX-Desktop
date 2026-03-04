@@ -759,10 +759,9 @@ class FakeA2VPipeline:
         checkpoint_path: str,
         gemma_root: str | None,
         upsampler_path: str,
-        distilled_lora_path: str,
         device: str | object,
     ) -> "FakeA2VPipeline":
-        del checkpoint_path, gemma_root, upsampler_path, distilled_lora_path, device
+        del checkpoint_path, gemma_root, upsampler_path, device
         pipeline = FakeA2VPipeline._singleton
         if pipeline is None:
             raise RuntimeError("FakeA2VPipeline singleton is not bound")
