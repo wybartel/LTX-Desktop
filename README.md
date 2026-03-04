@@ -2,7 +2,7 @@
 
 LTX Desktop is an open-source desktop app for generating videos with LTX models — locally on supported Windows NVIDIA GPUs, with an API mode for unsupported hardware and macOS.
 
-> **Status: Beta.** Expect breaking changes.  
+> **Status: Beta.** Expect breaking changes.
 > Frontend architecture is under active refactor; large UI PRs may be declined for now (see [`CONTRIBUTING.md`](docs/CONTRIBUTING.md)).
 
 ## Features
@@ -155,10 +155,15 @@ pnpm backend:test
 Building installers:
 - See [`INSTALLER.md`](docs/INSTALLER.md)
 
+## Telemetry
+
+LTX Desktop collects minimal, anonymous usage analytics (app version, platform, and a random installation ID) to help prioritize development. No personal information or generated content is collected. Analytics is enabled by default and can be disabled in **Settings > General > Anonymous Analytics**. See [`TELEMETRY.md`](docs/TELEMETRY.md) for details.
+
 ## Docs
 
 - [`INSTALLER.md`](docs/INSTALLER.md) — building installers
 - [`RELEASING.md`](docs/RELEASING.md) — release process
+- [`TELEMETRY.md`](docs/TELEMETRY.md) — telemetry and privacy
 - [`backend/architecture.md`](backend/architecture.md) — backend architecture
 
 ## Contributing
