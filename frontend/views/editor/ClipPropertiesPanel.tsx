@@ -45,7 +45,7 @@ interface ClipPropertiesPanelProps {
   setClips: React.Dispatch<React.SetStateAction<TimelineClip[]>>
   pushUndo: (currentClips?: TimelineClip[]) => void
   handleClipTakeChange: (clipId: string, direction: 'prev' | 'next') => void
-  handleRetakeSubmit?: (clipId: string, prompt: string, settings: any) => void
+  handleRetakeSubmit?: (params: { videoPath: string; startTime: number; duration: number; prompt: string; mode: string }) => void
   retakeClipId: string | null
   setRetakeClipId: (v: string | null) => void
   setSubtitleTrackStyleIdx: (v: number | null) => void

@@ -3874,7 +3874,7 @@ export function VideoEditor() {
             setClips={setClips}
             pushUndo={pushUndo}
             handleClipTakeChange={handleClipTakeChange}
-            handleRetakeSubmit={undefined}
+            handleRetakeSubmit={handleRetakeSubmit}
             retakeClipId={retakeClipId}
             setRetakeClipId={setRetakeClipId}
             setSubtitleTrackStyleIdx={setSubtitleTrackStyleIdx}
