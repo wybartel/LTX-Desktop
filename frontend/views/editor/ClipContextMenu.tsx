@@ -3,7 +3,7 @@ import {
   Clipboard, Copy, Scissors, Trash2, Layers, Type, X, RefreshCw,
   ZoomIn, Film, Eye, FolderOpen, RotateCcw, Volume2, VolumeX,
   FlipHorizontal2, FlipVertical2, Link2, Unlink2,
-  ChevronLeft, ChevronRight, Paintbrush, // IC-LORA HIDDEN: removed Sparkles
+  ChevronLeft, ChevronRight, // IC-LORA HIDDEN: removed Sparkles
   Video, Camera,
 } from 'lucide-react'
 import type { Asset, TimelineClip, Track, TextOverlayStyle } from '../../types/project'
@@ -53,7 +53,6 @@ export interface ClipContextMenuProps {
   setRetakeClipId: (v: string | null) => void
   setIcLoraSourceClipId: (v: string | null) => void
   setShowICLoraPanel: (v: boolean) => void
-  onCaptureFrameForEdit: (clip: TimelineClip) => void
   onCaptureFrameForVideo: (clip: TimelineClip) => void
   onCreateVideoFromAudio: (clip: TimelineClip) => void
 }
@@ -134,7 +133,6 @@ export function ClipContextMenu({
   setRetakeClipId,
   setIcLoraSourceClipId, // IC-LORA HIDDEN: still passed to SingleClipMenu
   setShowICLoraPanel, // IC-LORA HIDDEN: still passed to SingleClipMenu
-  onCaptureFrameForEdit,
   onCaptureFrameForVideo,
   onCreateVideoFromAudio,
 }: ClipContextMenuProps) {
@@ -252,7 +250,6 @@ export function ClipContextMenu({
           setRetakeClipId={setRetakeClipId}
           setIcLoraSourceClipId={setIcLoraSourceClipId}
           setShowICLoraPanel={setShowICLoraPanel}
-          onCaptureFrameForEdit={onCaptureFrameForEdit}
           onCaptureFrameForVideo={onCaptureFrameForVideo}
           onCreateVideoFromAudio={onCreateVideoFromAudio}
           close={close}
@@ -285,7 +282,7 @@ function SingleClipMenu({
   getLiveAsset, getMaxClipDuration,
   setAssetFilter, setSelectedBin, setTakesViewAssetId, setSelectedAssetIds,
   setI2vClipId, setI2vPrompt, setRetakeClipId,   setIcLoraSourceClipId: _setIcLoraSourceClipId, setShowICLoraPanel: _setShowICLoraPanel, // IC-LORA HIDDEN
-  onCaptureFrameForEdit, onCaptureFrameForVideo,
+  onCaptureFrameForVideo,
   onCreateVideoFromAudio,
   close,
 }: {
@@ -318,7 +315,6 @@ function SingleClipMenu({
   setRetakeClipId: (v: string | null) => void
   setIcLoraSourceClipId: (v: string | null) => void
   setShowICLoraPanel: (v: boolean) => void
-  onCaptureFrameForEdit: (clip: TimelineClip) => void
   onCaptureFrameForVideo: (clip: TimelineClip) => void
   onCreateVideoFromAudio: (clip: TimelineClip) => void
   close: () => void
@@ -553,8 +549,6 @@ function SingleClipMenu({
                 <ChevronRight className="h-3 w-3 text-zinc-500" />
               </button>
               <div className="absolute left-full top-0 ml-0.5 min-w-[200px] bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 z-[70] hidden group-hover/capture:block">
-                <MenuItem icon={Paintbrush} iconClass="text-emerald-400" label="Edit Image in Gen Space"
-                  onClick={() => { onCaptureFrameForEdit(contextClip); close() }} />
                 <MenuItem icon={Video} iconClass="text-blue-400" label="Generate Video in Gen Space"
                   onClick={() => { onCaptureFrameForVideo(contextClip); close() }} />
                 {isImage && (

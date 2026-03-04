@@ -24,7 +24,6 @@ interface GenerationProgress {
 interface UseGenerationReturn extends GenerationState {
   generate: (prompt: string, imagePath: string | null, settings: GenerationSettings, audioPath?: string | null) => Promise<void>
   generateImage: (prompt: string, settings: GenerationSettings) => Promise<void>
-  editImage: (prompt: string, imagePaths: string[], settings: GenerationSettings) => Promise<void>
   cancel: () => void
   reset: () => void
 }
@@ -449,159 +448,6 @@ export function useGeneration(): UseGenerationReturn {
     }
   }, [appSettings.hasFalApiKey, forceApiGenerations, refreshSettings])
 
-  const editImage = useCallback(async (
-    prompt: string,
-    imagePaths: string[],
-    settings: GenerationSettings
-  ) => {
-    if (imagePaths.length === 0) return
-
-    if (forceApiGenerations) {
-      try {
-        const backendUrl = await window.electronAPI.getBackendUrl()
-        const response = await fetch(`${backendUrl}/api/settings`)
-        if (response.ok) {
-          const payload = await response.json()
-          if (!payload?.hasFalApiKey) {
-            void refreshSettings()
-            window.dispatchEvent(new CustomEvent('open-api-gateway', {
-              detail: {
-                requiredKeys: ['fal'],
-                title: 'Connect FAL AI',
-                description: 'FAL AI is required for generating images with Z Image Turbo when API generations are enabled.',
-                blocking: false,
-              },
-            }))
-            return
-          }
-        }
-      } catch {
-        if (!appSettings.hasFalApiKey) {
-          window.dispatchEvent(new CustomEvent('open-api-gateway', {
-            detail: {
-              requiredKeys: ['fal'],
-              title: 'Connect FAL AI',
-              description: 'FAL AI is required for generating images with Z Image Turbo when API generations are enabled.',
-              blocking: false,
-            },
-          }))
-          return
-        }
-      }
-    }
-
-    setState({
-      isGenerating: true,
-      progress: 0,
-      statusMessage: 'Editing image...',
-      videoUrl: null,
-      videoPath: null,
-      imageUrl: null,
-      imageUrls: [],
-      error: null,
-    })
-
-    abortControllerRef.current = new AbortController()
-
-    try {
-      const backendUrl = await window.electronAPI.getBackendUrl()
-
-      const dims = getImageDimensions(settings)
-      const numSteps = settings.imageSteps || 4
-
-      // Poll for progress
-      const pollProgress = async () => {
-        try {
-          const res = await fetch(`${backendUrl}/api/generation/progress`)
-          if (res.ok) {
-            const data = await res.json()
-            setState(prev => ({
-              ...prev,
-              progress: data.progress,
-              statusMessage: data.phase === 'loading_model'
-                ? 'Loading Z-Image Turbo model...'
-                : data.phase === 'inference'
-                  ? 'Editing image...'
-                  : data.phase === 'complete'
-                    ? 'Complete!'
-                    : 'Processing...',
-            }))
-          }
-        } catch {
-          // Ignore polling errors
-        }
-      }
-
-      const progressInterval = setInterval(pollProgress, 500)
-
-      const response = await fetch(`${backendUrl}/api/edit-image`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, width: dims.width, height: dims.height, numSteps, imagePaths }),
-        signal: abortControllerRef.current.signal,
-      })
-
-      clearInterval(progressInterval)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || 'Image editing failed')
-      }
-
-      const result = await response.json()
-
-      if (result.status === 'complete') {
-        let rawPaths: string[] = []
-        if (result.image_paths && Array.isArray(result.image_paths)) {
-          rawPaths = result.image_paths
-        } else if (result.image_path) {
-          rawPaths = [result.image_path]
-        }
-
-        if (rawPaths.length > 0) {
-          const fileUrls = rawPaths.map((path: string) => {
-            const imagePath = path.replace(/\\/g, '/')
-            return imagePath.startsWith('/') ? `file://${imagePath}` : `file:///${imagePath}`
-          })
-
-          setState({
-            isGenerating: false,
-            progress: 100,
-            statusMessage: 'Complete!',
-            videoUrl: null,
-            videoPath: null,
-            imageUrl: fileUrls[0],
-            imageUrls: fileUrls,
-            error: null,
-          })
-        }
-      } else if (result.status === 'cancelled') {
-        setState(prev => ({
-          ...prev,
-          isGenerating: false,
-          statusMessage: 'Cancelled',
-        }))
-      } else if (result.error) {
-        throw new Error(result.error)
-      }
-
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        setState(prev => ({
-          ...prev,
-          isGenerating: false,
-          statusMessage: 'Cancelled',
-        }))
-      } else {
-        setState(prev => ({
-          ...prev,
-          isGenerating: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        }))
-      }
-    }
-  }, [appSettings.hasFalApiKey, forceApiGenerations, refreshSettings])
-
   const reset = useCallback(() => {
     setState({
       isGenerating: false,
@@ -619,7 +465,6 @@ export function useGeneration(): UseGenerationReturn {
     ...state,
     generate,
     generateImage,
-    editImage,
     cancel,
     reset,
   }

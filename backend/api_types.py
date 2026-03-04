@@ -266,14 +266,6 @@ class GenerateImageRequest(BaseModel):
     numImages: int = 1
 
 
-class EditImageRequest(BaseModel):
-    prompt: NonEmptyPrompt
-    width: int = 1024
-    height: int = 1024
-    numSteps: int = 4
-    imagePaths: list[str]
-
-
 class ModelDownloadRequest(BaseModel):
     skipTextEncoder: bool = False
 

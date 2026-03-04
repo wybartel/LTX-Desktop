@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 from typing import Any, cast
 
 from services.http_client.http_client import HTTPClient
@@ -10,12 +9,10 @@ from services.services_utils import JSONValue
 
 FAL_API_BASE_URL = "https://fal.run"
 FAL_TEXT_TO_IMAGE_ENDPOINT = "/fal-ai/z-image/turbo"
-FAL_IMAGE_TO_IMAGE_ENDPOINT = "/fal-ai/z-image/turbo/image-to-image"
 
 DEFAULT_OUTPUT_FORMAT = "png"
 DEFAULT_ACCELERATION = "regular"
 DEFAULT_ENABLE_SAFETY_CHECKER = True
-DEFAULT_STRENGTH = 0.6
 
 
 class ZitAPIClientImpl:
@@ -45,38 +42,6 @@ class ZitAPIClientImpl:
         }
         return self._submit_and_download(
             endpoint=FAL_TEXT_TO_IMAGE_ENDPOINT,
-            api_key=api_key,
-            payload=payload,
-        )
-
-    def generate_image_edit(
-        self,
-        *,
-        api_key: str,
-        prompt: str,
-        width: int,
-        height: int,
-        seed: int,
-        num_inference_steps: int,
-        input_images: list[bytes],
-    ) -> bytes:
-        if not input_images:
-            raise RuntimeError("FAL image edit requires at least one input image")
-
-        payload: dict[str, JSONValue] = {
-            "prompt": prompt,
-            "image_size": {"width": width, "height": height},
-            "num_inference_steps": num_inference_steps,
-            "seed": seed,
-            "num_images": 1,
-            "output_format": DEFAULT_OUTPUT_FORMAT,
-            "acceleration": DEFAULT_ACCELERATION,
-            "enable_safety_checker": DEFAULT_ENABLE_SAFETY_CHECKER,
-            "strength": DEFAULT_STRENGTH,
-            "image_url": self._to_data_uri(input_images[0]),
-        }
-        return self._submit_and_download(
-            endpoint=FAL_IMAGE_TO_IMAGE_ENDPOINT,
             api_key=api_key,
             payload=payload,
         )
@@ -140,8 +105,3 @@ class ZitAPIClientImpl:
         if isinstance(payload, dict):
             return cast(dict[str, Any], payload)
         raise RuntimeError(f"Unexpected FAL {context} response format")
-
-    @staticmethod
-    def _to_data_uri(image_bytes: bytes) -> str:
-        encoded = base64.b64encode(image_bytes).decode("ascii")
-        return f"data:image/png;base64,{encoded}"

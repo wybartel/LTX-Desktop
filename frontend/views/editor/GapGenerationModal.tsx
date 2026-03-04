@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react'
 import {
   X, Upload, Video, Image,
-  Loader2, Sparkles, ChevronDown, RefreshCw, Info
+  Loader2, Sparkles, RefreshCw, Info
 } from 'lucide-react'
 import { SettingsPanel } from '../../components/SettingsPanel'
 import type { GenerationSettings } from '../../components/SettingsPanel'
@@ -12,32 +12,6 @@ interface TimelineGap {
   startTime: number
   endTime: number
 }
-
-const SHOT_TYPES = [
-  { value: 'none', label: 'Default' },
-  { value: 'Extreme close-up', label: 'Extreme Close-up' },
-  { value: 'Close-up', label: 'Close-up' },
-  { value: 'Medium close-up', label: 'Medium Close-up' },
-  { value: 'Medium shot', label: 'Medium Shot' },
-  { value: 'Medium wide shot', label: 'Medium Wide' },
-  { value: 'Wide shot', label: 'Wide Shot' },
-  { value: 'Full shot', label: 'Full Shot' },
-  { value: 'Over the shoulder', label: 'Over the Shoulder' },
-  { value: 'POV shot', label: 'POV' },
-]
-
-const CAMERA_ANGLES = [
-  { value: 'none', label: 'Default' },
-  { value: 'eye level', label: 'Eye Level' },
-  { value: 'low angle', label: 'Low Angle' },
-  { value: 'high angle', label: 'High Angle' },
-  { value: 'from the side', label: 'From the Side' },
-  { value: 'from behind', label: 'From Behind' },
-  { value: 'three-quarter view', label: '3/4 View' },
-  { value: 'dutch angle', label: 'Dutch Angle' },
-  { value: 'bird\'s eye view', label: 'Bird\'s Eye' },
-  { value: 'worm\'s eye view', label: 'Worm\'s Eye' },
-]
 
 type GapGenerateMode = 'text-to-video' | 'image-to-video' | 'text-to-image'
 
@@ -65,38 +39,11 @@ interface GapGenerationModalProps {
   handleGapGenerate: () => void
   deleteGap: (gap: TimelineGap) => void
   setSelectedGap: (gap: TimelineGap | null) => void
-  gapShotType: string
-  setGapShotType: (v: string) => void
-  gapCameraAngle: string
-  setGapCameraAngle: (v: string) => void
   gapApplyAudioToTrack: boolean
   setGapApplyAudioToTrack: (v: boolean) => void
   regenerateSuggestion: () => void
   gapSuggestionError?: boolean
   gapSuggestionNoApiKey?: boolean
-}
-
-function Dropdown({ label, value, onChange, options }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  options: { value: string; label: string }[]
-}) {
-  return (
-    <div className="flex-1">
-      <label className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold mb-1 block">{label}</label>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-blue-500/50 cursor-pointer pr-7"
-        >
-          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-zinc-500 pointer-events-none" />
-      </div>
-    </div>
-  )
 }
 
 export function GapGenerationModal({
@@ -121,10 +68,6 @@ export function GapGenerationModal({
   handleGapGenerate,
   deleteGap,
   setSelectedGap,
-  gapShotType,
-  setGapShotType,
-  gapCameraAngle,
-  setGapCameraAngle,
   gapApplyAudioToTrack,
   setGapApplyAudioToTrack,
   regenerateSuggestion,
@@ -144,7 +87,7 @@ export function GapGenerationModal({
 
   const modalTitle = isVideoMode
     ? (gapImageFile ? 'Image to Video' : 'Generate Video')
-    : (gapImageFile ? 'Edit Image' : 'Generate Image')
+    : 'Generate Image'
 
   const settingsMode: GenerationMode = isVideoMode
     ? (gapImageFile ? 'image-to-video' : 'text-to-video')
@@ -232,7 +175,7 @@ export function GapGenerationModal({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-zinc-400 font-medium">
-                    {isVideoMode ? 'Generate from' : 'Reference image'}
+                    {isVideoMode ? 'Generate from' : 'Context frames'}
                   </span>
                   <div className="relative group/info">
                     <Info className="h-3 w-3 text-zinc-600 cursor-help" />
@@ -243,7 +186,7 @@ export function GapGenerationModal({
                           <p className="mt-1.5">If <strong className="text-white">End frame</strong> is selected, it will be treated as the start frame, since the model does not currently support generating from an end frame. The video will then be generated from that frame and played in reverse.</p>
                         </>
                       ) : (
-                        <p>Select a frame from an adjacent clip to use as a visual reference for the generated image.</p>
+                        <p>Select frames from adjacent clips to provide context for the prompt.</p>
                       )}
                     </div>
                   </div>
@@ -309,7 +252,7 @@ export function GapGenerationModal({
 
                 {/* Center gap area */}
                 <div className="flex-1 relative overflow-hidden">
-                  {gapImageFile && gapImageUrl ? (
+                  {isVideoMode && gapImageFile && gapImageUrl ? (
                     <div className="relative w-full h-full group/center">
                       <img src={gapImageUrl} alt="" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 ring-2 ring-inset ring-blue-500/50 pointer-events-none" />
@@ -321,7 +264,7 @@ export function GapGenerationModal({
                       </button>
                       <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent py-1 px-2 flex items-center justify-center">
                         <span className="text-[8px] text-blue-200/90 font-medium">
-                          {isVideoMode ? 'Source frame' : 'Edit reference'}
+                          Source frame
                         </span>
                       </div>
                     </div>
@@ -414,7 +357,7 @@ export function GapGenerationModal({
                     placeholder={gapSuggesting
                       ? 'Analyzing surrounding shots for context...'
                       : isImageMode
-                      ? (gapImageFile ? 'Describe the edits to apply...' : 'Describe the image to generate...')
+                      ? 'Describe the image to generate...'
                       : (gapImageFile ? 'Describe the video to generate from the image...' : 'Describe the video shot to generate...')}
                     className={`w-full bg-zinc-800 border rounded-xl p-3 text-sm text-white resize-none focus:outline-none focus:ring-1 placeholder-zinc-600 ${
                       gapSuggesting
@@ -453,17 +396,6 @@ export function GapGenerationModal({
                   <p className="text-[10px] text-zinc-500 mt-1.5">Could not suggest a prompt. Type your own or try again.</p>
                 )}
               </div>
-
-              {/* Shot type & camera angle — only for image editing (T2I with input image) */}
-              {isImageMode && gapImageFile && (
-                <div>
-                  <label className="text-xs text-zinc-500 uppercase font-semibold mb-2 block">Shot Framing</label>
-                  <div className="flex gap-3">
-                    <Dropdown label="SHOT TYPE" value={gapShotType} onChange={setGapShotType} options={SHOT_TYPES} />
-                    <Dropdown label="CAMERA ANGLE" value={gapCameraAngle} onChange={setGapCameraAngle} options={CAMERA_ANGLES} />
-                  </div>
-                </div>
-              )}
 
               {/* Settings */}
               <div className="[&_select]:h-8 [&_select]:text-xs [&_select]:py-1 [&_label]:text-[10px] [&_label]:mb-1">

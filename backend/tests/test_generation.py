@@ -799,24 +799,6 @@ class TestForcedApiGenerateImage:
         assert r.status_code == 200
         assert r.json()["status"] == "cancelled"
 
-    def test_edit_image_routes_to_zit_api(self, client, test_state, fake_services, make_test_image, tmp_path):
-        test_state.config.force_api_generations = True
-        test_state.state.app_settings.fal_api_key = "fal-key"
-        image_path = tmp_path / "img1.png"
-        image_path.write_bytes(make_test_image(100, 100).getvalue())
-
-        r = client.post(
-            "/api/edit-image",
-            json={"prompt": "Make it blue", "width": 1024, "height": 1024, "imagePaths": [str(image_path)]},
-        )
-
-        assert r.status_code == 200
-        data = r.json()
-        assert data["status"] == "complete"
-        assert len(data["image_paths"]) == 1
-        assert len(fake_services.zit_api_client.image_edit_calls) == 1
-        assert len(fake_services.image_generation_pipeline.generate_edit_calls) == 0
-
 
 class TestEmptyPromptRejected:
     def test_empty_prompt_rejected(self, client):
@@ -842,49 +824,6 @@ class TestEmptyPromptRejected:
     def test_missing_image_prompt_rejected(self, client):
         r = client.post("/api/generate-image", json={})
         assert r.status_code == 422
-
-
-class TestEditImage:
-    def test_happy_path(self, client, make_test_image, create_fake_model_files, tmp_path):
-        create_fake_model_files(include_zit=True)
-        image_path = tmp_path / "test.png"
-        image_path.write_bytes(make_test_image(100, 100).getvalue())
-
-        r = client.post(
-            "/api/edit-image",
-            json={"prompt": "Make it blue", "width": 1024, "height": 1024, "imagePaths": [str(image_path)]},
-        )
-        assert r.status_code == 200
-
-        data = r.json()
-        assert data["status"] == "complete"
-        assert len(data["image_paths"]) == 1
-        assert Path(data["image_paths"][0]).exists()
-
-    def test_no_image(self, client):
-        r = client.post(
-            "/api/edit-image",
-            json={"prompt": "Make it blue", "width": 1024, "height": 1024},
-        )
-        assert r.status_code == 422
-
-    def test_multiple_reference_images(self, client, fake_services, make_test_image, create_fake_model_files, tmp_path):
-        create_fake_model_files(include_zit=True)
-        image_paths: list[str] = []
-        for idx in range(3):
-            p = tmp_path / f"img{idx + 1}.png"
-            p.write_bytes(make_test_image(100, 100).getvalue())
-            image_paths.append(str(p))
-
-        r = client.post(
-            "/api/edit-image",
-            json={"prompt": "Combine styles", "width": 1024, "height": 1024, "imagePaths": image_paths},
-        )
-        assert r.status_code == 200
-
-        call = fake_services.image_generation_pipeline.generate_edit_calls[0]
-        assert isinstance(call["image"], list)
-        assert len(call["image"]) == 3
 
 
 class TestEnhancePromptFlag:

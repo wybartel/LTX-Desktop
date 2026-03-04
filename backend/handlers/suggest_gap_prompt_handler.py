@@ -83,36 +83,23 @@ class SuggestGapPromptHandler(StateHandlerBase):
             raise HTTPError(400, "GEMINI_API_KEY_MISSING")
 
         is_image_gen = mode in ("text-to-image", "t2i")
-        is_image_edit = is_image_gen and bool(input_image)
+        is_image_to_video = mode in ("image-to-video", "i2v")
+        if not is_image_to_video:
+            input_image = None
 
-        if is_image_edit:
-            system_text = (
-                "You are a video production assistant. The user is editing a video timeline and has a gap "
-                f"of {gap_duration:.1f} seconds between two shots. The user has provided an INPUT IMAGE that they want to "
-                "edit/modify to fit into this gap. Your job is to suggest a prompt describing how to EDIT the input image "
-                "so it fits naturally between the surrounding shots.\n\n"
-                "Guidelines:\n"
-                "- Describe what changes should be made to the input image\n"
-                "- The edits should make the image blend seamlessly with the surrounding shots\n"
-                "- Match the visual style, lighting, color palette, and mood of the neighboring shots\n"
-                "- Keep the prompt concise (1-3 sentences max)\n"
-                "- Write only the edit instruction prompt, no explanations or labels\n"
-                "- Focus on what to CHANGE, not what the image already contains\n"
-            )
-        else:
-            system_text = (
-                "You are a video production assistant. The user is editing a video timeline and has a gap "
-                f"of {gap_duration:.1f} seconds between two shots. Your job is to suggest a detailed prompt "
-                f"for generating {'an image' if is_image_gen else 'a video clip'} to fill this gap, so that it flows naturally between the "
-                "preceding and following shots.\n\n"
-                "Guidelines:\n"
-                f"- Describe the scene, {'composition' if is_image_gen else 'action, camera movement'}, lighting, and mood\n"
-                "- Match the visual style and tone of the surrounding shots\n"
-                "- Create a smooth narrative or visual transition between the two shots\n"
-                "- Keep the prompt concise (2-4 sentences max)\n"
-                "- Write only the prompt text, no explanations or labels\n"
-                "- If only one neighboring shot is available, suggest something that naturally leads into or out of it\n"
-            )
+        system_text = (
+            "You are a video production assistant. The user is editing a video timeline and has a gap "
+            f"of {gap_duration:.1f} seconds between two shots. Your job is to suggest a detailed prompt "
+            f"for generating {'an image' if is_image_gen else 'a video clip'} to fill this gap, so that it flows naturally between the "
+            "preceding and following shots.\n\n"
+            "Guidelines:\n"
+            f"- Describe the scene, {'composition' if is_image_gen else 'action, camera movement'}, lighting, and mood\n"
+            "- Match the visual style and tone of the surrounding shots\n"
+            "- Create a smooth narrative or visual transition between the two shots\n"
+            "- Keep the prompt concise (2-4 sentences max)\n"
+            "- Write only the prompt text, no explanations or labels\n"
+            "- If only one neighboring shot is available, suggest something that naturally leads into or out of it\n"
+        )
 
         context_text = "Here is the context from the timeline:\n\n"
         if before_frame or before_prompt:
@@ -130,18 +117,16 @@ class SuggestGapPromptHandler(StateHandlerBase):
                 context_text += "  First frame (see image below):\n"
 
         context_text += f"\nGap duration: {gap_duration:.1f} seconds\n"
-        if is_image_edit:
-            context_text += "Mode: Image editing — the user wants to EDIT the provided input image to fit this gap.\n"
-            context_text += "\nPlease suggest an edit prompt describing how to modify the input image so it fits naturally between the surrounding shots."
-        else:
-            mode_label = "image generation" if is_image_gen else ("image-to-video" if mode in ("image-to-video", "i2v") else "text-to-video")
-            context_text += f"Generation mode: {mode_label}\n"
-            context_text += "\nPlease suggest a detailed prompt for generating " + ("an image" if is_image_gen else "a video clip") + " to fill this gap."
+        mode_label = "image generation" if is_image_gen else ("image-to-video" if is_image_to_video else "text-to-video")
+        context_text += f"Generation mode: {mode_label}\n"
+        if input_image:
+            context_text += "A reference image is provided to guide the start of the shot.\n"
+        context_text += "\nPlease suggest a detailed prompt for generating " + ("an image" if is_image_gen else "a video clip") + " to fill this gap."
 
         user_parts: list[JSONValue] = [{"text": context_text}]
 
         if input_image:
-            user_parts.append({"text": "INPUT IMAGE to edit (this is the image the user wants to modify to fit the gap):"})
+            user_parts.append({"text": "Reference image for the start of the generated shot:"})
             user_parts.append({"inlineData": {"mimeType": "image/jpeg", "data": input_image}})
         if before_frame:
             user_parts.append({"text": "Last frame of the shot BEFORE the gap:"})

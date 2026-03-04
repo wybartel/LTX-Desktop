@@ -17,16 +17,3 @@ class ZitAPIClient(Protocol):
         num_inference_steps: int,
     ) -> bytes:
         ...
-
-    def generate_image_edit(
-        self,
-        *,
-        api_key: str,
-        prompt: str,
-        width: int,
-        height: int,
-        seed: int,
-        num_inference_steps: int,
-        input_images: list[bytes],
-    ) -> bytes:
-        ...

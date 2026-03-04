@@ -230,11 +230,8 @@ class FakeZitAPIClient:
     def __init__(self) -> None:
         self.configured = True
         self.text_to_image_calls: list[dict[str, Any]] = []
-        self.image_edit_calls: list[dict[str, Any]] = []
         self.raise_on_text_to_image: Exception | None = None
-        self.raise_on_image_edit: Exception | None = None
         self.text_to_image_result = b"fake-zit-api-image"
-        self.image_edit_result = b"fake-zit-api-edit-image"
 
     def is_configured(self) -> bool:
         return self.configured
@@ -262,32 +259,6 @@ class FakeZitAPIClient:
         if self.raise_on_text_to_image is not None:
             raise self.raise_on_text_to_image
         return self.text_to_image_result
-
-    def generate_image_edit(
-        self,
-        *,
-        api_key: str,
-        prompt: str,
-        width: int,
-        height: int,
-        seed: int,
-        num_inference_steps: int,
-        input_images: list[bytes],
-    ) -> bytes:
-        self.image_edit_calls.append(
-            {
-                "api_key": api_key,
-                "prompt": prompt,
-                "width": width,
-                "height": height,
-                "seed": seed,
-                "num_inference_steps": num_inference_steps,
-                "input_images_count": len(input_images),
-            }
-        )
-        if self.raise_on_image_edit is not None:
-            raise self.raise_on_image_edit
-        return self.image_edit_result
 
 
 class FakeModelDownloader:
@@ -701,21 +672,13 @@ class FakeImageGenerationPipeline:
     def __init__(self) -> None:
         self.device: str | None = None
         self.generate_calls: list[dict[str, Any]] = []
-        self.generate_edit_calls: list[dict[str, Any]] = []
         self.raise_on_generate: Exception | None = None
-        self.raise_on_generate_edit: Exception | None = None
 
     def generate(self, **kwargs: Any) -> FakeZitOutput:
         self.generate_calls.append(kwargs)
         if self.raise_on_generate is not None:
             raise self.raise_on_generate
         return FakeZitOutput(color="blue")
-
-    def generate_edit(self, **kwargs: Any) -> FakeZitOutput:
-        self.generate_edit_calls.append(kwargs)
-        if self.raise_on_generate_edit is not None:
-            raise self.raise_on_generate_edit
-        return FakeZitOutput(color="green")
 
     def to(self, device: str) -> None:
         self.device = device

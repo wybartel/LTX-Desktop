@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 import torch
-from diffusers import ZImageImg2ImgPipeline, ZImagePipeline
+from diffusers import ZImagePipeline
 from PIL.Image import Image as PILImage
 
 from services.services_utils import ImagePipelineOutputLike, PILImageType, get_device_type
@@ -32,17 +32,8 @@ class ZitImageGenerationPipeline:
             model_path,
             torch_dtype=torch.bfloat16,
         )
-        self._edit_pipeline: ZImageImg2ImgPipeline | None = None
         if device is not None:
             self.to(device)
-
-    def _ensure_edit_pipeline(self) -> ZImageImg2ImgPipeline:
-        if self._edit_pipeline is not None:
-            return self._edit_pipeline
-        self._edit_pipeline = ZImageImg2ImgPipeline.from_pipe(self.pipeline)  # type: ignore[reportUnknownMemberType]
-        if self._cpu_offload_active:
-            self._edit_pipeline.enable_model_cpu_offload()  # type: ignore[reportUnknownMemberType]
-        return self._edit_pipeline
 
     def _resolve_generator_device(self) -> str:
         if self._cpu_offload_active:
@@ -91,43 +82,12 @@ class ZitImageGenerationPipeline:
         )
         return self._normalize_output(output)
 
-    @torch.inference_mode()
-    def generate_edit(
-        self,
-        prompt: str,
-        image: PILImageType | list[PILImageType],
-        height: int,
-        width: int,
-        guidance_scale: float,
-        num_inference_steps: int,
-        seed: int,
-    ) -> ImagePipelineOutputLike:
-        del guidance_scale
-        edit_pipe = self._ensure_edit_pipeline()
-        generator = torch.Generator(device=self._resolve_generator_device()).manual_seed(seed)
-        output = edit_pipe(  # type: ignore[reportUnknownMemberType]
-            prompt=prompt,
-            image=image,
-            height=height,
-            width=width,
-            guidance_scale=0.0,
-            num_inference_steps=num_inference_steps,
-            generator=generator,
-            output_type="pil",
-            return_dict=True,
-        )
-        return self._normalize_output(output)
-
     def to(self, device: str) -> None:
         runtime_device = get_device_type(device)
         if runtime_device in ("cuda", "mps"):
             self.pipeline.enable_model_cpu_offload()  # type: ignore[reportUnknownMemberType]
             self._cpu_offload_active = True
-            if self._edit_pipeline is not None:
-                self._edit_pipeline.enable_model_cpu_offload()  # type: ignore[reportUnknownMemberType]
         else:
             self._cpu_offload_active = False
             self.pipeline.to(runtime_device)  # type: ignore[reportUnknownMemberType]
-            if self._edit_pipeline is not None:
-                self._edit_pipeline.to(runtime_device)  # type: ignore[reportUnknownMemberType]
         self._device = runtime_device

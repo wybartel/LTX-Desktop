@@ -92,7 +92,6 @@ export function VideoEditor() {
   const {
     generate: regenGenerate,
     generateImage: regenGenerateImage,
-    editImage: regenEditImage,
     isGenerating: isRegenerating,
     progress: regenProgress,
     statusMessage: regenStatusMessage,
@@ -990,7 +989,6 @@ export function VideoEditor() {
     gapPrompt, setGapPrompt, gapSettings, setGapSettings,
     gapImageFile, setGapImageFile, gapImageInputRef,
     gapSuggesting, gapSuggestion, gapSuggestionError, gapSuggestionNoApiKey, gapBeforeFrame, gapAfterFrame,
-    gapShotType, setGapShotType, gapCameraAngle, setGapCameraAngle,
     gapApplyAudioToTrack, setGapApplyAudioToTrack,
     regenerateSuggestion,
     generatingGap, regenProgress: gapRegenProgress,
@@ -999,7 +997,7 @@ export function VideoEditor() {
   } = useGapGeneration({
     clips, tracks, setClips, setTracks, setSubtitles, currentProjectId,
     addAsset, resolveClipSrc,
-    regenGenerate, regenGenerateImage, regenEditImage,
+    regenGenerate, regenGenerateImage,
     regenVideoUrl, regenVideoPath, regenImageUrl,
     isRegenerating, regenProgress, regenCancel, regenReset, regenError,
     assetSavePath: currentProject?.assetSavePath,
@@ -1491,15 +1489,6 @@ export function VideoEditor() {
       return null
     }
   }, [currentTime, resolveClipSrc])
-
-  // Capture a frame and send to Gen Space for image editing
-  const handleCaptureFrameForEdit = useCallback(async (clip: TimelineClip) => {
-    const dataUrl = await extractCurrentFrame(clip)
-    if (!dataUrl) return
-    setGenSpaceEditMode('image')
-    setGenSpaceEditImageUrl(dataUrl)
-    setCurrentTab('gen-space')
-  }, [extractCurrentFrame, setGenSpaceEditImageUrl, setGenSpaceEditMode, setCurrentTab])
 
   // Capture a frame and send to Gen Space for video generation (I2V)
   const handleCaptureFrameForVideo = useCallback(async (clip: TimelineClip) => {
@@ -4052,7 +4041,6 @@ export function VideoEditor() {
             setRetakeClipId={setRetakeClipId}
             setIcLoraSourceClipId={_setIcLoraSourceClipId}
             setShowICLoraPanel={_setShowICLoraPanel}
-            onCaptureFrameForEdit={handleCaptureFrameForEdit}
             onCaptureFrameForVideo={handleCaptureFrameForVideo}
             onCreateVideoFromAudio={handleCreateVideoFromAudio}
           />
@@ -4207,10 +4195,6 @@ export function VideoEditor() {
           handleGapGenerate={handleGapGenerate}
           deleteGap={deleteGap}
           setSelectedGap={setSelectedGap}
-          gapShotType={gapShotType}
-          setGapShotType={setGapShotType}
-          gapCameraAngle={gapCameraAngle}
-          setGapCameraAngle={setGapCameraAngle}
           gapApplyAudioToTrack={gapApplyAudioToTrack}
           setGapApplyAudioToTrack={setGapApplyAudioToTrack}
           regenerateSuggestion={regenerateSuggestion}

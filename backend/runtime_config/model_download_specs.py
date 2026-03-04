@@ -67,7 +67,7 @@ DEFAULT_MODEL_DOWNLOAD_SPECS: dict[ModelFileType, ModelFileDownloadSpec] = {
         expected_size_bytes=31_000_000_000,
         is_folder=True,
         repo_id="Tongyi-MAI/Z-Image-Turbo",
-        description="Z-Image-Turbo model for text-to-image and image editing",
+        description="Z-Image-Turbo model for text-to-image generation",
     ),
 }
 

@@ -3,7 +3,7 @@ import {
   Plus, Trash2, Download, Image, Video, X,
   Heart, Film, Volume2, VolumeX, Sparkles,
   Clock, Monitor, ChevronUp, Scissors, AudioLines, Music,
-  Paintbrush, ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useProjects } from '../contexts/ProjectContext'
 import { useAppSettings } from '../contexts/AppSettingsContext'
@@ -27,7 +27,6 @@ function AssetCard({
   onPlay,
   onDragStart,
   onCreateVideo,
-  onEditImage,
   onToggleFavorite
 }: { 
   asset: Asset
@@ -35,7 +34,6 @@ function AssetCard({
   onPlay: () => void
   onDragStart: (e: React.DragEvent, asset: Asset) => void
   onCreateVideo?: (asset: Asset) => void
-  onEditImage?: (asset: Asset) => void
   onToggleFavorite?: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -126,13 +124,6 @@ function AssetCard({
             
             {asset.type === 'image' && (
               <>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onEditImage?.(asset) }}
-                  className="px-2.5 py-1.5 rounded-lg bg-blue-500/70 backdrop-blur-md text-white hover:bg-blue-400/80 transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
-                >
-                  <Paintbrush className="h-3 w-3" />
-                  Edit
-                </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); onCreateVideo?.(asset) }}
                   className="px-2.5 py-1.5 rounded-lg bg-black/40 backdrop-blur-md text-white hover:bg-black/60 transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
@@ -419,37 +410,39 @@ function PromptBar({
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-visible">
       {/* Top row: Image ref | Prompt | Generate */}
       <div className="flex items-start">
-        {/* Input image drop zone */}
-        <div
-          className={`relative w-10 h-10 mx-2 mt-2 rounded-lg border-2 border-dashed transition-colors flex items-center justify-center flex-shrink-0 cursor-pointer ${
-            isDragOver ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700 hover:border-zinc-500'
-          }`}
-          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
-          onDragLeave={() => setIsDragOver(false)}
-          onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-        >
-          {inputImage ? (
-            <>
-              <img src={inputImage} alt="" className="w-full h-full object-cover rounded-md" />
-              <button
-                onClick={(e) => { e.stopPropagation(); onInputImageChange(null) }}
-                className="absolute -top-1 -right-1 p-0.5 rounded-full bg-zinc-800 text-zinc-400 hover:text-white z-10"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </>
-          ) : (
-            <Image className="h-4 w-4 text-zinc-500" />
-          )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-        </div>
+        {/* Input image drop zone — video mode only (I2V) */}
+        {mode === 'video' && (
+          <div
+            className={`relative w-10 h-10 mx-2 mt-2 rounded-lg border-2 border-dashed transition-colors flex items-center justify-center flex-shrink-0 cursor-pointer ${
+              isDragOver ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700 hover:border-zinc-500'
+            }`}
+            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current?.click()}
+          >
+            {inputImage ? (
+              <>
+                <img src={inputImage} alt="" className="w-full h-full object-cover rounded-md" />
+                <button
+                  onClick={(e) => { e.stopPropagation(); onInputImageChange(null) }}
+                  className="absolute -top-1 -right-1 p-0.5 rounded-full bg-zinc-800 text-zinc-400 hover:text-white z-10"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </>
+            ) : (
+              <Image className="h-4 w-4 text-zinc-500" />
+            )}
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </div>
+        )}
 
         {/* Audio drop zone — only in video mode */}
         {mode === 'video' && (
@@ -493,7 +486,7 @@ function PromptBar({
             onChange={(e) => onPromptChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={mode === 'image'
-              ? (inputImage ? "Change the background to a sunset beach..." : "A close-up of a woman talking on the phone...")
+              ? "A close-up of a woman talking on the phone..."
               : "The woman sips from a cup of coffee..."
             }
             className="w-full bg-transparent text-white text-sm placeholder:text-zinc-500 focus:outline-none px-2 py-2 resize-none overflow-y-auto h-[70px] leading-5"
@@ -750,7 +743,7 @@ const DEFAULT_VIDEO_SETTINGS = {
 }
 
 export function GenSpace() {
-  const { currentProject, currentProjectId, addAsset, deleteAsset, toggleFavorite, genSpaceEditImageUrl, setGenSpaceEditImageUrl, genSpaceEditMode, setGenSpaceEditMode, genSpaceAudioUrl, setGenSpaceAudioUrl } = useProjects()
+  const { currentProject, currentProjectId, addAsset, deleteAsset, toggleFavorite, genSpaceEditImageUrl, setGenSpaceEditImageUrl, setGenSpaceEditMode, genSpaceAudioUrl, setGenSpaceAudioUrl } = useProjects()
   const { forceApiGenerations } = useAppSettings()
   const [mode, setMode] = useState<'image' | 'video'>('video')
   const [prompt, setPrompt] = useState('')
@@ -775,7 +768,6 @@ export function GenSpace() {
   const {
     generate,
     generateImage,
-    editImage,
     isGenerating,
     progress,
     statusMessage,
@@ -789,14 +781,13 @@ export function GenSpace() {
   // Handle incoming frame from the Video Editor for editing
   useEffect(() => {
     if (genSpaceEditImageUrl) {
-      const targetMode = genSpaceEditMode || 'image'
-      setMode(targetMode)
+      setMode('video')
       setInputImage(genSpaceEditImageUrl)
       setPrompt('')
       setGenSpaceEditImageUrl(null)
       setGenSpaceEditMode(null)
     }
-  }, [genSpaceEditImageUrl, setGenSpaceEditImageUrl, genSpaceEditMode, setGenSpaceEditMode])
+  }, [genSpaceEditImageUrl, setGenSpaceEditImageUrl, setGenSpaceEditMode])
 
   // Handle incoming audio from the Video Editor for A2V
   useEffect(() => {
@@ -874,7 +865,7 @@ export function GenSpace() {
   // When image generation/editing completes, add all images to project assets
   useEffect(() => {
     if (imageUrls.length > 0 && currentProjectId && !isGenerating) {
-      const genMode = inputImage ? 'image-edit' : 'text-to-image'
+      const genMode = 'text-to-image'
       ;(async () => {
         for (const imageUrl of imageUrls) {
           const exists = assets.some(a => a.url === imageUrl)
@@ -887,7 +878,7 @@ export function GenSpace() {
               prompt: lastPrompt,
               resolution: settings.imageResolution,
               generationParams: {
-                mode: genMode as any,
+                mode: genMode,
                 prompt: lastPrompt,
                 model: 'fast',
                 duration: 5,
@@ -897,7 +888,6 @@ export function GenSpace() {
                 cameraMotion: 'none',
                 imageAspectRatio: settings.aspectRatio,
                 imageSteps: 4,
-                inputImageUrl: genMode === 'image-edit' ? inputImage || undefined : undefined,
               },
               takes: [{
                 url: finalUrl,
@@ -919,45 +909,21 @@ export function GenSpace() {
     setLastPrompt(prompt)
     
     if (mode === 'image') {
-      if (inputImage) {
-        // Image + input image → edit image mode (auto-detected)
-        // inputImage is always a file:// URL (frame capture via ffmpeg or image clip src)
-        const imagePath = fileUrlToPath(inputImage)
-        if (!imagePath) return
-
-        editImage(
-          prompt,
-          [imagePath],
-          {
-            model: 'fast' as 'fast' | 'pro',
-            duration: 5,
-            videoResolution: settings.videoResolution,
-            fps: 24,
-            audio: false,
-            cameraMotion: 'none',
-            imageResolution: settings.imageResolution,
-            imageAspectRatio: settings.aspectRatio,
-            imageSteps: 4,
-          }
-        )
-      } else {
-        // No input image → generate image(s)
-        generateImage(
-          prompt,
-          {
-            model: 'fast' as 'fast' | 'pro',
-            duration: 5,
-            videoResolution: settings.videoResolution,
-            fps: 24,
-            audio: false,
-            cameraMotion: 'none',
-            imageResolution: settings.imageResolution,
-            imageAspectRatio: settings.aspectRatio,
-            imageSteps: 4,
-            variations: settings.variations,
-          }
-        )
-      }
+      generateImage(
+        prompt,
+        {
+          model: 'fast' as 'fast' | 'pro',
+          duration: 5,
+          videoResolution: settings.videoResolution,
+          fps: 24,
+          audio: false,
+          cameraMotion: 'none',
+          imageResolution: settings.imageResolution,
+          imageAspectRatio: settings.aspectRatio,
+          imageSteps: 4,
+          variations: settings.variations,
+        }
+      )
     } else {
       // Generate video (t2v if no image/audio, i2v if image, a2v if audio)
       // Extract filesystem path from the file:// URL for the backend
@@ -1000,12 +966,6 @@ export function GenSpace() {
     setMode('video')
     setInputImage(imageAsset.url)
     setPrompt(`${imageAsset.prompt || 'The scene comes to life...'}`)
-  }
-  
-  const handleEditImage = (imageAsset: Asset) => {
-    setMode('image')
-    setInputImage(imageAsset.url)
-    setPrompt('')
   }
   
   // Close size menu on click outside
@@ -1173,7 +1133,6 @@ export function GenSpace() {
                   onPlay={() => setSelectedAsset(asset)}
                   onDragStart={handleDragStart}
                   onCreateVideo={handleCreateVideo}
-                  onEditImage={handleEditImage}
                   onToggleFavorite={() => currentProjectId && toggleFavorite(currentProjectId, asset.id)}
                 />
               ))}

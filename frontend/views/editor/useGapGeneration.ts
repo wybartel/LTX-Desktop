@@ -16,7 +16,6 @@ export interface UseGapGenerationParams {
   resolveClipSrc: (clip: TimelineClip | null) => string
   regenGenerate: (prompt: string, imagePath: string | null, settings: GenerationSettings) => Promise<void>
   regenGenerateImage: (prompt: string, settings: GenerationSettings) => Promise<void>
-  regenEditImage: (prompt: string, imagePaths: string[], settings: GenerationSettings) => Promise<void>
   regenVideoUrl: string | null
   regenVideoPath: string | null
   regenImageUrl: string | null
@@ -39,7 +38,6 @@ export function useGapGeneration({
   resolveClipSrc,
   regenGenerate,
   regenGenerateImage,
-  regenEditImage,
   regenVideoUrl,
   regenVideoPath,
   regenImageUrl,
@@ -53,8 +51,6 @@ export function useGapGeneration({
   // Gap selection and generation
   const [selectedGap, setSelectedGap] = useState<{ trackIndex: number; startTime: number; endTime: number } | null>(null)
   const [gapGenerateMode, setGapGenerateMode] = useState<'text-to-video' | 'image-to-video' | 'text-to-image' | null>(null)
-  const [gapShotType, setGapShotType] = useState<string>('none')
-  const [gapCameraAngle, setGapCameraAngle] = useState<string>('none')
   const gapGenerateModeRef = useRef(gapGenerateMode)
   gapGenerateModeRef.current = gapGenerateMode
   const [gapPrompt, setGapPrompt] = useState('')
@@ -72,6 +68,12 @@ export function useGapGeneration({
   const [gapImageFile, setGapImageFile] = useState<File | null>(null)
   const gapImageInputRef = useRef<HTMLInputElement>(null)
   const [gapApplyAudioToTrack, setGapApplyAudioToTrack] = useState(true)
+
+  useEffect(() => {
+    if (gapGenerateMode === 'text-to-image' && gapImageFile) {
+      setGapImageFile(null)
+    }
+  }, [gapGenerateMode, gapImageFile])
 
   // Tracks the gap currently being generated in the background (after modal closes)
   const [generatingGap, setGeneratingGap] = useState<{
@@ -149,16 +151,7 @@ export function useGapGeneration({
     const mode = gapGenerateMode
     const gapDuration = gap.endTime - gap.startTime
     
-    // Compose final prompt with shot type and camera angle modifiers
-    let finalPrompt = gapPrompt.trim()
-    if (mode === 'text-to-image' || mode === 'image-to-video' || mode === 'text-to-video') {
-      const modifiers: string[] = []
-      if (gapShotType !== 'none') modifiers.push(gapShotType)
-      if (gapCameraAngle !== 'none') modifiers.push(gapCameraAngle)
-      if (modifiers.length > 0) {
-        finalPrompt = `${modifiers.join(', ')} shot. ${finalPrompt}`
-      }
-    }
+    const finalPrompt = gapPrompt.trim()
     
     const settings: GenerationSettings = {
       ...gapSettings,
@@ -182,24 +175,7 @@ export function useGapGeneration({
     setGapGenerateMode(null)
     
     try {
-      if (mode === 'text-to-image' && gapImageFile) {
-        // Extract filesystem path from the File object
-        let imagePath: string
-        const electronPath = (gapImageFile as any).path as string | undefined
-        if (electronPath) {
-          imagePath = electronPath
-        } else {
-          // In-memory file (e.g. canvas capture) — save to temp file
-          const buf = await gapImageFile.arrayBuffer()
-          const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
-          const modelsPath = await window.electronAPI.getModelsPath()
-          const tmpDir = modelsPath.replace(/[/\\]models$/, '')
-          const tmpPath = `${tmpDir}/tmp_gap_edit_image_${Date.now()}.png`
-          await window.electronAPI.saveFile(tmpPath, b64, 'base64')
-          imagePath = tmpPath
-        }
-        await regenEditImage(finalPrompt, [imagePath], settings)
-      } else if (mode === 'text-to-image') {
+      if (mode === 'text-to-image') {
         await regenGenerateImage(finalPrompt, settings)
       } else {
         // Convert File to filesystem path for the JSON-based generate API
@@ -225,7 +201,7 @@ export function useGapGeneration({
       console.error('Gap generation failed:', err)
       setGeneratingGap(null)
     }
-  }, [selectedGap, gapGenerateMode, gapPrompt, gapShotType, gapCameraAngle, gapSettings, gapImageFile, gapApplyAudioToTrack, currentProjectId, regenGenerate, regenGenerateImage, regenEditImage])
+  }, [selectedGap, gapGenerateMode, gapPrompt, gapSettings, gapImageFile, gapApplyAudioToTrack, currentProjectId, regenGenerate, regenGenerateImage])
 
   // When generation completes, place the result in the gap
   useEffect(() => {
@@ -469,10 +445,10 @@ export function useGapGeneration({
         return
       }
       
-      // Extract file path from the user's input image if present (for edit-mode suggestions)
+      // Extract file path from the user's input image if present (for I2V suggestions)
       let inputImagePath = ''
       const imageFile = gapImageFileRef.current
-      if (imageFile && mode && mode.includes('image')) {
+      if (imageFile && mode === 'image-to-video') {
         const electronPath = (imageFile as any).path as string | undefined
         if (electronPath) {
           inputImagePath = electronPath
@@ -556,15 +532,15 @@ export function useGapGeneration({
     return () => { gapSuggestionAbortRef.current?.abort() }
   }, [selectedGap, gapGenerateMode, runSuggestion])
 
-  // Auto re-analyze when the user adds/removes an input image in T2I mode
+  // Auto re-analyze when the user adds/removes an input image in I2V mode
   const prevImageFileRef = useRef<File | null>(null)
   useEffect(() => {
     const prev = prevImageFileRef.current
     prevImageFileRef.current = gapImageFile
     
-    // Only trigger when the image actually changed (not on initial mount) and in image mode
+    // Only trigger when the image actually changed (not on initial mount) and in I2V mode
     if (prev === gapImageFile) return
-    if (!gapGenerateMode?.includes('image')) return
+    if (gapGenerateMode !== 'image-to-video') return
     if (!selectedGap) return
     
     // Re-run suggestion with force replace since context changed
@@ -603,10 +579,6 @@ export function useGapGeneration({
     gapSuggestionNoApiKey,
     gapBeforeFrame,
     gapAfterFrame,
-    gapShotType,
-    setGapShotType,
-    gapCameraAngle,
-    setGapCameraAngle,
     gapApplyAudioToTrack,
     setGapApplyAudioToTrack,
     regenerateSuggestion,
