@@ -332,7 +332,9 @@ function PromptBar({
   const videoDurationOptions = forceApiGenerations
     ? [...getAllowedForcedApiDurations(settings.model, settings.videoResolution, settings.fps)]
     : [5, 6, 8, 10, 20].filter(d => d <= localMaxDuration)
-  const videoResolutionOptions = forceApiGenerations ? [...FORCED_API_VIDEO_RESOLUTIONS] : ['540p', '720p', '1080p']
+  const videoResolutionOptions = forceApiGenerations
+    ? (inputAudio ? ['1080p'] : [...FORCED_API_VIDEO_RESOLUTIONS])
+    : ['540p', '720p', '1080p']
   const videoFpsOptions = forceApiGenerations ? [...FORCED_API_VIDEO_FPS] : [24, 25, 50]
 
   const handleDrop = (e: React.DragEvent) => {
@@ -649,10 +651,13 @@ function PromptBar({
               title="ASPECT RATIO"
               value={settings.aspectRatio}
               onChange={(v) => onSettingsChange({ ...settings, aspectRatio: v })}
-              options={[
-                { value: '16:9', label: '16:9' },
-                { value: '9:16', label: '9:16' },
-              ]}
+              options={inputAudio
+                ? [{ value: '16:9', label: '16:9' }]
+                : [
+                    { value: '16:9', label: '16:9' },
+                    { value: '9:16', label: '9:16' },
+                  ]
+              }
               trigger={
                 <>
                   <AspectIcon className="h-3.5 w-3.5" />
@@ -766,9 +771,9 @@ export function GenSpace() {
   const applyForcedVideoSettings = useCallback(
     (next: { model: string; duration: number; videoResolution: string; fps: number; audio: boolean; aspectRatio: string; imageResolution: string; variations: number }) => {
       if (!forceApiGenerations) return next
-      return sanitizeForcedApiVideoSettings(next)
+      return sanitizeForcedApiVideoSettings(next, { hasAudio: !!inputAudio })
     },
-    [forceApiGenerations],
+    [forceApiGenerations, inputAudio],
   )
   
   const {
@@ -810,9 +815,9 @@ export function GenSpace() {
     setSettings((prev) => applyForcedVideoSettings({ ...prev, model: 'fast' }))
   }, [applyForcedVideoSettings, forceApiGenerations])
 
-  // Force pro model when audio is attached (A2V only supports pro)
+  // Force pro model + resolution when audio is attached (A2V only supports pro @ 1080p 16:9)
   useEffect(() => {
-    if (inputAudio && settings.model !== 'pro') {
+    if (inputAudio) {
       setSettings(prev => applyForcedVideoSettings({ ...prev, model: 'pro' }))
     }
   }, [inputAudio]) // eslint-disable-line react-hooks/exhaustive-deps

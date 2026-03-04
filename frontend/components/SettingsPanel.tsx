@@ -46,7 +46,7 @@ export function SettingsPanel({
   const handleChange = (key: keyof GenerationSettings, value: string | number | boolean) => {
     const nextSettings = { ...settings, [key]: value } as GenerationSettings
     if (forceApiGenerations && !isImageMode) {
-      onSettingsChange(sanitizeForcedApiVideoSettings(nextSettings))
+      onSettingsChange(sanitizeForcedApiVideoSettings(nextSettings, { hasAudio }))
       return
     }
 
@@ -65,7 +65,9 @@ export function SettingsPanel({
   const durationOptions = forceApiGenerations
     ? [...getAllowedForcedApiDurations(settings.model, settings.videoResolution, settings.fps)]
     : [5, 6, 8, 10, 20].filter(d => d <= localMaxDuration)
-  const resolutionOptions = forceApiGenerations ? [...FORCED_API_VIDEO_RESOLUTIONS] : ['1080p', '720p', '540p']
+  const resolutionOptions = forceApiGenerations
+    ? (hasAudio ? ['1080p'] : [...FORCED_API_VIDEO_RESOLUTIONS])
+    : ['1080p', '720p', '540p']
   const fpsOptions = forceApiGenerations ? [...FORCED_API_VIDEO_FPS] : [24, 25, 50]
 
   // Image mode settings
@@ -178,11 +180,15 @@ export function SettingsPanel({
           onChange={(e) => handleChange('aspectRatio', e.target.value)}
           disabled={disabled}
         >
-          {FORCED_API_VIDEO_ASPECT_RATIOS.map((ar) => (
-            <option key={ar} value={ar}>
-              {ar === '16:9' ? '16:9 Landscape' : '9:16 Portrait'}
-            </option>
-          ))}
+          {hasAudio ? (
+            <option value="16:9">16:9 Landscape</option>
+          ) : (
+            FORCED_API_VIDEO_ASPECT_RATIOS.map((ar) => (
+              <option key={ar} value={ar}>
+                {ar === '16:9' ? '16:9 Landscape' : '9:16 Portrait'}
+              </option>
+            ))
+          )}
         </Select>
       )}
 

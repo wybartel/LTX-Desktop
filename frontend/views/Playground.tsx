@@ -48,12 +48,17 @@ export function Playground() {
     setSettings((prev) => sanitizeForcedApiVideoSettings({ ...prev, model: 'fast' }))
   }, [forceApiGenerations])
 
-  // Force pro model when audio is attached (A2V only supports pro)
+  // Force pro model + resolution when audio is attached (A2V only supports pro @ 1080p 16:9)
   useEffect(() => {
-    if (selectedAudio && settings.model !== 'pro') {
-      setSettings(prev => ({ ...prev, model: 'pro' }))
+    if (selectedAudio) {
+      setSettings(prev => {
+        if (forceApiGenerations) {
+          return sanitizeForcedApiVideoSettings({ ...prev, model: 'pro' }, { hasAudio: true })
+        }
+        return prev.model !== 'pro' ? { ...prev, model: 'pro' } : prev
+      })
     }
-  }, [selectedAudio]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedAudio, forceApiGenerations]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle mode change
   const handleModeChange = (newMode: GenerationMode) => {

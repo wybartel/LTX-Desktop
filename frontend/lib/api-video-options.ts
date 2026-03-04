@@ -10,6 +10,9 @@ export type ForcedApiVideoFps = (typeof FORCED_API_VIDEO_FPS)[number]
 export type ForcedApiVideoModel = (typeof FORCED_API_VIDEO_MODELS)[number]
 export type ForcedApiVideoAspectRatio = (typeof FORCED_API_VIDEO_ASPECT_RATIOS)[number]
 
+export const A2V_FORCED_RESOLUTION: ForcedApiVideoResolution = '1080p'
+export const A2V_FORCED_ASPECT_RATIO: ForcedApiVideoAspectRatio = '16:9'
+
 type ForcedVideoSettingsShape = {
   model: string
   duration: number
@@ -75,11 +78,19 @@ function clampDuration(value: number, allowed: readonly number[]): number {
 
 export function sanitizeForcedApiVideoSettings<T extends ForcedVideoSettingsShape>(
   settings: T,
+  options?: { hasAudio?: boolean },
 ): T {
-  const nextModel = normalizeForcedModel(settings.model)
-  const nextResolution = normalizeForcedResolution(settings.videoResolution)
+  let nextModel = normalizeForcedModel(settings.model)
+  let nextResolution = normalizeForcedResolution(settings.videoResolution)
+  let nextAspectRatio = normalizeForcedAspectRatio(settings.aspectRatio)
+
+  if (options?.hasAudio) {
+    nextModel = 'pro'
+    nextResolution = A2V_FORCED_RESOLUTION
+    nextAspectRatio = A2V_FORCED_ASPECT_RATIO
+  }
+
   const nextFps = normalizeForcedFps(settings.fps)
-  const nextAspectRatio = normalizeForcedAspectRatio(settings.aspectRatio)
   const allowedDurations = getAllowedForcedApiDurations(nextModel, nextResolution, nextFps)
   const nextDuration = clampDuration(settings.duration, allowedDurations)
 
