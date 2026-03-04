@@ -302,7 +302,7 @@ class TestA2VGenerate:
         for resolution, expected_w, expected_h in [
             ("540p", 960, 576),
             ("720p", 1280, 704),
-            ("1080p", 960, 576),
+            ("1080p", 1920, 1088),
         ]:
             fake_services.a2v_pipeline.generate_calls.clear()
             r = client.post(

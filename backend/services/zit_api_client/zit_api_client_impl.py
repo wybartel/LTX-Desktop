@@ -85,9 +85,11 @@ class ZitAPIClientImpl:
     def _extract_image_url(payload: dict[str, Any]) -> str:
         images = payload.get("images")
         if isinstance(images, list) and images:
-            first = images[0]
+            images_list = cast(list[object], images)
+            first = images_list[0]
             if isinstance(first, dict):
-                url = first.get("url")
+                first_payload = cast(dict[str, Any], first)
+                url = first_payload.get("url")
                 if isinstance(url, str) and url:
                     return url
             if isinstance(first, str) and first:

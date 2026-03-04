@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import inspect
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -46,6 +47,8 @@ def _make_progress_tqdm_class(callback: Callable[[int, int], None]) -> type:
 class HuggingFaceDownloader:
     """Wraps huggingface_hub download functions."""
 
+    _HF_HUB_DOWNLOAD_SUPPORTS_TQDM = "tqdm_class" in inspect.signature(hf_hub_download).parameters  # type: ignore[reportUnknownArgumentType]
+
     def download_file(
         self,
         repo_id: str,
@@ -54,12 +57,14 @@ class HuggingFaceDownloader:
         on_progress: Callable[[int, int], None] | None = None,
     ) -> Path:
         tqdm_class = _make_progress_tqdm_class(on_progress) if on_progress is not None else None
-        path = hf_hub_download(
-            repo_id=repo_id,
-            filename=filename,
-            local_dir=local_dir,
-            tqdm_class=tqdm_class,
-        )
+        download_kwargs: dict[str, Any] = {
+            "repo_id": repo_id,
+            "filename": filename,
+            "local_dir": local_dir,
+        }
+        if tqdm_class is not None and self._HF_HUB_DOWNLOAD_SUPPORTS_TQDM:
+            download_kwargs["tqdm_class"] = tqdm_class
+        path: str = hf_hub_download(**download_kwargs)
         return Path(path)
 
     def download_snapshot(
@@ -70,10 +75,12 @@ class HuggingFaceDownloader:
         on_progress: Callable[[int, int], None] | None = None,
     ) -> Path:
         tqdm_class = _make_progress_tqdm_class(on_progress) if on_progress is not None else None
-        path = snapshot_download(
-            repo_id=repo_id,
-            local_dir=local_dir,
-            allow_patterns=allow_patterns,
-            tqdm_class=tqdm_class,
-        )
+        download_kwargs: dict[str, Any] = {
+            "repo_id": repo_id,
+            "local_dir": local_dir,
+            "allow_patterns": allow_patterns,
+        }
+        if tqdm_class is not None:
+            download_kwargs["tqdm_class"] = tqdm_class
+        path: str = snapshot_download(**download_kwargs)
         return Path(path)

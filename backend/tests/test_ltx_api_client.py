@@ -245,8 +245,15 @@ def test_generate_audio_to_video_raises_on_non_200() -> None:
         )
 
 
-def test_retake_returns_direct_video_bytes() -> None:
+def _write_dummy_video(tmp_path) -> str:
+    input_path = tmp_path / "input.mp4"
+    input_path.write_bytes(b"fake-video")
+    return str(input_path)
+
+
+def test_retake_returns_direct_video_bytes(tmp_path) -> None:
     http = FakeHTTPClient()
+    input_path = _write_dummy_video(tmp_path)
     http.queue(
         "post",
         FakeResponse(
@@ -268,7 +275,7 @@ def test_retake_returns_direct_video_bytes() -> None:
     client = LTXAPIClientImpl(http=http, ltx_api_base_url="https://api.ltx.video")
     result = client.retake(
         api_key="test-key",
-        video_path="/tmp/input.mp4",
+        video_path=input_path,
         start_time=1.0,
         duration=3.0,
         prompt="make it dramatic",
@@ -285,8 +292,9 @@ def test_retake_returns_direct_video_bytes() -> None:
     assert http.calls[2].json_payload["video_uri"] == "storage://retake/123"
 
 
-def test_retake_json_video_url_downloads_bytes() -> None:
+def test_retake_json_video_url_downloads_bytes(tmp_path) -> None:
     http = FakeHTTPClient()
+    input_path = _write_dummy_video(tmp_path)
     http.queue(
         "post",
         FakeResponse(
@@ -309,7 +317,7 @@ def test_retake_json_video_url_downloads_bytes() -> None:
     client = LTXAPIClientImpl(http=http, ltx_api_base_url="https://api.ltx.video")
     result = client.retake(
         api_key="test-key",
-        video_path="/tmp/input.mp4",
+        video_path=input_path,
         start_time=2.0,
         duration=4.0,
         prompt="test",
@@ -321,8 +329,9 @@ def test_retake_json_video_url_downloads_bytes() -> None:
     assert http.calls[-1].url == "https://cdn.example.com/retake.mp4"
 
 
-def test_retake_json_without_video_url_returns_payload() -> None:
+def test_retake_json_without_video_url_returns_payload(tmp_path) -> None:
     http = FakeHTTPClient()
+    input_path = _write_dummy_video(tmp_path)
     http.queue(
         "post",
         FakeResponse(
@@ -344,7 +353,7 @@ def test_retake_json_without_video_url_returns_payload() -> None:
     client = LTXAPIClientImpl(http=http, ltx_api_base_url="https://api.ltx.video")
     result = client.retake(
         api_key="test-key",
-        video_path="/tmp/input.mp4",
+        video_path=input_path,
         start_time=0.0,
         duration=2.5,
         prompt="test",
@@ -356,8 +365,9 @@ def test_retake_json_without_video_url_returns_payload() -> None:
     assert result.result_payload["status"] == "processing"
 
 
-def test_retake_422_maps_to_safety_filter_error() -> None:
+def test_retake_422_maps_to_safety_filter_error(tmp_path) -> None:
     http = FakeHTTPClient()
+    input_path = _write_dummy_video(tmp_path)
     http.queue(
         "post",
         FakeResponse(
@@ -376,7 +386,7 @@ def test_retake_422_maps_to_safety_filter_error() -> None:
     with pytest.raises(LTXAPIClientError, match="Content rejected by safety filters") as exc:
         client.retake(
             api_key="test-key",
-            video_path="/tmp/input.mp4",
+            video_path=input_path,
             start_time=1.0,
             duration=3.0,
             prompt="test",
