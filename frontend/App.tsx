@@ -260,19 +260,22 @@ function AppContent() {
   const shouldShowGlobalForcedUpsell = forceApiGenerations && !setupState.needsSetup && isLoaded && !settings.hasLtxApiKey
   const shouldBlockForLtxKey = shouldShowForcedFirstRunUpsell || shouldShowGlobalForcedUpsell
 
-  const forcedGatewayRequest: ApiGatewayRequest = {
-    requiredKeys: ['ltx'],
-    title: 'Connect API Keys',
-    description: 'This app is configured for API-only generation. Add your API key to continue.',
-    blocking: true,
-    includeOptionalMissing: true,
-  }
+  useEffect(() => {
+    if (shouldBlockForLtxKey && apiGatewayRequest === null) {
+      setApiGatewayRequest({
+        requiredKeys: ['ltx'],
+        title: 'Connect API Keys',
+        description: 'This app is configured for API-only generation. Add your API key to continue.',
+        blocking: true,
+        includeOptionalMissing: true,
+      })
+    }
+  }, [shouldBlockForLtxKey, apiGatewayRequest])
 
-  const activeGatewayRequest = shouldBlockForLtxKey ? forcedGatewayRequest : apiGatewayRequest
-  const shouldShowGateway = activeGatewayRequest !== null
+  const shouldShowGateway = apiGatewayRequest !== null
 
   const gatewaySections: ApiGatewaySection[] = useMemo(() => {
-    if (!activeGatewayRequest) return []
+    if (!apiGatewayRequest) return []
 
     const handleSaveLtxKey = async (apiKey: string) => {
       if (isForcedFirstRun) {
@@ -287,7 +290,7 @@ function AppContent() {
         keyType: 'ltx',
         title: 'LTX API',
         description: 'Video generation, prompt enhancement, and cloud text encoding.',
-        required: activeGatewayRequest.requiredKeys.includes('ltx'),
+        required: apiGatewayRequest.requiredKeys.includes('ltx'),
         isConfigured: settings.hasLtxApiKey,
         inputLabel: 'LTX API key',
         placeholder: 'Enter your LTX API key...',
@@ -299,7 +302,7 @@ function AppContent() {
         keyType: 'fal',
         title: 'FAL AI',
         description: 'Required to generate images with Z Image Turbo.',
-        required: activeGatewayRequest.requiredKeys.includes('fal'),
+        required: apiGatewayRequest.requiredKeys.includes('fal'),
         isConfigured: settings.hasFalApiKey,
         inputLabel: 'FAL AI API key',
         placeholder: 'Enter your FAL AI API key...',
@@ -311,11 +314,11 @@ function AppContent() {
 
     return sections.filter((section) => {
       if (section.required) return true
-      if (activeGatewayRequest.includeOptionalMissing && !section.isConfigured) return true
+      if (apiGatewayRequest.includeOptionalMissing) return true
       return false
     })
   }, [
-    activeGatewayRequest,
+    apiGatewayRequest,
     isForcedFirstRun,
     saveApiKeyForFirstRun,
     saveFalApiKey,
@@ -467,10 +470,10 @@ function AppContent() {
       />
       <ApiGatewayModal
         isOpen={shouldShowGateway}
-        blocking={activeGatewayRequest?.blocking}
+        blocking={apiGatewayRequest?.blocking}
         onClose={() => setApiGatewayRequest(null)}
-        title={activeGatewayRequest?.title ?? 'Connect API Keys'}
-        description={activeGatewayRequest?.description ?? 'Add the required API keys to continue.'}
+        title={apiGatewayRequest?.title ?? 'Connect API Keys'}
+        description={apiGatewayRequest?.description ?? 'Add the required API keys to continue.'}
         sections={gatewaySections}
       />
 

@@ -58,14 +58,19 @@ export function ApiGatewayModal({
     setErrors({ ltx: null, fal: null })
   }, [isOpen])
 
+  const allRequiredConfigured = useMemo(() => {
+    const requiredSections = sections.filter((section) => section.required)
+    if (requiredSections.length === 0) return true
+    return requiredSections.every((section) => section.isConfigured)
+  }, [sections])
+
   useEffect(() => {
     if (!isOpen) return
-    const requiredSections = sections.filter((section) => section.required)
-    if (requiredSections.length === 0) return
-    if (requiredSections.every((section) => section.isConfigured)) {
+    if (!allRequiredConfigured) return
+    if (sections.length <= 1) {
       onClose()
     }
-  }, [isOpen, onClose, sections])
+  }, [isOpen, onClose, sections.length, allRequiredConfigured])
 
   useEffect(() => {
     if (!isOpen) return
@@ -196,6 +201,17 @@ export function ApiGatewayModal({
           {blocking && requiredMissing && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
               Required API keys are missing. Add them to continue.
+            </div>
+          )}
+
+          {sections.length > 1 && allRequiredConfigured && (
+            <div className="flex justify-end">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 transition-colors"
+              >
+                Done
+              </button>
             </div>
           )}
         </div>
