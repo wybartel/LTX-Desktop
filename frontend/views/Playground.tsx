@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Sparkles, Trash2, Square, ImageIcon, ArrowLeft } from 'lucide-react'
 import { logger } from '../lib/logger'
 import { ImageUploader } from '../components/ImageUploader'
+import { AudioUploader } from '../components/AudioUploader'
 import { VideoPlayer } from '../components/VideoPlayer'
 import { ImageResult } from '../components/ImageResult'
 import { SettingsPanel, type GenerationSettings } from '../components/SettingsPanel'
@@ -36,6 +37,7 @@ export function Playground() {
   const [mode, setMode] = useState<GenerationMode>('text-to-video')
   const [prompt, setPrompt] = useState('')
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [selectedAudio, setSelectedAudio] = useState<string | null>(null)
   const [settings, setSettings] = useState<GenerationSettings>(() => ({ ...DEFAULT_SETTINGS }))
 
   const { status, processStatus } = useBackend()
@@ -78,7 +80,8 @@ export function Playground() {
       // Auto-detect: if image is loaded → I2V, otherwise → T2V
       if (!prompt.trim()) return
       const imagePath = selectedImage ? fileUrlToPath(selectedImage) : null
-      generate(prompt, imagePath, effectiveVideoSettings)
+      const audioPath = selectedAudio ? fileUrlToPath(selectedAudio) : null
+      generate(prompt, imagePath, effectiveVideoSettings, audioPath)
     }
   }
   
@@ -98,6 +101,7 @@ export function Playground() {
   const handleClearAll = () => {
     setPrompt('')
     setSelectedImage(null)
+    setSelectedAudio(null)
     const baseDefaults = { ...DEFAULT_SETTINGS }
     setSettings(forceApiGenerations ? sanitizeForcedApiVideoSettings(baseDefaults) : baseDefaults)
     if (mode !== 'text-to-image') setMode('text-to-video')
@@ -154,10 +158,16 @@ export function Playground() {
 
             {/* Image Upload - Always shown in video mode (optional: makes it I2V) */}
             {isVideoMode && (
-              <ImageUploader 
-                selectedImage={selectedImage}
-                onImageSelect={setSelectedImage}
-              />
+              <>
+                <ImageUploader
+                  selectedImage={selectedImage}
+                  onImageSelect={setSelectedImage}
+                />
+                <AudioUploader
+                  selectedAudio={selectedAudio}
+                  onAudioSelect={setSelectedAudio}
+                />
+              </>
             )}
 
             {/* Prompt Input */}
