@@ -578,8 +578,7 @@ function PromptBar({
                       { value: 'pro', label: 'LTX-2.3 Pro (API)' },
                     ]
                   : [
-                      { value: 'fast', label: 'LTX-2.0 Fast', disabled: !!inputAudio, tooltip: inputAudio ? 'Fast model is not available for Audio-to-Video' : undefined },
-                      { value: 'pro', label: 'LTX-2.0 Pro' },
+                      { value: 'fast', label: 'LTX 2.3 Fast' },
                     ]
               }
               trigger={

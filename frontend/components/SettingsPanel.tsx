@@ -104,22 +104,14 @@ export function SettingsPanel({
     <div className="space-y-4">
       {/* Model Selection */}
       {!forceApiGenerations ? (
-        <div>
-          <Select
-            label="Model"
-            value={settings.model}
-            onChange={(e) => handleChange('model', e.target.value)}
-            disabled={disabled}
-          >
-            <option value="fast" disabled={hasAudio}>Fast (Distilled)</option>
-            <option value="pro">Pro (Full)</option>
-          </Select>
-          {settings.model === 'pro' && (
-            <p className="text-[10px] text-zinc-500 mt-1">
-              First generation with Pro may take longer to load
-            </p>
-          )}
-        </div>
+        <Select
+          label="Model"
+          value={settings.model}
+          onChange={(e) => handleChange('model', e.target.value)}
+          disabled={disabled}
+        >
+          <option value="fast">LTX 2.3 Fast</option>
+        </Select>
       ) : (
         <Select
           label="Model"
