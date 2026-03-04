@@ -13,9 +13,9 @@ import { GenerationErrorDialog } from '../components/GenerationErrorDialog'
 import { copyToAssetFolder } from '../lib/asset-copy'
 import { fileUrlToPath } from '../lib/url-to-path'
 import {
-  FORCED_API_VIDEO_DURATIONS,
   FORCED_API_VIDEO_FPS,
   FORCED_API_VIDEO_RESOLUTIONS,
+  getAllowedForcedApiDurations,
   sanitizeForcedApiVideoSettings,
 } from '../lib/api-video-options'
 import { logger } from '../lib/logger'
@@ -329,7 +329,9 @@ function PromptBar({
   const [isAudioDragOver, setIsAudioDragOver] = useState(false)
   const LOCAL_MAX_DURATION: Record<string, number> = { '540p': 20, '720p': 10, '1080p': 5 }
   const localMaxDuration = LOCAL_MAX_DURATION[settings.videoResolution] ?? 20
-  const videoDurationOptions = forceApiGenerations ? [...FORCED_API_VIDEO_DURATIONS] : [5, 6, 8, 10, 20].filter(d => d <= localMaxDuration)
+  const videoDurationOptions = forceApiGenerations
+    ? [...getAllowedForcedApiDurations(settings.model, settings.videoResolution, settings.fps)]
+    : [5, 6, 8, 10, 20].filter(d => d <= localMaxDuration)
   const videoResolutionOptions = forceApiGenerations ? [...FORCED_API_VIDEO_RESOLUTIONS] : ['540p', '720p', '1080p']
   const videoFpsOptions = forceApiGenerations ? [...FORCED_API_VIDEO_FPS] : [24, 25, 50]
 
@@ -648,9 +650,8 @@ function PromptBar({
               value={settings.aspectRatio}
               onChange={(v) => onSettingsChange({ ...settings, aspectRatio: v })}
               options={[
-                { value: '1:1', label: '1:1', disabled: true, tooltip: 'Coming soon' },
                 { value: '16:9', label: '16:9' },
-                { value: '9:16', label: '9:16', disabled: true, tooltip: 'Coming soon' },
+                { value: '9:16', label: '9:16' },
               ]}
               trigger={
                 <>
@@ -954,6 +955,7 @@ export function GenSpace() {
           fps: videoSettings.fps,
           audio: videoSettings.audio || false,
           cameraMotion: 'none',
+          aspectRatio: videoSettings.aspectRatio,
           imageResolution: videoSettings.imageResolution,
           imageAspectRatio: videoSettings.aspectRatio,
           imageSteps: 4,

@@ -615,7 +615,7 @@ class TestForcedApiGenerate:
                 "resolution": "1080p",
                 "model": "pro",
                 "duration": "6",
-                "fps": "24",
+                "fps": "30",
                 "audio": "false",
             },
         )
@@ -661,6 +661,220 @@ class TestForcedApiGenerate:
 
         assert r.status_code == 200
         assert r.json()["status"] == "cancelled"
+
+    def test_portrait_resolution_1080p(self, client, test_state, fake_services):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A portrait video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "25",
+                "aspectRatio": "9:16",
+            },
+        )
+
+        assert r.status_code == 200
+        call = fake_services.ltx_api_client.text_to_video_calls[0]
+        assert call["resolution"] == "1080x1920"
+
+    def test_portrait_resolution_1440p(self, client, test_state, fake_services):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A portrait video",
+                "resolution": "1440p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "25",
+                "aspectRatio": "9:16",
+            },
+        )
+
+        assert r.status_code == 200
+        call = fake_services.ltx_api_client.text_to_video_calls[0]
+        assert call["resolution"] == "1440x2560"
+
+    def test_portrait_resolution_4k(self, client, test_state, fake_services):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A portrait video",
+                "resolution": "2160p",
+                "model": "pro",
+                "duration": "6",
+                "fps": "25",
+                "aspectRatio": "9:16",
+            },
+        )
+
+        assert r.status_code == 200
+        call = fake_services.ltx_api_client.text_to_video_calls[0]
+        assert call["resolution"] == "2160x3840"
+
+    def test_default_landscape_when_aspect_ratio_omitted(self, client, test_state, fake_services):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A landscape video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "25",
+            },
+        )
+
+        assert r.status_code == 200
+        call = fake_services.ltx_api_client.text_to_video_calls[0]
+        assert call["resolution"] == "1920x1080"
+
+    def test_invalid_aspect_ratio_rejected(self, client, test_state):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "25",
+                "aspectRatio": "4:3",
+            },
+        )
+
+        assert r.status_code == 400
+        assert r.json()["error"] == "INVALID_FORCED_API_ASPECT_RATIO"
+
+    def test_extended_durations_for_fast_1080p_24fps(self, client, test_state, fake_services):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A long video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "20",
+                "fps": "24",
+            },
+        )
+
+        assert r.status_code == 200
+        call = fake_services.ltx_api_client.text_to_video_calls[0]
+        assert call["duration"] == 20.0
+
+    def test_extended_duration_rejected_for_pro_1080p_24fps(self, client, test_state):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A long video",
+                "resolution": "1080p",
+                "model": "pro",
+                "duration": "20",
+                "fps": "24",
+            },
+        )
+
+        assert r.status_code == 400
+        assert r.json()["error"] == "INVALID_FORCED_API_DURATION"
+
+    def test_extended_duration_rejected_for_fast_1440p_24fps(self, client, test_state):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A long video",
+                "resolution": "1440p",
+                "model": "fast",
+                "duration": "20",
+                "fps": "24",
+            },
+        )
+
+        assert r.status_code == 400
+        assert r.json()["error"] == "INVALID_FORCED_API_DURATION"
+
+    def test_fps_24_accepted(self, client, test_state, fake_services):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "24",
+            },
+        )
+
+        assert r.status_code == 200
+        call = fake_services.ltx_api_client.text_to_video_calls[0]
+        assert call["fps"] == 24.0
+
+    def test_fps_48_accepted(self, client, test_state, fake_services):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A video",
+                "resolution": "1080p",
+                "model": "fast",
+                "duration": "6",
+                "fps": "48",
+            },
+        )
+
+        assert r.status_code == 200
+        call = fake_services.ltx_api_client.text_to_video_calls[0]
+        assert call["fps"] == 48.0
+
+    def test_a2v_portrait_resolution(self, client, test_state, fake_services, tmp_path):
+        test_state.config.force_api_generations = True
+        test_state.state.app_settings.ltx_api_key = "api-key"
+        audio_file = tmp_path / "test_audio.wav"
+        _write_test_wav(audio_file)
+
+        r = client.post(
+            "/api/generate",
+            json={
+                "prompt": "A portrait music video",
+                "resolution": "1080p",
+                "model": "pro",
+                "duration": "6",
+                "fps": "25",
+                "audioPath": str(audio_file),
+                "aspectRatio": "9:16",
+            },
+        )
+
+        assert r.status_code == 200
+        call = fake_services.ltx_api_client.audio_to_video_calls[0]
+        assert call["resolution"] == "1080x1920"
 
 
 class TestGenerateCancel:

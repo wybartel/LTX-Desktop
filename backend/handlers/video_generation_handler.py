@@ -44,13 +44,19 @@ FORCED_API_MODEL_MAP: dict[str, str] = {
     "fast": "ltx-2-3-fast",
     "pro": "ltx-2-3-pro",
 }
-FORCED_API_RESOLUTION_MAP: dict[str, str] = {
-    "1080p": "1920x1080",
-    "1440p": "2560x1440",
-    "2160p": "3840x2160",
+FORCED_API_RESOLUTION_MAP: dict[str, dict[str, str]] = {
+    "1080p": {"16:9": "1920x1080", "9:16": "1080x1920"},
+    "1440p": {"16:9": "2560x1440", "9:16": "1440x2560"},
+    "2160p": {"16:9": "3840x2160", "9:16": "2160x3840"},
 }
-FORCED_API_ALLOWED_DURATIONS = {6, 8, 10}
-FORCED_API_ALLOWED_FPS = {25, 50}
+FORCED_API_ALLOWED_ASPECT_RATIOS = {"16:9", "9:16"}
+FORCED_API_ALLOWED_FPS = {24, 25, 48, 50}
+
+
+def _get_allowed_durations(model_id: str, resolution_label: str, fps: int) -> set[int]:
+    if model_id == "ltx-2-3-fast" and resolution_label == "1080p" and fps in {24, 25}:
+        return {6, 8, 10, 12, 14, 16, 18, 20}
+    return {6, 8, 10}
 
 
 class VideoGenerationHandler(StateHandlerBase):
@@ -414,9 +420,15 @@ class VideoGenerationHandler(StateHandlerBase):
                 raise HTTPError(400, "INVALID_FORCED_API_MODEL")
 
             resolution_label = req.resolution
-            api_resolution = FORCED_API_RESOLUTION_MAP.get(resolution_label)
-            if api_resolution is None:
+            resolution_by_aspect = FORCED_API_RESOLUTION_MAP.get(resolution_label)
+            if resolution_by_aspect is None:
                 raise HTTPError(400, "INVALID_FORCED_API_RESOLUTION")
+
+            aspect_ratio = req.aspectRatio.strip()
+            if aspect_ratio not in FORCED_API_ALLOWED_ASPECT_RATIOS:
+                raise HTTPError(400, "INVALID_FORCED_API_ASPECT_RATIO")
+
+            api_resolution = resolution_by_aspect[aspect_ratio]
 
             prompt = req.prompt
 
@@ -458,12 +470,11 @@ class VideoGenerationHandler(StateHandlerBase):
                 validated_image_path = validate_image_file(image_path)
 
                 duration = self._parse_forced_numeric_field(req.duration, "INVALID_FORCED_API_DURATION")
-                if duration not in FORCED_API_ALLOWED_DURATIONS:
-                    raise HTTPError(400, "INVALID_FORCED_API_DURATION")
-
                 fps = self._parse_forced_numeric_field(req.fps, "INVALID_FORCED_API_FPS")
                 if fps not in FORCED_API_ALLOWED_FPS:
                     raise HTTPError(400, "INVALID_FORCED_API_FPS")
+                if duration not in _get_allowed_durations(api_model_id, resolution_label, fps):
+                    raise HTTPError(400, "INVALID_FORCED_API_DURATION")
 
                 generate_audio = self._parse_audio_flag(req.audio)
                 self._generation.update_progress("uploading_image", 20, None, None)
@@ -486,12 +497,11 @@ class VideoGenerationHandler(StateHandlerBase):
                 self._generation.update_progress("downloading_output", 85, None, None)
             else:
                 duration = self._parse_forced_numeric_field(req.duration, "INVALID_FORCED_API_DURATION")
-                if duration not in FORCED_API_ALLOWED_DURATIONS:
-                    raise HTTPError(400, "INVALID_FORCED_API_DURATION")
-
                 fps = self._parse_forced_numeric_field(req.fps, "INVALID_FORCED_API_FPS")
                 if fps not in FORCED_API_ALLOWED_FPS:
                     raise HTTPError(400, "INVALID_FORCED_API_FPS")
+                if duration not in _get_allowed_durations(api_model_id, resolution_label, fps):
+                    raise HTTPError(400, "INVALID_FORCED_API_DURATION")
 
                 generate_audio = self._parse_audio_flag(req.audio)
                 self._generation.update_progress("inference", 55, None, None)

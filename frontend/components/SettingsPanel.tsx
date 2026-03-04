@@ -1,9 +1,10 @@
 import { Select } from './ui/select'
 import type { GenerationMode } from './ModeTabs'
 import {
-  FORCED_API_VIDEO_DURATIONS,
   FORCED_API_VIDEO_FPS,
   FORCED_API_VIDEO_RESOLUTIONS,
+  FORCED_API_VIDEO_ASPECT_RATIOS,
+  getAllowedForcedApiDurations,
   sanitizeForcedApiVideoSettings,
 } from '../lib/api-video-options'
 
@@ -14,6 +15,7 @@ export interface GenerationSettings {
   fps: number
   audio: boolean
   cameraMotion: string
+  aspectRatio?: string
   // Image-specific settings
   imageResolution: string
   imageAspectRatio: string
@@ -60,7 +62,9 @@ export function SettingsPanel({
   }
 
   const localMaxDuration = LOCAL_MAX_DURATION[settings.videoResolution] ?? 20
-  const durationOptions = forceApiGenerations ? [...FORCED_API_VIDEO_DURATIONS] : [5, 6, 8, 10, 20].filter(d => d <= localMaxDuration)
+  const durationOptions = forceApiGenerations
+    ? [...getAllowedForcedApiDurations(settings.model, settings.videoResolution, settings.fps)]
+    : [5, 6, 8, 10, 20].filter(d => d <= localMaxDuration)
   const resolutionOptions = forceApiGenerations ? [...FORCED_API_VIDEO_RESOLUTIONS] : ['1080p', '720p', '540p']
   const fpsOptions = forceApiGenerations ? [...FORCED_API_VIDEO_FPS] : [24, 25, 50]
 
@@ -165,6 +169,22 @@ export function SettingsPanel({
           ))}
         </Select>
       </div>
+
+      {/* Aspect Ratio - only for API mode video */}
+      {forceApiGenerations && (
+        <Select
+          label="Aspect Ratio"
+          value={settings.aspectRatio || '16:9'}
+          onChange={(e) => handleChange('aspectRatio', e.target.value)}
+          disabled={disabled}
+        >
+          {FORCED_API_VIDEO_ASPECT_RATIOS.map((ar) => (
+            <option key={ar} value={ar}>
+              {ar === '16:9' ? '16:9 Landscape' : '9:16 Portrait'}
+            </option>
+          ))}
+        </Select>
+      )}
 
       {/* Audio and Camera Motion Row */}
       <div className="flex gap-3">

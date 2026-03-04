@@ -139,6 +139,7 @@ export function useGeneration(): UseGenerationReturn {
         fps: String(settings.fps),
         audio: String(settings.audio),
         cameraMotion: settings.cameraMotion,
+        aspectRatio: settings.aspectRatio || '16:9',
       }
       if (imagePath) {
         body.imagePath = imagePath

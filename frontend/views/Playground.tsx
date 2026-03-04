@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS: GenerationSettings = {
   fps: 24,
   audio: true,
   cameraMotion: 'none',
+  aspectRatio: '16:9',
   // Image settings
   imageResolution: '1080p',
   imageAspectRatio: '16:9',
