@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any, cast
 
 import torch
-from diffusers import ZImagePipeline
+from diffusers.pipelines.auto_pipeline import ZImagePipeline  # type: ignore[reportUnknownVariableType]
 from PIL.Image import Image as PILImage
 
 from services.services_utils import ImagePipelineOutputLike, PILImageType, get_device_type
@@ -50,8 +51,9 @@ class ZitImageGenerationPipeline:
         if not isinstance(images, Sequence):
             raise RuntimeError("Unexpected ZIT pipeline output format: missing images sequence")
 
+        images_list = cast(Sequence[object], images)
         validated_images: list[PILImageType] = []
-        for image in images:
+        for image in images_list:
             if not isinstance(image, PILImage):
                 raise RuntimeError("Unexpected ZIT pipeline output format: images must be PIL.Image instances")
             validated_images.append(image)
@@ -68,9 +70,11 @@ class ZitImageGenerationPipeline:
         num_inference_steps: int,
         seed: int,
     ) -> ImagePipelineOutputLike:
-        del guidance_scale
+        # ZImagePipeline ignores guidance_scale, so we drop it explicitly.
+        _ = guidance_scale
         generator = torch.Generator(device=self._resolve_generator_device()).manual_seed(seed)
-        output = self.pipeline(  # type: ignore[reportUnknownMemberType]
+        pipeline = cast(Any, self.pipeline)
+        output = pipeline(
             prompt=prompt,
             height=height,
             width=width,

@@ -2,7 +2,7 @@
 
 import inspect
 
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, snapshot_download
 
 from state.app_state_types import FileDownloadCompleted, FileDownloadRunning
 
@@ -265,6 +265,11 @@ class TestHuggingFaceInternals:
 
     def test_hf_hub_download_accepts_tqdm_class(self):
         sig = inspect.signature(hf_hub_download)
+        if "tqdm_class" in sig.parameters:
+            assert "tqdm_class" in sig.parameters
+            return
+
+        sig = inspect.signature(snapshot_download)
         assert "tqdm_class" in sig.parameters, (
-            "hf_hub_download no longer accepts tqdm_class — progress tracking is broken"
+            "hf_hub_download and snapshot_download no longer accept tqdm_class — progress tracking is broken"
         )

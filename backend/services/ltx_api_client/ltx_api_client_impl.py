@@ -208,7 +208,7 @@ class LTXAPIClientImpl:
                     return LTXRetakeResult(video_bytes=dl_resp.content, result_payload=None)
                 raise LTXAPIClientError(500, f"Failed to download retake video: {dl_resp.status_code}")
 
-            response_payload = cast(dict[str, Any], parsed_payload.model_dump(mode="python"))
+            response_payload = parsed_payload.model_dump(mode="python")
             return LTXRetakeResult(video_bytes=None, result_payload=response_payload)
 
         if response.status_code == 422:
