@@ -585,7 +585,9 @@ function PromptBar({
                 <>
                   <LightricksIcon className="h-3.5 w-3.5" />
                   <span className="text-zinc-300 font-medium">
-                    {forceApiGenerations ? 'LTX-2.3 Fast (API)' : 'LTX 2.3 Fast'}
+                    {forceApiGenerations
+                      ? (settings.model === 'pro' ? 'LTX-2.3 Pro (API)' : 'LTX-2.3 Fast (API)')
+                      : 'LTX 2.3 Fast'}
                   </span>
                 </>
               }
