@@ -186,6 +186,7 @@ class LTXAPIClientImpl:
             timeout=600,
         )
 
+        rid = self._fmt_request_id(response)
         if response.status_code == 200:
             content_type = str(response.headers.get("Content-Type", "")).lower()
             if "video" in content_type or "octet-stream" in content_type:
@@ -194,28 +195,28 @@ class LTXAPIClientImpl:
             try:
                 payload_obj = response.json()
             except json.JSONDecodeError as exc:
-                raise LTXAPIClientError(500, f"Unexpected response format: {response.text[:200]}") from exc
+                raise LTXAPIClientError(500, f"Unexpected response format: {response.text[:200]}{rid}") from exc
 
             try:
                 parsed_payload = _RetakeResponsePayload.model_validate(payload_obj)
             except ValidationError as exc:
-                raise LTXAPIClientError(500, "Unexpected response format") from exc
+                raise LTXAPIClientError(500, f"Unexpected response format{rid}") from exc
 
             video_url = parsed_payload.extract_video_url()
             if video_url:
                 dl_resp = self._http.get(video_url, timeout=120)
                 if dl_resp.status_code == 200:
                     return LTXRetakeResult(video_bytes=dl_resp.content, result_payload=None)
-                raise LTXAPIClientError(500, f"Failed to download retake video: {dl_resp.status_code}")
+                raise LTXAPIClientError(500, f"Failed to download retake video: {dl_resp.status_code}{rid}")
 
             response_payload = cast(dict[str, Any], parsed_payload.model_dump(mode="python"))
             return LTXRetakeResult(video_bytes=None, result_payload=response_payload)
 
         if response.status_code == 422:
-            raise LTXAPIClientError(422, "Content rejected by safety filters")
+            raise LTXAPIClientError(422, f"Content rejected by safety filters{rid}")
 
         error_text = response.text[:500] if response.text else "Unknown error"
-        raise LTXAPIClientError(response.status_code, f"Retake API error: {error_text}")
+        raise LTXAPIClientError(response.status_code, f"Retake API error: {error_text}{rid}")
 
     def upload_file(self, *, file_path: str, api_key: str) -> str:
         upload_resp = self._http.post(
@@ -225,9 +226,10 @@ class LTXAPIClientImpl:
         )
         if upload_resp.status_code != 200:
             err = upload_resp.text[:500]
+            rid = self._fmt_request_id(upload_resp)
             raise LTXAPIClientError(
                 upload_resp.status_code,
-                f"LTX upload init failed ({upload_resp.status_code}): {err}",
+                f"LTX upload init failed ({upload_resp.status_code}): {err}{rid}",
                 stage="upload_init",
             )
 
@@ -237,7 +239,8 @@ class LTXAPIClientImpl:
             storage_uri = str(payload["storage_uri"])
             required_headers = cast(dict[str, str], payload.get("required_headers", {}))
         except Exception as exc:
-            raise LTXAPIClientError(500, "Unexpected LTX upload response format", stage="upload_parse") from exc
+            rid = self._fmt_request_id(upload_resp)
+            raise LTXAPIClientError(500, f"Unexpected LTX upload response format{rid}", stage="upload_parse") from exc
 
         path_obj = Path(file_path)
         mime = mimetypes.guess_type(path_obj.name)[0] or "application/octet-stream"
@@ -250,25 +253,27 @@ class LTXAPIClientImpl:
             )
         if put_resp.status_code not in (200, 201):
             err = put_resp.text[:500]
-            raise LTXAPIClientError(500, f"LTX upload failed ({put_resp.status_code}): {err}", stage="upload_put")
+            rid = self._fmt_request_id(upload_resp)
+            raise LTXAPIClientError(500, f"LTX upload failed ({put_resp.status_code}): {err}{rid}", stage="upload_put")
 
         return storage_uri
 
     def _extract_video_bytes(self, response: Any, api_key: str) -> bytes:
+        rid = self._fmt_request_id(response)
         if response.status_code != 200:
             err = response.text[:500] if response.text else "Unknown error"
-            raise RuntimeError(f"LTX API generation failed ({response.status_code}): {err}")
+            raise RuntimeError(f"LTX API generation failed ({response.status_code}): {err}{rid}")
 
         content_type = str(response.headers.get("Content-Type", "")).lower()
         if "video" in content_type or "octet-stream" in content_type:
             if not response.content:
-                raise RuntimeError("LTX API returned empty video body")
+                raise RuntimeError(f"LTX API returned empty video body{rid}")
             return response.content
 
         try:
             payload = cast(dict[str, Any], response.json())
         except Exception as exc:
-            raise RuntimeError("Unexpected LTX API response format") from exc
+            raise RuntimeError(f"Unexpected LTX API response format{rid}") from exc
 
         video_url = self._extract_video_url(payload)
         if video_url is not None:
@@ -278,15 +283,25 @@ class LTXAPIClientImpl:
                 timeout=120,
             )
             if dl_resp.status_code != 200:
-                raise RuntimeError(f"Failed to download generated video ({dl_resp.status_code})")
+                raise RuntimeError(f"Failed to download generated video ({dl_resp.status_code}){rid}")
             if not dl_resp.content:
-                raise RuntimeError("Downloaded generated video is empty")
+                raise RuntimeError(f"Downloaded generated video is empty{rid}")
             return dl_resp.content
 
         error_text = payload.get("error") or payload.get("message") or payload.get("detail")
         if isinstance(error_text, str) and error_text:
-            raise RuntimeError(f"LTX API returned an error payload: {error_text}")
-        raise RuntimeError("LTX API response did not include a video payload")
+            raise RuntimeError(f"LTX API returned an error payload: {error_text}{rid}")
+        raise RuntimeError(f"LTX API response did not include a video payload{rid}")
+
+    @staticmethod
+    def _request_id(response: Any) -> str | None:
+        rid = response.headers.get("x-request-id")
+        return str(rid) if rid else None
+
+    @staticmethod
+    def _fmt_request_id(response: Any) -> str:
+        rid = response.headers.get("x-request-id")
+        return f" [request_id={rid}]" if rid else ""
 
     @staticmethod
     def _extract_error_detail(detail: str) -> str:
