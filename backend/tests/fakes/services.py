@@ -10,6 +10,7 @@ from typing import Any, ClassVar
 from PIL import Image
 from api_types import ImageConditioningInput, VideoCameraMotion
 from services.interfaces import IcLoraDownloadPayload, IcLoraModelPayload, VideoInfoPayload
+from services.ltx_api_client.ltx_api_client import LTXRetakeResult
 from tests.fakes.fake_gpu_info import FakeGpuInfo
 
 
@@ -117,13 +118,16 @@ class FakeLTXAPIClient:
         self.text_to_video_calls: list[dict[str, Any]] = []
         self.image_to_video_calls: list[dict[str, Any]] = []
         self.audio_to_video_calls: list[dict[str, Any]] = []
+        self.retake_calls: list[dict[str, Any]] = []
         self.raise_on_upload_file: Exception | None = None
         self.raise_on_text_to_video: Exception | None = None
         self.raise_on_image_to_video: Exception | None = None
         self.raise_on_audio_to_video: Exception | None = None
+        self.raise_on_retake: Exception | None = None
         self.text_to_video_result = b"fake-ltx-api-t2v-video"
         self.image_to_video_result = b"fake-ltx-api-i2v-video"
         self.audio_to_video_result = b"fake-ltx-api-a2v-video"
+        self.retake_result = LTXRetakeResult(video_bytes=b"fake-ltx-api-retake-video", result_payload=None)
         self.upload_file_results: dict[str, str] = {}
 
     def upload_file(
@@ -224,6 +228,30 @@ class FakeLTXAPIClient:
         if self.raise_on_audio_to_video is not None:
             raise self.raise_on_audio_to_video
         return self.audio_to_video_result
+
+    def retake(
+        self,
+        *,
+        api_key: str,
+        video_path: str,
+        start_time: float,
+        duration: float,
+        prompt: str,
+        mode: str,
+    ) -> LTXRetakeResult:
+        self.retake_calls.append(
+            {
+                "api_key": api_key,
+                "video_path": video_path,
+                "start_time": start_time,
+                "duration": duration,
+                "prompt": prompt,
+                "mode": mode,
+            }
+        )
+        if self.raise_on_retake is not None:
+            raise self.raise_on_retake
+        return self.retake_result
 
 
 class FakeZitAPIClient:

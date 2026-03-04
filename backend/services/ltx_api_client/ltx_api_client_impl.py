@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import mimetypes
 from pathlib import Path
 from typing import Any, Literal, cast
 
 from api_types import VideoCameraMotion
+from pydantic import BaseModel, ConfigDict, ValidationError
+from services.ltx_api_client.ltx_api_client import LTXAPIClientError, LTXRetakeResult
 from services.http_client.http_client import HTTPClient
 from services.services_utils import JSONValue
 
@@ -32,6 +35,21 @@ _CAMERA_MOTION_TO_LTX: dict[VideoCameraMotion, LTXCameraMotion | None] = {
     "static": "static",
     "focus_shift": "focus_shift",
 }
+
+
+class _RetakeNestedPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    video_url: str | None = None
+
+
+class _RetakeResponsePayload(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    video_url: str | None = None
+    output_video: str | None = None
+    result: _RetakeNestedPayload | None = None
+
+    def extract_video_url(self) -> str | None:
+        return self.video_url or self.output_video or (self.result.video_url if self.result is not None else None)
 
 
 class LTXAPIClientImpl:
@@ -129,6 +147,76 @@ class LTXAPIClientImpl:
         )
         return self._extract_video_bytes(response, api_key)
 
+    def retake(
+        self,
+        *,
+        api_key: str,
+        video_path: str,
+        start_time: float,
+        duration: float,
+        prompt: str,
+        mode: str,
+    ) -> LTXRetakeResult:
+        try:
+            storage_uri = self.upload_file(api_key=api_key, file_path=video_path)
+        except LTXAPIClientError as exc:
+            if exc.stage == "upload_init":
+                err_text = self._extract_error_detail(exc.detail)
+                raise LTXAPIClientError(exc.status_code, f"Failed to get upload URL: {err_text}") from exc
+            if exc.stage == "upload_parse":
+                raise LTXAPIClientError(500, "Unexpected upload response format") from exc
+            if exc.stage == "upload_put":
+                err_text = self._extract_error_detail(exc.detail)
+                raise LTXAPIClientError(500, f"Video upload failed: {err_text}") from exc
+            raise
+
+        payload: dict[str, JSONValue] = {
+            "video_uri": storage_uri,
+            "start_time": float(start_time),
+            "duration": float(duration),
+            "mode": mode,
+        }
+        if prompt:
+            payload["prompt"] = prompt
+
+        response = self._http.post(
+            f"{self._base_url}/v1/retake",
+            headers=self._json_headers(api_key),
+            json_payload=payload,
+            timeout=600,
+        )
+
+        if response.status_code == 200:
+            content_type = str(response.headers.get("Content-Type", "")).lower()
+            if "video" in content_type or "octet-stream" in content_type:
+                return LTXRetakeResult(video_bytes=response.content, result_payload=None)
+
+            try:
+                payload_obj = response.json()
+            except json.JSONDecodeError as exc:
+                raise LTXAPIClientError(500, f"Unexpected response format: {response.text[:200]}") from exc
+
+            try:
+                parsed_payload = _RetakeResponsePayload.model_validate(payload_obj)
+            except ValidationError as exc:
+                raise LTXAPIClientError(500, "Unexpected response format") from exc
+
+            video_url = parsed_payload.extract_video_url()
+            if video_url:
+                dl_resp = self._http.get(video_url, timeout=120)
+                if dl_resp.status_code == 200:
+                    return LTXRetakeResult(video_bytes=dl_resp.content, result_payload=None)
+                raise LTXAPIClientError(500, f"Failed to download retake video: {dl_resp.status_code}")
+
+            response_payload = cast(dict[str, Any], parsed_payload.model_dump(mode="python"))
+            return LTXRetakeResult(video_bytes=None, result_payload=response_payload)
+
+        if response.status_code == 422:
+            raise LTXAPIClientError(422, "Content rejected by safety filters")
+
+        error_text = response.text[:500] if response.text else "Unknown error"
+        raise LTXAPIClientError(response.status_code, f"Retake API error: {error_text}")
+
     def upload_file(self, *, file_path: str, api_key: str) -> str:
         upload_resp = self._http.post(
             f"{self._base_url}/v1/upload",
@@ -137,7 +225,11 @@ class LTXAPIClientImpl:
         )
         if upload_resp.status_code != 200:
             err = upload_resp.text[:500]
-            raise RuntimeError(f"LTX upload init failed ({upload_resp.status_code}): {err}")
+            raise LTXAPIClientError(
+                upload_resp.status_code,
+                f"LTX upload init failed ({upload_resp.status_code}): {err}",
+                stage="upload_init",
+            )
 
         try:
             payload = cast(dict[str, Any], upload_resp.json())
@@ -145,7 +237,7 @@ class LTXAPIClientImpl:
             storage_uri = str(payload["storage_uri"])
             required_headers = cast(dict[str, str], payload.get("required_headers", {}))
         except Exception as exc:
-            raise RuntimeError("Unexpected LTX upload response format") from exc
+            raise LTXAPIClientError(500, "Unexpected LTX upload response format", stage="upload_parse") from exc
 
         path_obj = Path(file_path)
         mime = mimetypes.guess_type(path_obj.name)[0] or "application/octet-stream"
@@ -158,7 +250,7 @@ class LTXAPIClientImpl:
             )
         if put_resp.status_code not in (200, 201):
             err = put_resp.text[:500]
-            raise RuntimeError(f"LTX upload failed ({put_resp.status_code}): {err}")
+            raise LTXAPIClientError(500, f"LTX upload failed ({put_resp.status_code}): {err}", stage="upload_put")
 
         return storage_uri
 
@@ -195,6 +287,12 @@ class LTXAPIClientImpl:
         if isinstance(error_text, str) and error_text:
             raise RuntimeError(f"LTX API returned an error payload: {error_text}")
         raise RuntimeError("LTX API response did not include a video payload")
+
+    @staticmethod
+    def _extract_error_detail(detail: str) -> str:
+        if ":" not in detail:
+            return detail
+        return detail.split(":", 1)[1].strip()
 
     @staticmethod
     def _extract_video_url(payload: dict[str, Any]) -> str | None:

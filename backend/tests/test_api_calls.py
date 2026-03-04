@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from services.interfaces import HttpTimeoutError
+from services.ltx_api_client.ltx_api_client import LTXAPIClientError, LTXRetakeResult
 from tests.fakes import FakeResponse
 
 
@@ -74,37 +75,6 @@ class TestSuggestGapPrompt:
         assert r.status_code == 504
 
 
-def _upload_resp_ok() -> FakeResponse:
-    return FakeResponse(
-        status_code=200,
-        json_payload={
-            "upload_url": "https://storage.example.com/upload",
-            "storage_uri": "gs://bucket/video.mp4",
-            "required_headers": {},
-        },
-    )
-
-
-def _put_ok() -> FakeResponse:
-    return FakeResponse(status_code=200)
-
-
-def _retake_binary_resp() -> FakeResponse:
-    return FakeResponse(
-        status_code=200,
-        headers={"Content-Type": "video/mp4"},
-        content=b"\x00\x00\x00\x1cftypisom" + b"\x00" * 500,
-    )
-
-
-def _retake_json_resp(video_url: str = "https://cdn.example.com/retake.mp4") -> FakeResponse:
-    return FakeResponse(
-        status_code=200,
-        headers={"Content-Type": "application/json"},
-        json_payload={"video_url": video_url},
-    )
-
-
 class TestRetake:
     def _make_video(self, test_state) -> str:
         video_file = test_state.config.outputs_dir / f"retake_input_{uuid.uuid4().hex[:6]}.mp4"
@@ -122,9 +92,10 @@ class TestRetake:
     def test_happy_path_binary_response(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "test-key"
         video_path = self._make_video(test_state)
-
-        test_state.http.queue("post", _upload_resp_ok(), _retake_binary_resp())
-        test_state.http.queue("put", _put_ok())
+        test_state.ltx_api_client.retake_result = LTXRetakeResult(
+            video_bytes=b"\x00\x00\x00\x1cftypisom" + b"\x00" * 500,
+            result_payload=None,
+        )
 
         r = client.post("/api/retake", json=self._base_payload(video_path))
         assert r.status_code == 200
@@ -135,15 +106,9 @@ class TestRetake:
     def test_happy_path_json_video_url(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "test-key"
         video_path = self._make_video(test_state)
-
-        test_state.http.queue("post", _upload_resp_ok(), _retake_json_resp())
-        test_state.http.queue("put", _put_ok())
-        test_state.http.queue(
-            "get",
-            FakeResponse(
-                status_code=200,
-                content=b"\x00\x00\x00\x1cftypisom" + b"\x00" * 500,
-            ),
+        test_state.ltx_api_client.retake_result = LTXRetakeResult(
+            video_bytes=b"\x00\x00\x00\x1cftypisom" + b"\x00" * 500,
+            result_payload=None,
         )
 
         r = client.post("/api/retake", json=self._base_payload(video_path))
@@ -170,8 +135,7 @@ class TestRetake:
     def test_upload_url_failure(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "test-key"
         video_path = self._make_video(test_state)
-
-        test_state.http.queue("post", FakeResponse(status_code=401, text="Unauthorized"))
+        test_state.ltx_api_client.raise_on_retake = LTXAPIClientError(401, "Failed to get upload URL: Unauthorized")
 
         r = client.post("/api/retake", json=self._base_payload(video_path))
         assert r.status_code == 401
@@ -179,9 +143,7 @@ class TestRetake:
     def test_video_upload_failure(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "test-key"
         video_path = self._make_video(test_state)
-
-        test_state.http.queue("post", _upload_resp_ok())
-        test_state.http.queue("put", FakeResponse(status_code=500, text="Storage error"))
+        test_state.ltx_api_client.raise_on_retake = LTXAPIClientError(500, "Video upload failed: Storage error")
 
         r = client.post("/api/retake", json=self._base_payload(video_path))
         assert r.status_code == 500
@@ -189,9 +151,7 @@ class TestRetake:
     def test_retake_api_422_safety_filter(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "test-key"
         video_path = self._make_video(test_state)
-
-        test_state.http.queue("post", _upload_resp_ok(), FakeResponse(status_code=422, text="Content filtered"))
-        test_state.http.queue("put", _put_ok())
+        test_state.ltx_api_client.raise_on_retake = LTXAPIClientError(422, "Content rejected by safety filters")
 
         r = client.post("/api/retake", json=self._base_payload(video_path))
         assert r.status_code == 422
@@ -199,9 +159,10 @@ class TestRetake:
     def test_prompt_and_mode_forwarded(self, client, test_state):
         test_state.state.app_settings.ltx_api_key = "test-key"
         video_path = self._make_video(test_state)
-
-        test_state.http.queue("post", _upload_resp_ok(), _retake_binary_resp())
-        test_state.http.queue("put", _put_ok())
+        test_state.ltx_api_client.retake_result = LTXRetakeResult(
+            video_bytes=b"\x00\x00\x00\x1cftypisom" + b"\x00" * 500,
+            result_payload=None,
+        )
 
         client.post(
             "/api/retake",
@@ -214,7 +175,6 @@ class TestRetake:
             },
         )
 
-        retake_call = test_state.http.calls[-1]
-        payload = retake_call.json_payload
-        assert payload["prompt"] == "epic explosion"
-        assert payload["mode"] == "replace_video_only"
+        retake_call = test_state.ltx_api_client.retake_calls[-1]
+        assert retake_call["prompt"] == "epic explosion"
+        assert retake_call["mode"] == "replace_video_only"

@@ -203,7 +203,7 @@ class AppHandler:
         self.retake = RetakeHandler(
             state=self.state,
             lock=self._lock,
-            http=http,
+            ltx_api_client=ltx_api_client,
             outputs_dir=config.outputs_dir,
         )
 

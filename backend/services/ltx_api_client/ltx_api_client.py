@@ -2,9 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from dataclasses import dataclass
+from typing import Any, Protocol
 
 from api_types import VideoCameraMotion
+
+
+@dataclass(frozen=True)
+class LTXRetakeResult:
+    video_bytes: bytes | None
+    result_payload: dict[str, Any] | None
+
+
+class LTXAPIClientError(RuntimeError):
+    def __init__(self, status_code: int, detail: str, stage: str | None = None) -> None:
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+        self.stage = stage
 
 
 class LTXAPIClient(Protocol):
@@ -55,4 +70,16 @@ class LTXAPIClient(Protocol):
         model: str,
         resolution: str,
     ) -> bytes:
+        ...
+
+    def retake(
+        self,
+        *,
+        api_key: str,
+        video_path: str,
+        start_time: float,
+        duration: float,
+        prompt: str,
+        mode: str,
+    ) -> LTXRetakeResult:
         ...
