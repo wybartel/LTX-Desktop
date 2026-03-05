@@ -11,15 +11,12 @@
   "scripts": {
     "setup:dev:mac": "bash scripts/setup-dev.sh",
     "setup:dev:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-dev.ps1",
-
     "dev": "vite",
     "dev:debug": "cross-env BACKEND_DEBUG=1 ELECTRON_DEBUG=1 vite",
-
     "typecheck": "concurrently \"pnpm run typecheck:ts\" \"pnpm run typecheck:py\"",
     "typecheck:ts": "tsc --noEmit",
     "typecheck:py": "cd backend && uv run pyright",
     "backend:test": "cd backend && uv sync --frozen --extra test --extra dev && uv run pytest -v --tb=short",
-
     "build:mac": "bash scripts/local-build.sh --platform mac",
     "build:win": "powershell -ExecutionPolicy Bypass -File scripts/local-build.ps1",
     "build:mac:skip-python": "bash scripts/local-build.sh --platform mac --skip-python",
@@ -29,7 +26,6 @@
     "prepare:python:mac": "bash scripts/prepare-python.sh",
     "prepare:python:win": "powershell -ExecutionPolicy Bypass -File scripts/prepare-python.ps1",
     "build:frontend": "vite build",
-
     "start:unpacked:mac": "open release/mac-arm64/LTX\\ Desktop.app",
     "start:unpacked:win": "powershell -Command \"& '.\\release\\win-unpacked\\LTX Desktop.exe'\""
   },
@@ -54,7 +50,7 @@
     "autoprefixer": "^10.4.19",
     "concurrently": "^8.2.2",
     "cross-env": "^10.1.0",
-    "electron": "^31.0.0",
+    "electron": "^40.6.1",
     "electron-builder": "^26.8.1",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
