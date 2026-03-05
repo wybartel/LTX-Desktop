@@ -50,11 +50,6 @@ export function useRegeneration(params: UseRegenerationParams) {
   const [regeneratingAssetId, setRegeneratingAssetId] = useState<string | null>(null)
   const [regeneratingClipId, setRegeneratingClipId] = useState<string | null>(null)
 
-  // Retake state
-  const [retakeClipId, setRetakeClipId] = useState<string | null>(null)
-  const [isRetaking, setIsRetaking] = useState(false)
-  const [retakeStatus, setRetakeStatus] = useState('')
-
   // IC-LoRA panel state
   const [showICLoraPanel, setShowICLoraPanel] = useState(false)
   const [icLoraSourceClipId, setIcLoraSourceClipId] = useState<string | null>(null)
@@ -259,6 +254,16 @@ export function useRegeneration(params: UseRegenerationParams) {
       }
     }
 
+    if (params.mode === 'retake') {
+      setRegeneratingAssetId(null)
+      setRegeneratingClipId(null)
+      if (clipId) {
+        setClips(prev => prev.map(c => c.id === clipId ? { ...c, isRegenerating: false } : c))
+      }
+      setRegenerationPreError('Retake assets cannot be regenerated yet. Try using Retake from the clip menu instead.')
+      return
+    }
+
     if (params.mode === 'text-to-image') {
       regenGenerateImage(params.prompt, {
         model: params.model as 'fast' | 'pro',
@@ -378,88 +383,6 @@ export function useRegeneration(params: UseRegenerationParams) {
     // Do NOT call regenReset() — let the error dialog handle it
   }, [regenError, regeneratingAssetId, isRegenerating])
 
-  // Retake: regenerate a section of a video clip via LTX Cloud API
-  const handleRetakeSubmit = useCallback(async (params: {
-    videoPath: string
-    startTime: number
-    duration: number
-    prompt: string
-    mode: string
-  }) => {
-    if (!retakeClipId || !currentProjectId) return
-
-    const clip = clips.find(c => c.id === retakeClipId)
-    if (!clip) return
-    const asset = clip.assetId ? assets.find(a => a.id === clip.assetId) : null
-
-    setIsRetaking(true)
-    setRetakeStatus('Uploading video and calling Retake API...')
-
-    try {
-      const backendUrl = await window.electronAPI.getBackendUrl()
-      const response = await fetch(`${backendUrl}/api/retake`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          video_path: params.videoPath,
-          start_time: params.startTime,
-          duration: params.duration,
-          prompt: params.prompt,
-          mode: params.mode,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok && data.status === 'complete' && data.video_path) {
-        setRetakeStatus('Retake complete! Adding as new take...')
-
-        const pathNormalized = data.video_path.replace(/\\/g, '/')
-        const retakeUrl = pathNormalized.startsWith('/') ? `file://${pathNormalized}` : `file:///${pathNormalized}`
-
-        if (asset && currentProjectId) {
-          const newTakeIdx = asset.takes ? asset.takes.length : 1
-
-          addTakeToAsset(currentProjectId, asset.id, {
-            url: retakeUrl,
-            path: data.video_path,
-            createdAt: Date.now(),
-          })
-
-          // Update the video clip AND all linked audio clips to the new take
-          setClips(prev => {
-            const sourceClip = prev.find(c => c.id === retakeClipId)
-            const linkedIds = new Set(sourceClip?.linkedClipIds || [])
-            linkedIds.add(retakeClipId!)
-
-            return prev.map(c => {
-              if (!linkedIds.has(c.id)) return c
-              if (c.assetId !== asset.id) return c
-              return { ...c, takeIndex: newTakeIdx }
-            })
-          })
-        }
-
-        setRetakeClipId(null)
-      } else {
-        const errorMsg = data.error || 'Unknown error'
-        setRetakeStatus(`Error: ${errorMsg}`)
-        logger.error(`Retake failed: ${errorMsg}`)
-        setTimeout(() => {
-          setRetakeStatus('')
-        }, 5000)
-      }
-    } catch (error) {
-      logger.error(`Retake error: ${error}`)
-      setRetakeStatus(`Error: ${(error as Error).message}`)
-      setTimeout(() => {
-        setRetakeStatus('')
-      }, 5000)
-    } finally {
-      setIsRetaking(false)
-    }
-  }, [retakeClipId, clips, assets, currentProjectId, addTakeToAsset])
-
   // IC-LoRA result handler
   const handleICLoraResult = useCallback((result: { videoPath: string; sourceClipId: string | null }) => {
     if (!currentProjectId) return
@@ -557,9 +480,6 @@ export function useRegeneration(params: UseRegenerationParams) {
     // State
     regeneratingAssetId, setRegeneratingAssetId,
     regeneratingClipId, setRegeneratingClipId,
-    retakeClipId, setRetakeClipId,
-    isRetaking, setIsRetaking,
-    retakeStatus, setRetakeStatus,
     showICLoraPanel, setShowICLoraPanel,
     icLoraSourceClipId, setIcLoraSourceClipId,
     i2vClipId, setI2vClipId,
@@ -573,7 +493,6 @@ export function useRegeneration(params: UseRegenerationParams) {
     handleI2vGenerate,
     handleRegenerate,
     handleCancelRegeneration,
-    handleRetakeSubmit,
     handleICLoraResult,
     handleClipTakeChange,
     handleDeleteTake,

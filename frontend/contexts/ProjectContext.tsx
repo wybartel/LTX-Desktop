@@ -50,6 +50,25 @@ interface ProjectContextType {
   setGenSpaceEditMode: (mode: 'image' | 'video' | null) => void
   genSpaceAudioUrl: string | null
   setGenSpaceAudioUrl: (url: string | null) => void
+  genSpaceRetakeSource: GenSpaceRetakeSource | null
+  setGenSpaceRetakeSource: (source: GenSpaceRetakeSource | null) => void
+  pendingRetakeUpdate: PendingRetakeUpdate | null
+  setPendingRetakeUpdate: (update: PendingRetakeUpdate | null) => void
+}
+
+export interface GenSpaceRetakeSource {
+  videoUrl: string
+  videoPath: string
+  clipId?: string
+  assetId?: string
+  linkedClipIds?: string[]
+  duration?: number
+}
+
+export interface PendingRetakeUpdate {
+  assetId: string
+  clipIds: string[]
+  newTakeIndex: number
 }
 
 const ProjectContext = createContext<ProjectContextType | null>(null)
@@ -138,6 +157,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [genSpaceEditImageUrl, setGenSpaceEditImageUrl] = useState<string | null>(null)
   const [genSpaceEditMode, setGenSpaceEditMode] = useState<'image' | 'video' | null>(null)
   const [genSpaceAudioUrl, setGenSpaceAudioUrl] = useState<string | null>(null)
+  const [genSpaceRetakeSource, setGenSpaceRetakeSource] = useState<GenSpaceRetakeSource | null>(null)
+  const [pendingRetakeUpdate, setPendingRetakeUpdate] = useState<PendingRetakeUpdate | null>(null)
   // Initialize with data from localStorage
   const [projects, setProjects] = useState<Project[]>(() => loadProjectsFromStorage())
   const isInitializedRef = useRef(false)
@@ -498,6 +519,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       setGenSpaceEditMode,
       genSpaceAudioUrl,
       setGenSpaceAudioUrl,
+      genSpaceRetakeSource,
+      setGenSpaceRetakeSource,
+      pendingRetakeUpdate,
+      setPendingRetakeUpdate,
     }}>
       {children}
     </ProjectContext.Provider>

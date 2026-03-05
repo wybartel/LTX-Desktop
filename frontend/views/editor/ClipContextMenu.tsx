@@ -23,7 +23,6 @@ export interface ClipContextMenuProps {
   isRegenerating: boolean
   i2vClipId: string | null
   assets: Asset[]
-  isRetaking: boolean
   assetGridRef: React.RefObject<HTMLDivElement | null>
   currentProjectId: string | null
   updateAsset: (projectId: string, assetId: string, updates: Partial<Asset>) => void
@@ -50,7 +49,7 @@ export interface ClipContextMenuProps {
   setSelectedAssetIds: React.Dispatch<React.SetStateAction<Set<string>>>
   setI2vClipId: (v: string | null) => void
   setI2vPrompt: (v: string) => void
-  setRetakeClipId: (v: string | null) => void
+  onRetakeClip: (clip: TimelineClip) => void
   setIcLoraSourceClipId: (v: string | null) => void
   setShowICLoraPanel: (v: boolean) => void
   onCaptureFrameForVideo: (clip: TimelineClip) => void
@@ -103,7 +102,6 @@ export function ClipContextMenu({
   isRegenerating,
   i2vClipId,
   assets,
-  isRetaking,
   assetGridRef,
   currentProjectId,
   updateAsset,
@@ -130,7 +128,7 @@ export function ClipContextMenu({
   setSelectedAssetIds,
   setI2vClipId,
   setI2vPrompt,
-  setRetakeClipId,
+  onRetakeClip,
   setIcLoraSourceClipId, // IC-LORA HIDDEN: still passed to SingleClipMenu
   setShowICLoraPanel, // IC-LORA HIDDEN: still passed to SingleClipMenu
   onCaptureFrameForVideo,
@@ -225,7 +223,7 @@ export function ClipContextMenu({
           clips={clips}
           hasClipboard={hasClipboard}
           isRegenerating={isRegenerating} i2vClipId={i2vClipId}
-          assets={assets} isRetaking={isRetaking}
+          assets={assets}
           assetGridRef={assetGridRef}
           currentProjectId={currentProjectId}
           updateAsset={updateAsset}
@@ -247,7 +245,7 @@ export function ClipContextMenu({
           setSelectedAssetIds={setSelectedAssetIds}
           setI2vClipId={setI2vClipId}
           setI2vPrompt={setI2vPrompt}
-          setRetakeClipId={setRetakeClipId}
+          onRetakeClip={onRetakeClip}
           setIcLoraSourceClipId={setIcLoraSourceClipId}
           setShowICLoraPanel={setShowICLoraPanel}
           onCaptureFrameForVideo={onCaptureFrameForVideo}
@@ -273,7 +271,7 @@ export function ClipContextMenu({
    ────────────────────────────────────────────── */
 function SingleClipMenu({
   contextClip, clips, hasClipboard,
-  isRegenerating, i2vClipId, assets, isRetaking, assetGridRef,
+  isRegenerating, i2vClipId, assets, assetGridRef,
   currentProjectId, updateAsset,
   handleCopy, handleCut, handlePaste, pushUndo, setClips,
   handleRegenerate, handleCancelRegeneration,
@@ -281,7 +279,7 @@ function SingleClipMenu({
   duplicateClip, splitClipAtPlayhead, removeClip, updateClip,
   getLiveAsset, getMaxClipDuration,
   setAssetFilter, setSelectedBin, setTakesViewAssetId, setSelectedAssetIds,
-  setI2vClipId, setI2vPrompt, setRetakeClipId,   setIcLoraSourceClipId: _setIcLoraSourceClipId, setShowICLoraPanel: _setShowICLoraPanel, // IC-LORA HIDDEN
+  setI2vClipId, setI2vPrompt, onRetakeClip, setIcLoraSourceClipId: _setIcLoraSourceClipId, setShowICLoraPanel: _setShowICLoraPanel, // IC-LORA HIDDEN
   onCaptureFrameForVideo,
   onCreateVideoFromAudio,
   close,
@@ -290,7 +288,7 @@ function SingleClipMenu({
   clips: TimelineClip[]
   hasClipboard: boolean
   isRegenerating: boolean; i2vClipId: string | null
-  assets: Asset[]; isRetaking: boolean
+  assets: Asset[]
   assetGridRef: React.RefObject<HTMLDivElement | null>
   currentProjectId: string | null
   updateAsset: (projectId: string, assetId: string, updates: Partial<Asset>) => void
@@ -312,7 +310,7 @@ function SingleClipMenu({
   setSelectedAssetIds: React.Dispatch<React.SetStateAction<Set<string>>>
   setI2vClipId: (v: string | null) => void
   setI2vPrompt: (v: string) => void
-  setRetakeClipId: (v: string | null) => void
+  onRetakeClip: (clip: TimelineClip) => void
   setIcLoraSourceClipId: (v: string | null) => void
   setShowICLoraPanel: (v: boolean) => void
   onCaptureFrameForVideo: (clip: TimelineClip) => void
@@ -524,7 +522,7 @@ function SingleClipMenu({
           {isVideo && contextClip.assetId && (
             <>
               <MenuItem icon={Film} iconClass="text-blue-400" label="Retake Section"
-                disabled={isRetaking} onClick={() => { setRetakeClipId(contextClip.id); close() }} />
+                onClick={() => { onRetakeClip(contextClip); close() }} />
               {/* IC-LORA HIDDEN - IC-LoRA context menu item hidden because IC-LoRA is broken on server
               <MenuItem icon={Sparkles} iconClass="text-amber-400" label="IC-LoRA / Style Transfer"
                 onClick={() => { setIcLoraSourceClipId(contextClip.id); setShowICLoraPanel(true); close() }} />

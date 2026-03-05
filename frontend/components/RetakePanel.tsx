@@ -1,25 +1,24 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Play, Pause, Volume2, VolumeX, Loader2, Film } from 'lucide-react'
+import { Film, Play, Pause, Volume2, VolumeX, Loader2, Upload, Trash2, RefreshCw } from 'lucide-react'
 import { logger } from '../lib/logger'
+import { fileUrlToPath } from '../lib/url-to-path'
 
-type RetakeMode = 'replace_audio_and_video' | 'replace_video' | 'replace_audio'
-
-interface RetakeModalProps {
-  isOpen: boolean
-  videoUrl: string
-  videoPath: string
-  clipName: string
-  videoDuration: number
-  onClose: () => void
-  onSubmit: (params: {
-    videoPath: string
+interface RetakePanelProps {
+  initialVideoUrl?: string | null
+  initialVideoPath?: string | null
+  initialDuration?: number
+  resetKey?: number
+  isProcessing?: boolean
+  processingStatus?: string
+  fillHeight?: boolean
+  onChange?: (data: {
+    videoUrl: string | null
+    videoPath: string | null
     startTime: number
     duration: number
-    prompt: string
-    mode: RetakeMode
+    videoDuration: number
+    ready: boolean
   }) => void
-  isProcessing: boolean
-  processingStatus: string
 }
 
 const MIN_DURATION = 2
@@ -30,52 +29,92 @@ function formatTimecode(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${s.toFixed(2).padStart(5, '0')}`
 }
 
-export function RetakeModal({
-  isOpen,
-  videoUrl,
-  videoPath,
-  clipName,
-  videoDuration,
-  onClose,
-  onSubmit,
-  isProcessing,
-  processingStatus,
-}: RetakeModalProps) {
+function pathToFileUrl(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/')
+  return normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`
+}
+
+export function RetakePanel({
+  initialVideoUrl,
+  initialVideoPath,
+  initialDuration,
+  resetKey,
+  isProcessing = false,
+  processingStatus = '',
+  fillHeight = false,
+  onChange,
+}: RetakePanelProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const filmstripRef = useRef<HTMLDivElement>(null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(initialVideoUrl || null)
+  const [videoPath, setVideoPath] = useState<string | null>(initialVideoPath || null)
+  const [videoDuration, setVideoDuration] = useState<number>(initialDuration || 0)
+
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [currentTime, setCurrenTime] = useState(0)
+  const [isDragOver, setIsDragOver] = useState(false)
 
-  // Selection handles (in seconds)
   const [selStart, setSelStart] = useState(0)
-  const [selEnd, setSelEnd] = useState(Math.min(videoDuration, 5))
+  const [selEnd, setSelEnd] = useState(Math.min(videoDuration || 0, 5))
   const [draggingHandle, setDraggingHandle] = useState<'start' | 'end' | 'range' | null>(null)
   const dragStartRef = useRef<{ mouseX: number; selStart: number; selEnd: number } | null>(null)
+  const initialSelectionAppliedRef = useRef(false)
 
-  const [prompt, setPrompt] = useState('')
-
-  // Filmstrip thumbnails
   const [thumbnails, setThumbnails] = useState<string[]>([])
   const [thumbCount] = useState(20)
   const extractingRef = useRef(false)
 
-  // Reset state when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (resetKey === undefined) return
+    setVideoUrl(initialVideoUrl || null)
+    setVideoPath(initialVideoPath || null)
+    setVideoDuration(initialDuration || 0)
+    setIsPlaying(false)
+    setCurrenTime(0)
+    setSelStart(0)
+    setSelEnd(Math.min(initialDuration || 0, 5))
+    setThumbnails([])
+    extractingRef.current = false
+    initialSelectionAppliedRef.current = false
+  }, [resetKey, initialVideoUrl, initialVideoPath, initialDuration])
+
+  useEffect(() => {
+    if (!videoUrl) {
+      setVideoDuration(0)
       setIsPlaying(false)
       setCurrenTime(0)
       setSelStart(0)
-      setSelEnd(Math.min(videoDuration, 5))
-      setPrompt('')
+      setSelEnd(0)
       setThumbnails([])
       extractingRef.current = false
+      initialSelectionAppliedRef.current = false
+      return
     }
-  }, [isOpen, videoDuration])
+    initialSelectionAppliedRef.current = false
+  }, [videoUrl, initialDuration])
 
-  // Extract filmstrip thumbnails
   useEffect(() => {
-    if (!isOpen || !videoUrl || extractingRef.current || videoDuration <= 0) return
+    if (!videoUrl || videoDuration <= 0 || initialSelectionAppliedRef.current) return
+    setSelStart(0)
+    setSelEnd(Math.min(videoDuration, 5))
+    initialSelectionAppliedRef.current = true
+  }, [videoDuration, videoUrl])
+
+  useEffect(() => {
+    const ready = !!videoPath && (selEnd - selStart) >= MIN_DURATION
+    onChange?.({
+      videoUrl,
+      videoPath,
+      startTime: selStart,
+      duration: selEnd - selStart,
+      videoDuration,
+      ready,
+    })
+  }, [videoUrl, videoPath, selStart, selEnd, videoDuration, onChange])
+
+  useEffect(() => {
+    if (!videoUrl || extractingRef.current || videoDuration <= 0) return
     extractingRef.current = true
 
     const extractThumbnails = async () => {
@@ -120,16 +159,24 @@ export function RetakeModal({
     extractThumbnails().catch(err => {
       logger.warn(`Filmstrip extraction failed: ${err}`)
     })
-  }, [isOpen, videoUrl, videoDuration, thumbCount])
+  }, [videoUrl, videoDuration, thumbCount])
 
-  // Video time update
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
     const handler = () => setCurrenTime(video.currentTime)
+    const onLoaded = () => {
+      if ((initialDuration || 0) <= 0 && video.duration && Number.isFinite(video.duration)) {
+        setVideoDuration(video.duration)
+      }
+    }
     video.addEventListener('timeupdate', handler)
-    return () => video.removeEventListener('timeupdate', handler)
-  }, [isOpen])
+    video.addEventListener('loadedmetadata', onLoaded)
+    return () => {
+      video.removeEventListener('timeupdate', handler)
+      video.removeEventListener('loadedmetadata', onLoaded)
+    }
+  }, [videoUrl])
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current
@@ -150,9 +197,7 @@ export function RetakeModal({
     setIsMuted(video.muted)
   }, [])
 
-  // Keyboard shortcuts: Space, I, O, arrow keys — intercept so timeline doesn't get them
   useEffect(() => {
-    if (!isOpen) return
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       const key = e.key.toLowerCase()
@@ -165,7 +210,6 @@ export function RetakeModal({
       } else if (key === 'i') {
         e.preventDefault()
         e.stopPropagation()
-        // Mark In — move selection start to current playback time
         if (video) {
           const t = video.currentTime
           if (t < selEnd - MIN_DURATION) setSelStart(t)
@@ -173,7 +217,6 @@ export function RetakeModal({
       } else if (key === 'o') {
         e.preventDefault()
         e.stopPropagation()
-        // Mark Out — move selection end to current playback time
         if (video) {
           const t = video.currentTime
           if (t > selStart + MIN_DURATION) setSelEnd(t)
@@ -181,7 +224,6 @@ export function RetakeModal({
       } else if (key === 'arrowleft') {
         e.preventDefault()
         e.stopPropagation()
-        // Step back 1 frame
         if (video) {
           video.pause()
           setIsPlaying(false)
@@ -190,14 +232,12 @@ export function RetakeModal({
       } else if (key === 'arrowright') {
         e.preventDefault()
         e.stopPropagation()
-        // Step forward 1 frame
         if (video) {
           video.pause()
           setIsPlaying(false)
           video.currentTime = Math.min(videoDuration, video.currentTime + 1 / 24)
         }
       } else if (key === 'j' || key === 'k' || key === 'l') {
-        // Capture JKL so timeline shuttle doesn't activate
         e.preventDefault()
         e.stopPropagation()
         if (key === 'k') {
@@ -207,18 +247,15 @@ export function RetakeModal({
         }
       }
     }
-    // Use capture phase so this fires before the timeline's window-level listener
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
-  }, [isOpen, togglePlay, selStart, selEnd, videoDuration])
+  }, [togglePlay, selStart, selEnd, videoDuration])
 
-  // Refs for latest selection values so the drag effect never reads stale state
   const selStartRef = useRef(selStart)
   selStartRef.current = selStart
   const selEndRef = useRef(selEnd)
   selEndRef.current = selEnd
 
-  // Handle drag on the filmstrip handles or the range itself
   const handleFilmstripMouseDown = useCallback((e: React.MouseEvent, handle: 'start' | 'end' | 'range') => {
     e.preventDefault()
     e.stopPropagation()
@@ -236,13 +273,11 @@ export function RetakeModal({
       const rect = strip.getBoundingClientRect()
 
       if (draggingHandle === 'range') {
-        // Move the entire range as a chunk
         const dx = e.clientX - origin.mouseX
         const dtSeconds = (dx / rect.width) * videoDuration
         const rangeDuration = origin.selEnd - origin.selStart
         let newStart = origin.selStart + dtSeconds
         let newEnd = origin.selEnd + dtSeconds
-        // Clamp to bounds
         if (newStart < 0) { newStart = 0; newEnd = rangeDuration }
         if (newEnd > videoDuration) { newEnd = videoDuration; newStart = videoDuration - rangeDuration }
         setSelStart(Math.max(0, newStart))
@@ -273,7 +308,6 @@ export function RetakeModal({
     }
   }, [draggingHandle, videoDuration])
 
-  // Seek video when clicking on the filmstrip (outside the selected range)
   const handleFilmstripClick = useCallback((e: React.MouseEvent) => {
     if (draggingHandle) return
     const strip = filmstripRef.current
@@ -284,17 +318,65 @@ export function RetakeModal({
     video.currentTime = fraction * videoDuration
   }, [draggingHandle, videoDuration])
 
-  const handleSubmit = useCallback(() => {
-    onSubmit({
-      videoPath,
-      startTime: selStart,
-      duration: selEnd - selStart,
-      prompt,
-      mode: 'replace_audio_and_video',
+  const handleBrowse = useCallback(async () => {
+    const paths = await window.electronAPI.showOpenFileDialog({
+      title: 'Select Video',
+      filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'avi', 'webm', 'mkv'] }],
     })
-  }, [videoPath, selStart, selEnd, prompt, onSubmit])
+    if (paths && paths.length > 0) {
+      const filePath = paths[0]
+      setVideoPath(filePath)
+      setVideoUrl(pathToFileUrl(filePath))
+      setThumbnails([])
+      extractingRef.current = false
+    }
+  }, [])
 
-  if (!isOpen) return null
+  const handleClear = useCallback(() => {
+    setVideoUrl(null)
+    setVideoPath(null)
+    setVideoDuration(0)
+    setIsPlaying(false)
+    setCurrenTime(0)
+    setSelStart(0)
+    setSelEnd(0)
+    setThumbnails([])
+    extractingRef.current = false
+    initialSelectionAppliedRef.current = false
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const assetData = e.dataTransfer.getData('asset')
+    if (assetData) {
+      try {
+        const asset = JSON.parse(assetData) as { type?: string; url?: string; path?: string }
+        if (asset.type === 'video' && asset.url) {
+          const path = asset.path || fileUrlToPath(asset.url) || null
+          setVideoUrl(asset.url)
+          setVideoPath(path)
+          setThumbnails([])
+          extractingRef.current = false
+          return
+        }
+      } catch {
+        // fall through to file handling
+      }
+    }
+
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      const filePath = (file as any).path as string | undefined
+      if (filePath) {
+        setVideoPath(filePath)
+        setVideoUrl(pathToFileUrl(filePath))
+        setThumbnails([])
+        extractingRef.current = false
+      }
+    }
+  }, [])
 
   const selStartFrac = videoDuration > 0 ? selStart / videoDuration : 0
   const selEndFrac = videoDuration > 0 ? selEnd / videoDuration : 1
@@ -302,39 +384,70 @@ export function RetakeModal({
   const selDuration = selEnd - selStart
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div
-        className="bg-zinc-900 rounded-xl border border-zinc-700 shadow-2xl w-[640px] max-h-[90vh] flex flex-col overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800">
+    <div className={`bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col ${fillHeight ? 'h-full min-h-0' : ''}`}>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Film className="h-4 w-4 text-blue-400" />
+          <span className="text-sm font-semibold text-white">Retake</span>
+          {videoPath && (
+            <span className="text-xs text-zinc-500 truncate max-w-[240px]">
+              {videoPath.split(/[/\\]/).pop()}
+            </span>
+          )}
+        </div>
+        {videoUrl && (
           <div className="flex items-center gap-2">
-            <Film className="h-4 w-4 text-blue-400" />
-            <span className="text-sm font-semibold text-white">Retake</span>
-            <span className="text-xs text-zinc-500 truncate max-w-[200px]">{clipName}</span>
+            <button
+              onClick={handleClear}
+              className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+              title="Clear video"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={handleBrowse}
+              className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+              title="Replace video"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!videoUrl ? (
+        <div
+          className={`p-8 flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-xl m-4 transition-colors ${
+            isDragOver ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700'
+          }`}
+          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={handleDrop}
+        >
+          <div className="p-3 rounded-full bg-zinc-800">
+            <Upload className="h-5 w-5 text-zinc-400" />
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-white">Drop a video to retake</p>
+            <p className="text-xs text-zinc-500">mp4, mov, avi, webm, mkv</p>
           </div>
           <button
-            onClick={onClose}
-            disabled={isProcessing}
-            className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors disabled:opacity-50"
+            onClick={handleBrowse}
+            className="px-4 py-1.5 text-xs font-medium rounded-md bg-white text-black hover:bg-zinc-200 transition-colors"
           >
-            <X className="h-4 w-4" />
+            Browse
           </button>
         </div>
-
-        {/* Scrollable content area */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {/* Video Preview */}
-          <div className="relative bg-black flex-shrink-0">
+      ) : (
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="relative bg-black flex-1 min-h-0">
             <video
               ref={videoRef}
               src={videoUrl}
-              className="w-full max-h-[320px] object-contain"
+              className="w-full h-full object-contain"
               onClick={togglePlay}
               onEnded={() => setIsPlaying(false)}
             />
-            {/* Play/Mute overlay */}
             <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
               <button
                 onClick={toggleMute}
@@ -345,30 +458,27 @@ export function RetakeModal({
             </div>
           </div>
 
-          {/* Playback bar */}
-          <div className="flex items-center justify-center gap-3 px-5 py-2 bg-zinc-900 border-b border-zinc-800">
-            <button
-              onClick={togglePlay}
-              className="p-1 rounded hover:bg-zinc-800 text-white transition-colors"
-            >
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </button>
-            <span className="text-xs font-mono text-zinc-400">
-              {formatTimecode(currentTime)} / {formatTimecode(videoDuration)}
-            </span>
-          </div>
+          <div className="flex-shrink-0">
+            <div className="flex items-center justify-center gap-3 px-4 py-2 bg-zinc-900 border-b border-zinc-800">
+              <button
+                onClick={togglePlay}
+                className="p-1 rounded hover:bg-zinc-800 text-white transition-colors"
+              >
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </button>
+              <span className="text-xs font-mono text-zinc-400">
+                {formatTimecode(currentTime)} / {formatTimecode(videoDuration)}
+              </span>
+            </div>
 
-          {/* Section selector instructions */}
-          <div className="px-5 pt-3 pb-1">
-            <p className="text-xs font-semibold text-white">Select the video part to regenerate</p>
-            <p className="text-[10px] text-zinc-500 mt-0.5">
-              Then tap continue and describe what should happen in the prompt panel
-            </p>
-          </div>
+            <div className="px-4 pt-3 pb-1">
+              <p className="text-xs font-semibold text-white">Select the video part to regenerate</p>
+              <p className="text-[10px] text-zinc-500 mt-0.5">
+                Use the prompt panel below to describe what should happen
+              </p>
+            </div>
 
-          {/* Filmstrip section selector */}
-          <div className="px-5 pb-3">
-            {/* Playhead notch sits above the filmstrip */}
+            <div className="px-4 pb-4">
             <div className="relative h-3 mb-0">
               <div
                 className="absolute pointer-events-none z-10"
@@ -384,7 +494,6 @@ export function RetakeModal({
               className="relative h-14 rounded-md overflow-hidden cursor-pointer select-none"
               onClick={handleFilmstripClick}
             >
-              {/* Thumbnail strip background */}
               <div className="absolute inset-0 flex">
                 {thumbnails.length > 0 ? (
                   thumbnails.map((thumb, i) => (
@@ -404,7 +513,6 @@ export function RetakeModal({
                 )}
               </div>
 
-              {/* Dimmed regions outside selection */}
               <div
                 className="absolute top-0 bottom-0 left-0 bg-black/75 pointer-events-none"
                 style={{ width: `${selStartFrac * 100}%` }}
@@ -414,7 +522,6 @@ export function RetakeModal({
                 style={{ width: `${(1 - selEndFrac) * 100}%` }}
               />
 
-              {/* Solid white overlay on the selected range */}
               <div
                 className="absolute top-0 bottom-0 bg-white pointer-events-none"
                 style={{
@@ -423,7 +530,6 @@ export function RetakeModal({
                 }}
               />
 
-              {/* Draggable range area (grab the middle to slide the whole selection) */}
               <div
                 className={`absolute top-0 bottom-0 z-[12] ${draggingHandle === 'range' ? 'cursor-grabbing' : 'cursor-grab'}`}
                 style={{
@@ -433,7 +539,6 @@ export function RetakeModal({
                 onMouseDown={(e) => handleFilmstripMouseDown(e, 'range')}
               />
 
-              {/* Selection border (blue frame) */}
               <div
                 className="absolute top-0 bottom-0 border-2 border-blue-500 pointer-events-none"
                 style={{
@@ -442,7 +547,6 @@ export function RetakeModal({
                 }}
               />
 
-              {/* Start handle — wide hit area */}
               <div
                 className="absolute top-0 bottom-0 cursor-ew-resize z-20 group"
                 style={{ left: `calc(${selStartFrac * 100}% - 6px)`, width: '20px' }}
@@ -455,7 +559,6 @@ export function RetakeModal({
                 <div className="absolute bottom-0 bg-blue-500 group-hover:bg-blue-400 transition-colors" style={{ left: '5px', width: '10px', height: '3px', borderRadius: '0 0 0 2px' }} />
               </div>
 
-              {/* End handle — wide hit area */}
               <div
                 className="absolute top-0 bottom-0 cursor-ew-resize z-20 group"
                 style={{ left: `calc(${selEndFrac * 100}% - 14px)`, width: '20px' }}
@@ -468,13 +571,11 @@ export function RetakeModal({
                 <div className="absolute bottom-0 bg-blue-500 group-hover:bg-blue-400 transition-colors" style={{ right: '5px', width: '10px', height: '3px', borderRadius: '0 0 2px 0' }} />
               </div>
 
-              {/* Playhead line */}
               <div
                 className="absolute top-0 bottom-0 w-0.5 bg-zinc-800 pointer-events-none z-[15]"
                 style={{ left: `${playheadFrac * 100}%` }}
               />
 
-              {/* Timecode label at center of selection */}
               <div
                 className="absolute top-1/2 pointer-events-none z-10"
                 style={{
@@ -488,67 +589,24 @@ export function RetakeModal({
               </div>
             </div>
 
-            {/* Selection time labels */}
-            <div className="flex justify-between mt-1.5">
-              <span className="text-[10px] font-mono text-blue-400">{formatTimecode(selStart)}</span>
-              <span className="text-[10px] font-mono text-zinc-500">Duration: {formatTimecode(selDuration)}</span>
-              <span className="text-[10px] font-mono text-blue-400">{formatTimecode(selEnd)}</span>
-            </div>
-          </div>
-
-          {/* Prompt */}
-          <div className="px-5 pb-3 space-y-3 border-t border-zinc-800 pt-3">
-            {/* Prompt input */}
-            <div>
-              <label className="text-[11px] font-medium text-zinc-400 block mb-1.5">
-                Prompt <span className="text-zinc-600">(optional)</span>
-              </label>
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                disabled={isProcessing}
-                placeholder="Describe what should happen in the selected section..."
-                className="w-full h-16 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 resize-none focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50"
-              />
-            </div>
-          </div>
-
-          {/* Processing status */}
-          {isProcessing && (
-            <div className="px-5 pb-3">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600/10 border border-blue-500/20">
-                <Loader2 className="h-3.5 w-3.5 text-blue-400 animate-spin flex-shrink-0" />
-                <span className="text-xs text-blue-300">{processingStatus || 'Processing retake...'}</span>
+              <div className="flex justify-between mt-1.5">
+                <span className="text-[10px] font-mono text-blue-400">{formatTimecode(selStart)}</span>
+                <span className="text-[10px] font-mono text-zinc-500">Duration: {formatTimecode(selDuration)}</span>
+                <span className="text-[10px] font-mono text-blue-400">{formatTimecode(selEnd)}</span>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Footer buttons */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-800 flex-shrink-0">
-          <button
-            onClick={onClose}
-            disabled={isProcessing}
-            className="px-4 py-1.5 text-xs text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isProcessing || selDuration < MIN_DURATION}
-            className="px-5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              'Continue'
+            {isProcessing && (
+              <div className="px-4 pb-4">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600/10 border border-blue-500/20">
+                  <Loader2 className="h-3.5 w-3.5 text-blue-400 animate-spin flex-shrink-0" />
+                  <span className="text-xs text-blue-300">{processingStatus || 'Processing retake...'}</span>
+                </div>
+              </div>
             )}
-          </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

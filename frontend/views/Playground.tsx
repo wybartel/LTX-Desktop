@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Sparkles, Trash2, Square, ImageIcon, ArrowLeft } from 'lucide-react'
+import { Sparkles, Trash2, Square, ImageIcon, ArrowLeft, Scissors } from 'lucide-react'
 import { logger } from '../lib/logger'
 import { ImageUploader } from '../components/ImageUploader'
 import { AudioUploader } from '../components/AudioUploader'
@@ -12,11 +12,13 @@ import { ModelStatusDropdown } from '../components/ModelStatusDropdown'
 import { Textarea } from '../components/ui/textarea'
 import { Button } from '../components/ui/button'
 import { useGeneration } from '../hooks/use-generation'
+import { useRetake } from '../hooks/use-retake'
 import { useBackend } from '../hooks/use-backend'
 import { useProjects } from '../contexts/ProjectContext'
 import { useAppSettings } from '../contexts/AppSettingsContext'
 import { fileUrlToPath } from '../lib/url-to-path'
 import { sanitizeForcedApiVideoSettings } from '../lib/api-video-options'
+import { RetakePanel } from '../components/RetakePanel'
 
 const DEFAULT_SETTINGS: GenerationSettings = {
   model: 'fast',
@@ -77,11 +79,41 @@ export function Playground() {
     cancel,
     reset,
   } = useGeneration()
+
+  const {
+    submitRetake,
+    resetRetake,
+    isRetaking,
+    retakeStatus,
+    retakeError,
+    retakeResult,
+  } = useRetake()
+
+  const [retakeInput, setRetakeInput] = useState({
+    videoUrl: null as string | null,
+    videoPath: null as string | null,
+    startTime: 0,
+    duration: 0,
+    videoDuration: 0,
+    ready: false,
+  })
+  const [retakePanelKey, setRetakePanelKey] = useState(0)
   
   // Ref to store generated image URL for "Create video" flow
   const generatedImageRef = useRef<string | null>(null)
 
   const handleGenerate = () => {
+    if (mode === 'retake') {
+      if (!retakeInput.videoPath || retakeInput.duration < 2) return
+      submitRetake({
+        videoPath: retakeInput.videoPath,
+        startTime: retakeInput.startTime,
+        duration: retakeInput.duration,
+        prompt,
+        mode: 'replace_audio_and_video',
+      })
+      return
+    }
     const effectiveVideoSettings = forceApiGenerations
       ? sanitizeForcedApiVideoSettings(settings)
       : settings
@@ -119,12 +151,26 @@ export function Playground() {
     const baseDefaults = { ...DEFAULT_SETTINGS }
     setSettings(forceApiGenerations ? sanitizeForcedApiVideoSettings(baseDefaults) : baseDefaults)
     if (mode !== 'text-to-image') setMode('text-to-video')
+    setRetakeInput({
+      videoUrl: null,
+      videoPath: null,
+      startTime: 0,
+      duration: 0,
+      videoDuration: 0,
+      ready: false,
+    })
+    setRetakePanelKey((prev) => prev + 1)
+    resetRetake()
     reset()
   }
 
-  const isVideoMode = mode !== 'text-to-image'
-  const canGenerate = processStatus === 'alive' && !isGenerating && !!prompt.trim() && (
-    isVideoMode || mode === 'text-to-image'
+  const isRetakeMode = mode === 'retake'
+  const isVideoMode = mode === 'text-to-video' || mode === 'image-to-video'
+  const isBusy = isRetakeMode ? isRetaking : isGenerating
+  const canGenerate = processStatus === 'alive' && !isBusy && (
+    isRetakeMode
+      ? retakeInput.ready && !!retakeInput.videoPath
+      : !!prompt.trim()
   )
 
   return (
@@ -167,11 +213,11 @@ export function Playground() {
             <ModeTabs
               mode={mode}
               onModeChange={handleModeChange}
-              disabled={isGenerating}
+              disabled={isBusy}
             />
 
             {/* Image Upload - Always shown in video mode (optional: makes it I2V) */}
-            {isVideoMode && (
+            {isVideoMode && !isRetakeMode && (
               <>
                 <ImageUploader
                   selectedImage={selectedImage}
@@ -184,6 +230,15 @@ export function Playground() {
               </>
             )}
 
+            {isRetakeMode && (
+              <RetakePanel
+                resetKey={retakePanelKey}
+                isProcessing={isRetaking}
+                processingStatus={retakeStatus}
+                onChange={(data) => setRetakeInput(data)}
+              />
+            )}
+
             {/* Prompt Input */}
             <Textarea
               label="Prompt"
@@ -193,30 +248,32 @@ export function Playground() {
               helperText="Longer, detailed prompts lead to better, more accurate results."
               charCount={prompt.length}
               maxChars={5000}
-              disabled={isGenerating}
+              disabled={isBusy}
             />
 
             {/* Settings */}
-            <SettingsPanel
-              settings={settings}
-              onSettingsChange={setSettings}
-              disabled={isGenerating}
-              mode={mode}
-              forceApiGenerations={forceApiGenerations}
-              hasAudio={!!selectedAudio}
-            />
+            {!isRetakeMode && (
+              <SettingsPanel
+                settings={settings}
+                onSettingsChange={setSettings}
+                disabled={isBusy}
+                mode={mode}
+                forceApiGenerations={forceApiGenerations}
+                hasAudio={!!selectedAudio}
+              />
+            )}
 
             {/* Error Display */}
-            {generationError && (
+            {(generationError || retakeError) && (
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm">
-                {generationError.includes('TEXT_ENCODING_NOT_CONFIGURED') ? (
+                {(generationError || retakeError)!.includes('TEXT_ENCODING_NOT_CONFIGURED') ? (
                   <div className="space-y-2">
                     <p className="text-red-400 font-medium">Text encoding not configured</p>
                     <p className="text-red-400/80">
                       To generate videos, you need to set up text encoding in Settings.
                     </p>
                   </div>
-                ) : generationError.includes('TEXT_ENCODER_NOT_DOWNLOADED') ? (
+                ) : (generationError || retakeError)!.includes('TEXT_ENCODER_NOT_DOWNLOADED') ? (
                   <div className="space-y-2">
                     <p className="text-red-400 font-medium">Text encoder not downloaded</p>
                     <p className="text-red-400/80">
@@ -224,7 +281,7 @@ export function Playground() {
                     </p>
                   </div>
                 ) : (
-                  <span className="text-red-400">{generationError}</span>
+                  <span className="text-red-400">{generationError || retakeError}</span>
                 )}
               </div>
             )}
@@ -234,7 +291,7 @@ export function Playground() {
               <Button
                 variant="outline"
                 onClick={handleClearAll}
-                disabled={isGenerating}
+                disabled={isBusy}
                 className="flex items-center gap-2 border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700"
               >
                 <Trash2 className="h-4 w-4" />
@@ -255,7 +312,12 @@ export function Playground() {
                   disabled={!canGenerate}
                   className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white disabled:bg-zinc-700 disabled:text-zinc-500"
                 >
-                  {mode === 'text-to-image' ? (
+                  {isRetakeMode ? (
+                    <>
+                      <Scissors className="h-4 w-4" />
+                      {isRetaking ? 'Retaking...' : 'Retake'}
+                    </>
+                  ) : mode === 'text-to-image' ? (
                     <>
                       <ImageIcon className="h-4 w-4" />
                       Generate image
@@ -281,6 +343,15 @@ export function Playground() {
               progress={progress}
               statusMessage={statusMessage}
               onCreateVideo={handleCreateVideoFromImage}
+            />
+          ) : mode === 'retake' ? (
+            <VideoPlayer
+              videoUrl={retakeResult?.videoUrl || null}
+              videoPath={retakeResult?.videoPath || null}
+              videoResolution={settings.videoResolution}
+              isGenerating={isRetaking}
+              progress={0}
+              statusMessage={retakeStatus}
             />
           ) : (
             <VideoPlayer

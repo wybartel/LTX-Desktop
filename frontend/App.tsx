@@ -254,10 +254,10 @@ function AppContent() {
     </div>
   ) : null
 
-  const showGlobalControls = currentView !== 'home' && status.connected && !setupState.needsSetup
+  const showGlobalControls = currentView !== 'home' && status.connected && setupState !== 'loading' && !setupState.needsSetup
   const shouldBlockUntilSettingsLoaded = forceApiGenerations && !isLoaded
   const shouldShowForcedFirstRunUpsell = isForcedFirstRun && isLoaded && !settings.hasLtxApiKey
-  const shouldShowGlobalForcedUpsell = forceApiGenerations && !setupState.needsSetup && isLoaded && !settings.hasLtxApiKey
+  const shouldShowGlobalForcedUpsell = forceApiGenerations && setupState !== 'loading' && !setupState.needsSetup && isLoaded && !settings.hasLtxApiKey
   const shouldBlockForLtxKey = shouldShowForcedFirstRunUpsell || shouldShowGlobalForcedUpsell
 
   useEffect(() => {

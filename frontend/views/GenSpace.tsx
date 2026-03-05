@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
-  Plus, Trash2, Download, Image, Video, X,
+  Trash2, Download, Image, Video, X,
   Heart, Film, Volume2, VolumeX, Sparkles,
-  Clock, Monitor, ChevronUp, Scissors, AudioLines, Music,
+  Clock, Monitor, ChevronUp, Scissors, Music,
   ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useProjects } from '../contexts/ProjectContext'
+import type { GenSpaceRetakeSource } from '../contexts/ProjectContext'
 import { useAppSettings } from '../contexts/AppSettingsContext'
 import { useGeneration } from '../hooks/use-generation'
+import { useRetake } from '../hooks/use-retake'
 import type { Asset } from '../types/project'
 import { GenerationErrorDialog } from '../components/GenerationErrorDialog'
 import { copyToAssetFolder } from '../lib/asset-copy'
@@ -19,6 +21,7 @@ import {
   sanitizeForcedApiVideoSettings,
 } from '../lib/api-video-options'
 import { logger } from '../lib/logger'
+import { RetakePanel } from '../components/RetakePanel'
 
 // Asset card with hover overlays
 function AssetCard({ 
@@ -299,13 +302,19 @@ function PromptBar({
   settings,
   onSettingsChange,
   forceApiGenerations,
+  canGenerate,
+  buttonLabel,
+  buttonIcon,
 }: {
-  mode: 'image' | 'video'
-  onModeChange: (mode: 'image' | 'video') => void
+  mode: 'image' | 'video' | 'retake'
+  onModeChange: (mode: 'image' | 'video' | 'retake') => void
   prompt: string
   onPromptChange: (prompt: string) => void
   onGenerate: () => void
   isGenerating: boolean
+  canGenerate: boolean
+  buttonLabel: string
+  buttonIcon: React.ReactNode
   inputImage: string | null
   onInputImageChange: (url: string | null) => void
   inputAudio: string | null
@@ -327,6 +336,7 @@ function PromptBar({
   const audioInputRef = useRef<HTMLInputElement>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [isAudioDragOver, setIsAudioDragOver] = useState(false)
+  const isRetake = mode === 'retake'
   const LOCAL_MAX_DURATION: Record<string, number> = { '540p': 20, '720p': 10, '1080p': 5 }
   const localMaxDuration = LOCAL_MAX_DURATION[settings.videoResolution] ?? 20
   const videoDurationOptions = forceApiGenerations
@@ -406,7 +416,7 @@ function PromptBar({
   }
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && prompt.trim() && !isGenerating) {
+    if (e.key === 'Enter' && !e.shiftKey && !isGenerating && canGenerate) {
       e.preventDefault()
       onGenerate()
     }
@@ -417,7 +427,7 @@ function PromptBar({
       {/* Top row: Image ref | Prompt | Generate */}
       <div className="flex items-start">
         {/* Input image drop zone — video mode only (I2V) */}
-        {mode === 'video' && (
+        {mode === 'video' && !isRetake && (
           <div
             className={`relative w-10 h-10 mx-2 mt-2 rounded-lg border-2 border-dashed transition-colors flex items-center justify-center flex-shrink-0 cursor-pointer ${
               isDragOver ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700 hover:border-zinc-500'
@@ -451,7 +461,7 @@ function PromptBar({
         )}
 
         {/* Audio drop zone — only in video mode */}
-        {mode === 'video' && (
+        {mode === 'video' && !isRetake && (
           <div
             className={`relative w-10 h-10 mt-2 rounded-lg border-2 border-dashed transition-colors flex items-center justify-center flex-shrink-0 cursor-pointer ${
               isAudioDragOver ? 'border-emerald-500 bg-emerald-500/10' : inputAudio ? 'border-emerald-600' : 'border-zinc-700 hover:border-zinc-500'
@@ -491,9 +501,11 @@ function PromptBar({
             value={prompt}
             onChange={(e) => onPromptChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={mode === 'image'
-              ? "A close-up of a woman talking on the phone..."
-              : "The woman sips from a cup of coffee..."
+            placeholder={mode === 'retake'
+              ? "Describe what should happen in the selected section..."
+              : mode === 'image'
+                ? "A close-up of a woman talking on the phone..."
+                : "The woman sips from a cup of coffee..."
             }
             className="w-full bg-transparent text-white text-sm placeholder:text-zinc-500 focus:outline-none px-2 py-2 resize-none overflow-y-auto h-[70px] leading-5"
           />
@@ -507,16 +519,16 @@ function PromptBar({
         <SettingsDropdown
           title="MODE"
           value={mode}
-          onChange={(v) => onModeChange(v as 'image' | 'video')}
+          onChange={(v) => onModeChange(v as 'image' | 'video' | 'retake')}
           options={[
             { value: 'image', label: 'Generate Images', icon: <Image className="h-4 w-4" /> },
             { value: 'video', label: 'Generate Videos', icon: <Video className="h-4 w-4" /> },
-            { value: 'retake', label: 'Retake', icon: <Scissors className="h-4 w-4" />, disabled: true, tooltip: 'Coming soon' },
+            { value: 'retake', label: 'Retake', icon: <Scissors className="h-4 w-4" /> },
           ]}
           trigger={
             <>
-              {mode === 'image' ? <Image className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
-              <span className="text-zinc-300 font-medium">{mode === 'image' ? 'Image' : 'Video'}</span>
+              {mode === 'image' ? <Image className="h-3.5 w-3.5" /> : mode === 'retake' ? <Scissors className="h-3.5 w-3.5" /> : <Video className="h-3.5 w-3.5" />}
+              <span className="text-zinc-300 font-medium">{mode === 'image' ? 'Image' : mode === 'retake' ? 'Retake' : 'Video'}</span>
               <ChevronUp className="h-3 w-3 text-zinc-500" />
             </>
           }
@@ -524,7 +536,9 @@ function PromptBar({
         
         <div className="flex-1" />
         
-        {mode === 'image' ? (
+        {isRetake ? (
+          <div className="text-[10px] text-zinc-500 pr-2">Trim in the panel above, then retake</div>
+        ) : mode === 'image' ? (
           <>
             {/* Model indicator */}
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-800/50">
@@ -672,15 +686,15 @@ function PromptBar({
         {/* Generate button */}
         <button
           onClick={onGenerate}
-          disabled={isGenerating || !prompt.trim()}
+          disabled={isGenerating || !canGenerate}
           className={`flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all flex-shrink-0 ${
-            isGenerating || !prompt.trim()
+            isGenerating || !canGenerate
               ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
               : 'bg-white text-black hover:bg-zinc-200'
           }`}
         >
-          <Sparkles className={`h-3.5 w-3.5 ${isGenerating ? 'animate-pulse' : ''}`} />
-          Generate
+          <span className={isGenerating ? 'animate-pulse' : ''}>{buttonIcon}</span>
+          {buttonLabel}
         </button>
       </div>
     </div>
@@ -754,9 +768,9 @@ const DEFAULT_VIDEO_SETTINGS = {
 }
 
 export function GenSpace() {
-  const { currentProject, currentProjectId, addAsset, deleteAsset, toggleFavorite, genSpaceEditImageUrl, setGenSpaceEditImageUrl, setGenSpaceEditMode, genSpaceAudioUrl, setGenSpaceAudioUrl } = useProjects()
+  const { currentProject, currentProjectId, addAsset, addTakeToAsset, deleteAsset, toggleFavorite, genSpaceEditImageUrl, setGenSpaceEditImageUrl, setGenSpaceEditMode, genSpaceAudioUrl, setGenSpaceAudioUrl, genSpaceRetakeSource, setGenSpaceRetakeSource, setPendingRetakeUpdate } = useProjects()
   const { forceApiGenerations } = useAppSettings()
-  const [mode, setMode] = useState<'image' | 'video'>('video')
+  const [mode, setMode] = useState<'image' | 'video' | 'retake'>('video')
   const [prompt, setPrompt] = useState('')
   const [inputImage, setInputImage] = useState<string | null>(null)
   const [inputAudio, setInputAudio] = useState<string | null>(null)
@@ -767,6 +781,15 @@ export function GenSpace() {
   const [showSizeMenu, setShowSizeMenu] = useState(false)
   const sizeMenuRef = useRef<HTMLDivElement>(null)
   const persistedVideoKeyRef = useRef<string | null>(null)
+  const retakeSubmissionRef = useRef<{
+    prompt: string
+    input: {
+      videoPath: string | null
+      startTime: number
+      duration: number
+      videoDuration: number
+    }
+  } | null>(null)
   const [settings, setSettings] = useState(() => ({ ...DEFAULT_VIDEO_SETTINGS }))
   const applyForcedVideoSettings = useCallback(
     (next: { model: string; duration: number; videoResolution: string; fps: number; audio: boolean; aspectRatio: string; imageResolution: string; variations: number }) => {
@@ -788,6 +811,31 @@ export function GenSpace() {
     error,
     reset,
   } = useGeneration()
+
+  const {
+    submitRetake,
+    resetRetake,
+    isRetaking,
+    retakeStatus,
+    retakeError,
+    retakeResult,
+  } = useRetake()
+
+  const [retakeInput, setRetakeInput] = useState({
+    videoUrl: null as string | null,
+    videoPath: null as string | null,
+    startTime: 0,
+    duration: 0,
+    videoDuration: 0,
+    ready: false,
+  })
+  const [retakePanelKey, setRetakePanelKey] = useState(0)
+  const [retakeInitial, setRetakeInitial] = useState<{
+    videoUrl: string | null
+    videoPath: string | null
+    duration?: number
+  }>({ videoUrl: null, videoPath: null, duration: undefined })
+  const [activeRetakeSource, setActiveRetakeSource] = useState<GenSpaceRetakeSource | null>(null)
   
   // Handle incoming frame from the Video Editor for editing
   useEffect(() => {
@@ -811,9 +859,29 @@ export function GenSpace() {
   }, [genSpaceAudioUrl, setGenSpaceAudioUrl])
 
   useEffect(() => {
+    if (!genSpaceRetakeSource) return
+    setMode('retake')
+    setPrompt('')
+    setActiveRetakeSource(genSpaceRetakeSource)
+    setRetakeInitial({
+      videoUrl: genSpaceRetakeSource.videoUrl,
+      videoPath: genSpaceRetakeSource.videoPath,
+      duration: genSpaceRetakeSource.duration,
+    })
+    setRetakePanelKey((prev) => prev + 1)
+    setGenSpaceRetakeSource(null)
+  }, [genSpaceRetakeSource, setGenSpaceRetakeSource])
+
+  useEffect(() => {
     if (!forceApiGenerations) return
     setSettings((prev) => applyForcedVideoSettings({ ...prev, model: 'fast' }))
   }, [applyForcedVideoSettings, forceApiGenerations])
+
+  useEffect(() => {
+    if (retakeError) {
+      setLocalError(retakeError)
+    }
+  }, [retakeError])
 
   // Force pro model + resolution when audio is attached (A2V only supports pro @ 1080p 16:9)
   useEffect(() => {
@@ -879,6 +947,68 @@ export function GenSpace() {
       }
     })()
   }, [videoUrl, videoPath, currentProjectId, isGenerating, applyForcedVideoSettings, settings, inputImage, inputAudio, assetSavePath, lastPrompt, addAsset, reset])
+
+  // When retake completes, add as take or new asset
+  useEffect(() => {
+    if (!retakeResult || !currentProjectId || isRetaking) return
+    const submission = retakeSubmissionRef.current
+    if (!submission) return
+    retakeSubmissionRef.current = null
+
+    ;(async () => {
+      const usedPrompt = submission.prompt
+      const usedInput = submission.input
+      const { path: finalPath, url: finalUrl } = await copyToAssetFolder(retakeResult.videoPath, retakeResult.videoUrl, assetSavePath)
+
+      if (activeRetakeSource?.assetId) {
+        const sourceAsset = currentProject?.assets?.find(a => a.id === activeRetakeSource.assetId)
+        if (sourceAsset) {
+          const newTakeIndex = sourceAsset.takes ? sourceAsset.takes.length : 1
+          addTakeToAsset(currentProjectId, sourceAsset.id, {
+            url: finalUrl,
+            path: finalPath,
+            createdAt: Date.now(),
+          })
+          if (activeRetakeSource.linkedClipIds?.length) {
+            setPendingRetakeUpdate({
+              assetId: sourceAsset.id,
+              clipIds: activeRetakeSource.linkedClipIds,
+              newTakeIndex,
+            })
+          }
+        }
+      } else {
+        addAsset(currentProjectId, {
+          type: 'video',
+          path: finalPath,
+          url: finalUrl,
+          prompt: usedPrompt,
+          resolution: '',
+          duration: usedInput.duration,
+          generationParams: {
+            mode: 'retake',
+            prompt: usedPrompt,
+            model: 'pro',
+            duration: usedInput.duration,
+            resolution: '',
+            fps: 24,
+            audio: true,
+            cameraMotion: 'none',
+            retakeVideoPath: finalPath,
+            retakeStartTime: usedInput.startTime,
+            retakeDuration: usedInput.duration,
+            retakeMode: 'replace_audio_and_video',
+          },
+          takes: [{ url: finalUrl, path: finalPath, createdAt: Date.now() }],
+          activeTakeIndex: 0,
+        })
+        setMode('video')
+      }
+
+      setActiveRetakeSource(null)
+      resetRetake()
+    })()
+  }, [retakeResult, isRetaking, currentProjectId, currentProject?.assets, activeRetakeSource, addAsset, addTakeToAsset, assetSavePath, setPendingRetakeUpdate, resetRetake])
   
   // When image generation/editing completes, add all images to project assets
   useEffect(() => {
@@ -921,11 +1051,32 @@ export function GenSpace() {
   }, [imageUrls, currentProjectId, isGenerating])
   
   const handleGenerate = async () => {
+    if (mode === 'retake') {
+      if (!retakeInput.videoPath || retakeInput.duration < 2) return
+      retakeSubmissionRef.current = {
+        prompt,
+        input: {
+          videoPath: retakeInput.videoPath,
+          startTime: retakeInput.startTime,
+          duration: retakeInput.duration,
+          videoDuration: retakeInput.videoDuration,
+        },
+      }
+      await submitRetake({
+        videoPath: retakeInput.videoPath,
+        startTime: retakeInput.startTime,
+        duration: retakeInput.duration,
+        prompt,
+        mode: 'replace_audio_and_video',
+      })
+      return
+    }
+
     if (!prompt.trim()) return
-    
+
     // Save the prompt before generation starts
     setLastPrompt(prompt)
-    
+
     if (mode === 'image') {
       generateImage(
         prompt,
@@ -987,6 +1138,16 @@ export function GenSpace() {
     setInputImage(imageAsset.url)
     setPrompt(`${imageAsset.prompt || 'The scene comes to life...'}`)
   }
+
+  const isRetakeMode = mode === 'retake'
+  const canSubmit = isRetakeMode
+    ? retakeInput.ready && !!retakeInput.videoPath && !isRetaking
+    : !!prompt.trim()
+  const promptButtonLabel = isRetakeMode ? 'Retake' : 'Generate'
+  const promptButtonIcon = isRetakeMode
+    ? <Scissors className="h-3.5 w-3.5" />
+    : <Sparkles className={`h-3.5 w-3.5 ${isGenerating ? 'animate-pulse' : ''}`} />
+  const promptGenerating = isRetakeMode ? isRetaking : isGenerating
   
   // Close size menu on click outside
   useEffect(() => {
@@ -1033,7 +1194,7 @@ export function GenSpace() {
     <div className="h-full relative bg-zinc-950">
 
       {/* Empty state */}
-      {assets.length === 0 && !isGenerating && (
+      {mode !== 'retake' && assets.length === 0 && !isGenerating && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
           <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-zinc-700 flex items-center justify-center mb-4">
             <Sparkles className="h-10 w-10 text-zinc-600" />
@@ -1047,7 +1208,7 @@ export function GenSpace() {
       )}
 
       {/* No favorites empty state */}
-      {showFavorites && filteredAssets.length === 0 && assets.length > 0 && (
+      {mode !== 'retake' && showFavorites && filteredAssets.length === 0 && assets.length > 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
           <Heart className="h-12 w-12 text-zinc-700 mb-4" />
           <h3 className="text-lg font-semibold text-white mb-2">No favorites yet</h3>
@@ -1058,7 +1219,7 @@ export function GenSpace() {
       )}
 
       {/* Assets area — full width, no background, above the prompt bar */}
-      {(assets.length > 0 || isGenerating) && (
+      {mode !== 'retake' && (assets.length > 0 || isGenerating) && (
         <div className="absolute inset-x-0 top-0 bottom-[160px] flex flex-col px-4 pt-4">
           {/* Top bar */}
           <div className="flex items-center justify-end pb-2 gap-2">
@@ -1161,6 +1322,21 @@ export function GenSpace() {
         </div>
       )}
 
+      {mode === 'retake' && (
+        <div className="absolute inset-x-0 top-0 bottom-[160px] px-4 pt-4 pb-4 flex flex-col overflow-hidden">
+          <RetakePanel
+            initialVideoUrl={retakeInitial.videoUrl}
+            initialVideoPath={retakeInitial.videoPath}
+            initialDuration={retakeInitial.duration}
+            resetKey={retakePanelKey}
+            fillHeight
+            isProcessing={isRetaking}
+            processingStatus={retakeStatus}
+            onChange={(data) => setRetakeInput(data)}
+          />
+        </div>
+      )}
+
       {/* Floating prompt panel — wider, responsive, centered */}
       <div className="absolute bottom-5 left-1/2 w-[min(700px,calc(100%-2rem))] -translate-x-1/2">
 
@@ -1171,7 +1347,10 @@ export function GenSpace() {
           prompt={prompt}
           onPromptChange={setPrompt}
           onGenerate={handleGenerate}
-          isGenerating={isGenerating}
+          isGenerating={promptGenerating}
+          canGenerate={canSubmit}
+          buttonLabel={promptButtonLabel}
+          buttonIcon={promptButtonIcon}
           inputImage={inputImage}
           onInputImageChange={setInputImage}
           inputAudio={inputAudio}
@@ -1258,7 +1437,7 @@ export function GenSpace() {
       {(error || localError) && (
         <GenerationErrorDialog
           error={(error || localError)!}
-          onDismiss={() => { if (error) reset(); if (localError) setLocalError(null) }}
+          onDismiss={() => { if (error) reset(); if (localError) { setLocalError(null); resetRetake() } }}
         />
       )}
     </div>

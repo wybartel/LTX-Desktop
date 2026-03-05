@@ -25,7 +25,6 @@ import { ExportModal } from '../components/ExportModal'
 import { MenuBar, type MenuDefinition } from '../components/MenuBar'
 import { ImportTimelineModal } from '../components/ImportTimelineModal'
 import { ClipWaveform } from '../components/AudioWaveform'
-import { RetakeModal } from '../components/RetakeModal'
 // IC-LORA HIDDEN - import { ICLoraPanel } from '../components/ICLoraPanel'
 import type { TimelineClip, Track, SubtitleClip } from '../types/project' // EFFECTS HIDDEN: removed EffectType
 import { DEFAULT_TRACKS } from '../types/project' // EFFECTS HIDDEN: removed EFFECT_DEFINITIONS
@@ -79,6 +78,7 @@ export function VideoEditor() {
     addTimeline, deleteTimeline, renameTimeline, duplicateTimeline,
     setActiveTimeline, updateTimeline, getActiveTimeline,
     setCurrentTab, setGenSpaceEditImageUrl, setGenSpaceEditMode, setGenSpaceAudioUrl,
+    setGenSpaceRetakeSource, pendingRetakeUpdate, setPendingRetakeUpdate,
   } = useProjects()
 
   const { activeLayout: kbLayout, isEditorOpen: isKbEditorOpen, setEditorOpen: setKbEditorOpen } = useKeyboardShortcuts()
@@ -1063,12 +1063,9 @@ export function VideoEditor() {
   const matchFrameRef = useRef<() => void>(() => {})
   
 
-  // Regeneration / retake / I2V hook (state + logic extracted)
+  // Regeneration / I2V hook (state + logic extracted)
   const {
     regeneratingAssetId,
-    retakeClipId, setRetakeClipId,
-    isRetaking,
-    retakeStatus, setRetakeStatus,
     showICLoraPanel: _showICLoraPanel, setShowICLoraPanel: _setShowICLoraPanel, // IC-LORA HIDDEN
     icLoraSourceClipId: _icLoraSourceClipId, setIcLoraSourceClipId: _setIcLoraSourceClipId, // IC-LORA HIDDEN
     i2vClipId, setI2vClipId,
@@ -1076,7 +1073,6 @@ export function VideoEditor() {
     i2vSettings, setI2vSettings,
     handleI2vGenerate,
     handleRegenerate, handleCancelRegeneration,
-    handleRetakeSubmit,
     handleICLoraResult: _handleICLoraResult, // IC-LORA HIDDEN
     handleClipTakeChange, handleDeleteTake,
     regenerationPreError, dismissRegenerationPreError,
@@ -1507,6 +1503,49 @@ export function VideoEditor() {
     setCurrentTab('gen-space')
   }, [assets, setGenSpaceAudioUrl, setCurrentTab])
 
+  // Get the live asset for a clip (from project context, not stale clip.asset)
+  const getLiveAsset = useCallback((clip: TimelineClip) => {
+    if (!clip.assetId) return clip.asset
+    return assets.find(a => a.id === clip.assetId) || clip.asset
+  }, [assets])
+
+  const handleRetakeClip = useCallback((clip: TimelineClip) => {
+    const liveAsset = getLiveAsset(clip)
+    if (!liveAsset) return
+
+    const takeIndex = clip.takeIndex ?? liveAsset.activeTakeIndex
+    let takePath = liveAsset.path
+    let takeUrl = liveAsset.url
+    if (liveAsset.takes && liveAsset.takes.length > 0 && takeIndex !== undefined) {
+      const idx = Math.max(0, Math.min(takeIndex, liveAsset.takes.length - 1))
+      takePath = liveAsset.takes[idx].path
+      takeUrl = liveAsset.takes[idx].url
+    }
+
+    const linkedIds = new Set(clip.linkedClipIds || [])
+    linkedIds.add(clip.id)
+
+    setGenSpaceRetakeSource({
+      videoUrl: takeUrl,
+      videoPath: takePath,
+      clipId: clip.id,
+      assetId: liveAsset.id,
+      linkedClipIds: [...linkedIds],
+      duration: clip.duration || liveAsset.duration,
+    })
+    setCurrentTab('gen-space')
+  }, [getLiveAsset, setGenSpaceRetakeSource, setCurrentTab])
+
+  useEffect(() => {
+    if (!pendingRetakeUpdate) return
+    setClips(prev => prev.map(c => {
+      if (c.assetId !== pendingRetakeUpdate.assetId) return c
+      if (!pendingRetakeUpdate.clipIds.includes(c.id)) return c
+      return { ...c, takeIndex: pendingRetakeUpdate.newTakeIndex }
+    }))
+    setPendingRetakeUpdate(null)
+  }, [pendingRetakeUpdate, setPendingRetakeUpdate, setClips])
+
   // Populate fullscreen ref for keyboard handler
   toggleFullscreenRef.current = toggleFullscreen
 
@@ -1523,12 +1562,6 @@ export function VideoEditor() {
     // Use a special "no clip" context menu: clipId = '' signals background click
     setClipContextMenu({ clipId: '', x: e.clientX, y: e.clientY })
   }
-  
-  // Get the live asset for a clip (from project context, not stale clip.asset)
-  const getLiveAsset = useCallback((clip: TimelineClip) => {
-    if (!clip.assetId) return clip.asset
-    return assets.find(a => a.id === clip.assetId) || clip.asset
-  }, [assets])
   
   // Get the effective URL for a clip (considering its take index)
   const getClipUrl = useCallback((clip: TimelineClip): string | null => {
@@ -3174,15 +3207,10 @@ export function VideoEditor() {
                               {clip.type === 'video' && (
                                 <Tooltip content="Retake section" side="top">
                                   <button
-                                    onClick={() => setRetakeClipId(clip.id)}
-                                    disabled={isRetaking && retakeClipId === clip.id}
-                                    className={`p-0.5 rounded transition-colors ${
-                                      isRetaking && retakeClipId === clip.id
-                                        ? 'text-blue-400'
-                                        : 'hover:bg-white/10 text-zinc-500 hover:text-blue-400'
-                                    }`}
+                                    onClick={() => handleRetakeClip(clip)}
+                                    className="p-0.5 rounded transition-colors hover:bg-white/10 text-zinc-500 hover:text-blue-400"
                                   >
-                                    <Film className={`h-3 w-3 ${isRetaking && retakeClipId === clip.id ? 'animate-pulse' : ''}`} />
+                                    <Film className="h-3 w-3" />
                                   </button>
                                 </Tooltip>
                               )}
@@ -3874,9 +3902,6 @@ export function VideoEditor() {
             setClips={setClips}
             pushUndo={pushUndo}
             handleClipTakeChange={handleClipTakeChange}
-            handleRetakeSubmit={handleRetakeSubmit}
-            retakeClipId={retakeClipId}
-            setRetakeClipId={setRetakeClipId}
             setSubtitleTrackStyleIdx={setSubtitleTrackStyleIdx}
             subtitleTrackStyleIdx={subtitleTrackStyleIdx}
           />
@@ -4011,7 +4036,6 @@ export function VideoEditor() {
             isRegenerating={isRegenerating}
             i2vClipId={i2vClipId}
             assets={assets}
-            isRetaking={isRetaking}
             assetGridRef={assetGridRef}
             currentProjectId={currentProjectId}
             updateAsset={updateAsset}
@@ -4038,7 +4062,7 @@ export function VideoEditor() {
             setSelectedAssetIds={setSelectedAssetIds}
             setI2vClipId={setI2vClipId}
             setI2vPrompt={setI2vPrompt}
-            setRetakeClipId={setRetakeClipId}
+            onRetakeClip={handleRetakeClip}
             setIcLoraSourceClipId={_setIcLoraSourceClipId}
             setShowICLoraPanel={_setShowICLoraPanel}
             onCaptureFrameForVideo={handleCaptureFrameForVideo}
@@ -4119,35 +4143,6 @@ export function VideoEditor() {
               </div>
             </div>
           </div>
-        )
-      })()}
-      
-      {/* Retake modal */}
-      {(() => {
-        const retakeClip = retakeClipId ? clips.find(c => c.id === retakeClipId) : null
-        const retakeAsset = retakeClip?.assetId ? assets.find(a => a.id === retakeClip.assetId) : null
-        const retakeVideoUrl = retakeClip ? (getClipUrl(retakeClip) || retakeClip.asset?.url || '') : ''
-        let retakeVideoPath = ''
-        if (retakeAsset) {
-          if (retakeAsset.takes && retakeAsset.takes.length > 0 && retakeClip?.takeIndex !== undefined) {
-            const idx = Math.max(0, Math.min(retakeClip.takeIndex, retakeAsset.takes.length - 1))
-            retakeVideoPath = retakeAsset.takes[idx].path
-          } else {
-            retakeVideoPath = retakeAsset.path
-          }
-        }
-        return (
-          <RetakeModal
-            isOpen={!!retakeClipId}
-            videoUrl={retakeVideoUrl}
-            videoPath={retakeVideoPath}
-            clipName={retakeAsset?.prompt || retakeClip?.importedName || 'Video Clip'}
-            videoDuration={retakeClip?.duration || retakeAsset?.duration || 5}
-            onClose={() => { if (!isRetaking) { setRetakeClipId(null); setRetakeStatus('') } }}
-            onSubmit={handleRetakeSubmit}
-            isProcessing={isRetaking}
-            processingStatus={retakeStatus}
-          />
         )
       })()}
       

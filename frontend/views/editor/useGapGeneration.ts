@@ -333,8 +333,6 @@ export function useGapGeneration({
       setGeneratingGap(null)
       setGapPrompt('')
       setGapImageFile(null)
-      setGapShotType('none')
-      setGapCameraAngle('none')
       regenReset()
     })()
     

@@ -1,10 +1,10 @@
 import { cn } from '@/lib/utils'
-import { Video, ImageIcon } from 'lucide-react'
+import { Video, ImageIcon, Scissors } from 'lucide-react'
 
-export type GenerationMode = 'text-to-video' | 'image-to-video' | 'text-to-image'
+export type GenerationMode = 'text-to-video' | 'image-to-video' | 'text-to-image' | 'retake'
 
 // Simplified tab modes shown in the UI
-type TabMode = 'video' | 'text-to-image'
+type TabMode = 'video' | 'text-to-image' | 'retake'
 
 interface ModeTabsProps {
   mode: GenerationMode
@@ -15,10 +15,11 @@ interface ModeTabsProps {
 const tabs: { id: TabMode; label: string; genMode: GenerationMode; icon: React.ElementType }[] = [
   { id: 'video', label: 'Video', genMode: 'text-to-video', icon: Video },
   { id: 'text-to-image', label: 'Image', genMode: 'text-to-image', icon: ImageIcon },
+  { id: 'retake', label: 'Retake', genMode: 'retake', icon: Scissors },
 ]
 
 export function ModeTabs({ mode, onModeChange, disabled }: ModeTabsProps) {
-  const activeTab: TabMode = mode === 'text-to-image' ? 'text-to-image' : 'video'
+  const activeTab: TabMode = mode === 'text-to-image' ? 'text-to-image' : mode === 'retake' ? 'retake' : 'video'
 
   return (
     <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
